@@ -75,10 +75,11 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
       const fullNameParts = [firstName, secondName, firstLastName, secondLastName].filter(Boolean);
       const fullName = fullNameParts.join(' ');
 
-      // Insert profile
+      // Insert profile with email
       const { error: profileError } = await supabase.from('user_profiles').insert({
         id: userId,
         full_name: fullName,
+        email: email, // Save the email!
         role: emailConfig?.role || 'Usuario',
         company_id: emailConfig?.company_id || 'iwie-holding',
         department: emailConfig?.department || 'General',
