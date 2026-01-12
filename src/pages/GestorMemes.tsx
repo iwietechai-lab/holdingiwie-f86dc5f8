@@ -275,30 +275,11 @@ export default function GestorMemes() {
               memes.map((meme) => (
                 <Card 
                   key={meme.id} 
-                  className="group border-primary/10 bg-card/50 backdrop-blur hover:border-primary/30 transition-all overflow-hidden"
+                  className="border-primary/10 bg-card/50 backdrop-blur hover:border-primary/30 transition-all overflow-hidden"
                 >
+                  {/* Preview section */}
                   <div className="relative">
                     {renderMemePreview(meme)}
-                    
-                    {/* Overlay on hover */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => handlePlayMeme(meme)}
-                        className="bg-primary hover:bg-primary/90"
-                      >
-                        <Play className="w-4 h-4 mr-1" />
-                        Activar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => window.open(meme.url, '_blank')}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </div>
                     
                     {/* Type badge */}
                     <div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/70 text-xs flex items-center gap-1 text-white">
@@ -307,7 +288,8 @@ export default function GestorMemes() {
                     </div>
                   </div>
                   
-                  <CardContent className="p-3">
+                  <CardContent className="p-3 space-y-3">
+                    {/* Title and delete */}
                     <div className="flex items-center justify-between">
                       <p className="font-medium truncate flex-1">{meme.title}</p>
                       <Button 
@@ -319,9 +301,31 @@ export default function GestorMemes() {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    
+                    <p className="text-xs text-muted-foreground">
                       {meme.createdAt.toLocaleDateString()}
                     </p>
+                    
+                    {/* Always visible action buttons */}
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => handlePlayMeme(meme)}
+                        className="flex-1 bg-primary hover:bg-primary/90"
+                      >
+                        <Play className="w-4 h-4 mr-1" />
+                        Activar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => window.open(meme.url, '_blank')}
+                        title="Abrir en nueva pestaña"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))
