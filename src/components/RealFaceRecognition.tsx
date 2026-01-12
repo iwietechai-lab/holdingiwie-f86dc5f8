@@ -1,8 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle, XCircle, AlertTriangle, Eye, Loader2 } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle, XCircle, AlertTriangle, Eye, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as faceapi from 'face-api.js';
 import { supabase } from '@/lib/supabase';
+
+interface LocationData {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  country?: string;
+}
 
 interface RealFaceRecognitionProps {
   userId: string;
@@ -39,9 +46,79 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const [hasStoredEmbedding, setHasStoredEmbedding] = useState<boolean | null>(null);
   const [blinkDetected, setBlinkDetected] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [gettingLocation, setGettingLocation] = useState(true);
   
   // Eye aspect ratio history for blink detection
   const eyeRatioHistory = useRef<number[]>([]);
+
+  // Get user location
+  const getLocation = useCallback(async (): Promise<LocationData> => {
+    try {
+      setGettingLocation(true);
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          enableHighAccuracy: true,
+        });
+      });
+
+      // Try to get city/country from coordinates using reverse geocoding
+      try {
+        const response = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=es`
+        );
+        const data = await response.json();
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          city: data.city || data.locality || 'Desconocida',
+          country: data.countryName || 'Desconocido',
+        };
+        setLocationData(location);
+        setGettingLocation(false);
+        return location;
+      } catch {
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        setLocationData(location);
+        setGettingLocation(false);
+        return location;
+      }
+    } catch (err) {
+      console.error('Error getting location:', err);
+      setGettingLocation(false);
+      return {};
+    }
+  }, []);
+
+  // Log access with location and timestamp
+  const logAccessWithLocation = useCallback(async (success: boolean, location: LocationData) => {
+    try {
+      const timestamp = new Date().toISOString();
+      
+      const { error } = await supabase.from('access_logs').insert({
+        user_id: userId,
+        timestampt: timestamp,
+        latitude: location.latitude || null,
+        longitude: location.longitude || null,
+        city: location.city || null,
+        country: location.country || null,
+        device_info: navigator.userAgent,
+        success,
+      });
+
+      if (error) {
+        console.error('Error logging access:', error);
+      } else {
+        console.log('Access logged successfully:', { userId, timestamp, location, success });
+      }
+    } catch (error) {
+      console.error('Error logging access:', error);
+    }
+  }, [userId]);
   const blinkCount = useRef(0);
 
   // Load face-api.js models
@@ -305,13 +382,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setInstruction('¡Identidad verificada!');
           stopCamera();
           
-          // Log successful access
-          await supabase.from('access_logs').insert({
-            user_id: userId,
-            timestampt: new Date().toISOString(),
-            device_info: navigator.userAgent,
-            success: true,
-          });
+          // Log successful access with location
+          await logAccessWithLocation(true, locationData || {});
 
           setTimeout(onSuccess, 1500);
         } else {
@@ -348,13 +420,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setInstruction('¡Rostro registrado exitosamente!');
         stopCamera();
 
-        // Log successful access
-        await supabase.from('access_logs').insert({
-          user_id: userId,
-          timestampt: new Date().toISOString(),
-          device_info: navigator.userAgent,
-          success: true,
-        });
+        // Log successful access with location
+        await logAccessWithLocation(true, locationData || {});
 
         setTimeout(onSuccess, 1500);
       } catch (err) {
@@ -382,6 +449,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   // Initialize
   useEffect(() => {
     const init = async () => {
+      // Start getting location immediately
+      getLocation();
+      
       const modelsOk = await loadModels();
       if (modelsOk) {
         await checkStoredEmbedding();
@@ -392,7 +462,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     init();
     
     return () => stopCamera();
-  }, [loadModels, checkStoredEmbedding, startCamera, stopCamera]);
+  }, [loadModels, checkStoredEmbedding, startCamera, stopCamera, getLocation]);
 
   // Start detection when camera is ready
   useEffect(() => {
@@ -495,6 +565,18 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
               {blinkDetected ? '✓ Parpadeo detectado' : 'Parpadea ahora'}
             </div>
           )}
+
+          {/* Location indicator */}
+          <div className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+            locationData ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
+          }`}>
+            <MapPin className="w-3 h-3" />
+            {gettingLocation 
+              ? 'Obteniendo ubicación...' 
+              : locationData?.city 
+                ? `${locationData.city}, ${locationData.country}` 
+                : 'Ubicación no disponible'}
+          </div>
         </div>
 
         {/* Instruction text */}

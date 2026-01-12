@@ -207,25 +207,14 @@ export const useSupabaseAuth = () => {
             return { success: false, error: retryError.message };
           }
 
-          if (retryData.user) {
-            setTimeout(() => {
-              logAccess(retryData.user.id, true);
-            }, 0);
-          }
-
+          // Don't log access here - it will be logged after facial recognition
           return { success: true };
         }
 
         return { success: false, error: error.message };
       }
 
-      if (data.user) {
-        // Log access in background
-        setTimeout(() => {
-          logAccess(data.user.id, true);
-        }, 0);
-      }
-
+      // Don't log access here - it will be logged after facial recognition
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Error de conexión' };
