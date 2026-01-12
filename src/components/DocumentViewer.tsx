@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand } from 'lucide-react';
 
 // Configure PDF.js worker using Vite's URL import
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -22,6 +22,12 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
   const [imageZoom, setImageZoom] = useState(100);
+  
+  // Drag to scroll state
+  const [isDragging, setIsDragging] = useState(false);
+  const [startY, setStartY] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect file type
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
@@ -53,6 +59,38 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     setPageNumber(1);
   };
 
+  // Drag to scroll handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    setStartY(e.clientY);
+    setScrollTop(containerRef.current.scrollTop);
+    containerRef.current.style.cursor = 'grabbing';
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    e.preventDefault();
+    const deltaY = e.clientY - startY;
+    containerRef.current.scrollTop = scrollTop - deltaY;
+  }, [isDragging, startY, scrollTop]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    if (containerRef.current) {
+      containerRef.current.style.cursor = 'grab';
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      if (containerRef.current) {
+        containerRef.current.style.cursor = 'grab';
+      }
+    }
+  }, [isDragging]);
+
   // PDF Viewer with react-pdf
   if (isPdf) {
     return (
@@ -80,10 +118,23 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
               <ZoomIn className="w-4 h-4" />
             </Button>
           </div>
+          
+          <div className="flex items-center gap-1 ml-4 text-xs text-muted-foreground">
+            <Hand className="w-3 h-3" />
+            <span>Arrastra para desplazar</span>
+          </div>
         </div>
 
-        {/* PDF Document with scroll */}
-        <div className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0">
+        {/* PDF Document with drag-to-scroll */}
+        <div 
+          ref={containerRef}
+          className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0 select-none"
+          style={{ cursor: 'grab' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        >
           <div className="flex justify-center">
             {error ? (
               <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
@@ -123,7 +174,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                   }
-                  className="shadow-lg rounded-lg overflow-hidden"
+                  className="shadow-lg rounded-lg overflow-hidden pointer-events-none"
                 />
               </Document>
             )}
@@ -133,7 +184,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     );
   }
 
-  // Image Viewer with zoom controls
+  // Image Viewer with zoom controls and drag-to-scroll
   if (isImage) {
     return (
       <div className="flex flex-col h-full">
@@ -146,18 +197,31 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           <Button variant="outline" size="sm" onClick={imageZoomIn} disabled={imageZoom >= 300}>
             <ZoomIn className="w-4 h-4" />
           </Button>
+          <div className="flex items-center gap-1 ml-4 text-xs text-muted-foreground">
+            <Hand className="w-3 h-3" />
+            <span>Arrastra para desplazar</span>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-muted/10">
+        <div 
+          ref={containerRef}
+          className="flex-1 overflow-auto flex items-center justify-center p-4 bg-muted/10 select-none"
+          style={{ cursor: 'grab' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        >
           <img
             src={url}
             alt={fileName}
-            className="object-contain rounded-lg shadow-lg transition-transform"
+            className="object-contain rounded-lg shadow-lg transition-transform pointer-events-none"
             style={{ 
               maxWidth: `${imageZoom}%`,
               maxHeight: `${imageZoom}%`,
             }}
             onError={() => setError('Error al cargar la imagen')}
+            draggable={false}
           />
         </div>
       </div>
