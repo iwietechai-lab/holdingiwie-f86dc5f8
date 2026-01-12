@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand } from 'lucide-react';
@@ -23,11 +23,14 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const [scale, setScale] = useState(1.0);
   const [imageZoom, setImageZoom] = useState(100);
   
-  // Drag to scroll state
-  const [isDragging, setIsDragging] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
+  // Drag to scroll state using refs for real-time updates
   const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startXRef = useRef(0);
+  const scrollTopRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const [cursorStyle, setCursorStyle] = useState<'grab' | 'grabbing'>('grab');
 
   // Detect file type
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
@@ -59,37 +62,65 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     setPageNumber(1);
   };
 
-  // Drag to scroll handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    setIsDragging(true);
-    setStartY(e.clientY);
-    setScrollTop(containerRef.current.scrollTop);
-    containerRef.current.style.cursor = 'grabbing';
-  }, []);
+  // Drag to scroll handlers using native event listeners for better performance
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    e.preventDefault();
-    const deltaY = e.clientY - startY;
-    containerRef.current.scrollTop = scrollTop - deltaY;
-  }, [isDragging, startY, scrollTop]);
+    const handleMouseDown = (e: MouseEvent) => {
+      // Don't start drag on button clicks
+      if ((e.target as HTMLElement).closest('button')) return;
+      
+      isDraggingRef.current = true;
+      startYRef.current = e.clientY;
+      startXRef.current = e.clientX;
+      scrollTopRef.current = container.scrollTop;
+      scrollLeftRef.current = container.scrollLeft;
+      setCursorStyle('grabbing');
+      e.preventDefault();
+    };
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    if (containerRef.current) {
-      containerRef.current.style.cursor = 'grab';
-    }
-  }, []);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      
+      const deltaY = e.clientY - startYRef.current;
+      const deltaX = e.clientX - startXRef.current;
+      
+      container.scrollTop = scrollTopRef.current - deltaY;
+      container.scrollLeft = scrollLeftRef.current - deltaX;
+    };
 
-  const handleMouseLeave = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      if (containerRef.current) {
-        containerRef.current.style.cursor = 'grab';
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setCursorStyle('grab');
       }
-    }
-  }, [isDragging]);
+    };
+
+    const handleMouseLeave = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setCursorStyle('grab');
+      }
+    };
+
+    // Add event listeners
+    container.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('mouseup', handleMouseUp);
+    container.addEventListener('mouseleave', handleMouseLeave);
+    
+    // Also listen on window for mouseup to handle drag release outside container
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // PDF Viewer with react-pdf
   if (isPdf) {
@@ -129,13 +160,9 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
         <div 
           ref={containerRef}
           className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0 select-none"
-          style={{ cursor: 'grab' }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          style={{ cursor: cursorStyle }}
         >
-          <div className="flex justify-center">
+          <div className="flex justify-center min-w-max">
             {error ? (
               <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
                 <FileText className="w-16 h-16 mb-4 text-destructive/50" />
@@ -174,7 +201,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                   }
-                  className="shadow-lg rounded-lg overflow-hidden pointer-events-none"
+                  className="shadow-lg rounded-lg overflow-hidden"
                 />
               </Document>
             )}
@@ -189,7 +216,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     return (
       <div className="flex flex-col h-full">
         {/* Zoom Controls */}
-        <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border">
+        <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border shrink-0">
           <Button variant="outline" size="sm" onClick={imageZoomOut} disabled={imageZoom <= 50}>
             <ZoomOut className="w-4 h-4" />
           </Button>
@@ -205,24 +232,22 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
         
         <div 
           ref={containerRef}
-          className="flex-1 overflow-auto flex items-center justify-center p-4 bg-muted/10 select-none"
-          style={{ cursor: 'grab' }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          className="flex-1 overflow-auto p-4 bg-muted/10 select-none"
+          style={{ cursor: cursorStyle }}
         >
-          <img
-            src={url}
-            alt={fileName}
-            className="object-contain rounded-lg shadow-lg transition-transform pointer-events-none"
-            style={{ 
-              maxWidth: `${imageZoom}%`,
-              maxHeight: `${imageZoom}%`,
-            }}
-            onError={() => setError('Error al cargar la imagen')}
-            draggable={false}
-          />
+          <div className="flex justify-center items-center min-h-full min-w-max">
+            <img
+              src={url}
+              alt={fileName}
+              className="object-contain rounded-lg shadow-lg"
+              style={{ 
+                width: `${imageZoom}%`,
+                height: 'auto',
+              }}
+              onError={() => setError('Error al cargar la imagen')}
+              draggable={false}
+            />
+          </div>
         </div>
       </div>
     );
