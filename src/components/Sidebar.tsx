@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -8,7 +9,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Rocket
+  Rocket,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -16,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   selectedCompany: string | null;
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile, logout } = useSupabaseAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
@@ -41,9 +43,10 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', action: 'dashboard' },
+    { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
     { icon: Users, label: 'Usuarios', action: 'dev' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
+    { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
   ];
 
@@ -93,13 +96,14 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
             )}
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = item.action === 'dashboard';
+              const isActive = item.path ? location.pathname === item.path : false;
               
               const handleClick = () => {
                 if (item.action === 'dev') {
                   handleDevClick(item.label);
+                } else if (item.action === 'navigate' && item.path) {
+                  navigate(item.path);
                 }
-                // Dashboard is already the current page, no navigation needed
               };
               
               const button = (
