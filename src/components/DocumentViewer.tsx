@@ -162,7 +162,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0 select-none"
           style={{ cursor: cursorStyle }}
         >
-          <div className="flex justify-center min-w-max">
+          <div className="inline-flex justify-center w-full" style={{ minHeight: 'max-content' }}>
             {error ? (
               <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
                 <FileText className="w-16 h-16 mb-4 text-destructive/50" />
