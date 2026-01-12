@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, Mail, Lock, Eye, EyeOff, Sparkles, Shield, MapPin, Clock, Fingerprint, Satellite } from 'lucide-react';
+import { Rocket, Mail, Lock, Eye, EyeOff, Sparkles, Shield, MapPin, Clock, Fingerprint, Satellite, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FaceRecognition } from '@/components/FaceRecognition';
+import { RegisterForm } from '@/components/RegisterForm';
+import { ProfileSetupForm } from '@/components/ProfileSetupForm';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
 
-type LoginStep = 'credentials' | 'face-recognition';
+type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition';
 
 // Animated stars component
 const AnimatedStars = () => {
@@ -38,7 +41,7 @@ const AnimatedStars = () => {
 
 export const Login = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
+  const { login, isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
   const { toast } = useToast();
   
   const [step, setStep] = useState<LoginStep>('credentials');
@@ -46,13 +49,40 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingProfileCheck, setPendingProfileCheck] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated and has profile
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
+    if (isAuthenticated && !authLoading && profile) {
       navigate('/dashboard');
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, authLoading, profile, navigate]);
+
+  // Check if user needs profile setup after login
+  useEffect(() => {
+    const checkProfileExists = async () => {
+      if (isAuthenticated && user && step === 'credentials' && !pendingProfileCheck) {
+        setPendingProfileCheck(true);
+        
+        const { data: existingProfile } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          // New user - needs profile setup
+          setStep('profile-setup');
+        } else {
+          // Existing user - proceed to face recognition
+          setStep('face-recognition');
+        }
+        setPendingProfileCheck(false);
+      }
+    };
+
+    checkProfileExists();
+  }, [isAuthenticated, user, step, pendingProfileCheck]);
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +112,7 @@ export const Login = () => {
     const result = await login(email, password);
     
     if (result.success) {
-      setStep('face-recognition');
+      // Profile check will be handled by useEffect
     } else {
       toast({
         title: 'Error de autenticación',
@@ -92,6 +122,29 @@ export const Login = () => {
     }
     
     setIsLoading(false);
+  };
+
+  const handleRegisterSuccess = async (regEmail: string, regPassword: string) => {
+    // Auto-login after registration
+    setIsLoading(true);
+    const result = await login(regEmail, regPassword);
+    
+    if (result.success) {
+      // Will trigger profile setup via useEffect
+      setEmail(regEmail);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Registro exitoso. Por favor, inicia sesión manualmente.',
+        variant: 'destructive',
+      });
+      setStep('credentials');
+    }
+    setIsLoading(false);
+  };
+
+  const handleProfileSetupComplete = () => {
+    setStep('face-recognition');
   };
 
   const handleFaceRecognitionSuccess = () => {
@@ -112,6 +165,33 @@ export const Login = () => {
         <div className="flex flex-col items-center gap-4">
           <Rocket className="w-12 h-12 text-primary animate-pulse" />
           <p className="text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show profile setup form
+  if (step === 'profile-setup' && user) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
+        {/* Background */}
+        <div 
+          className="absolute inset-0 animate-earth-drift"
+          style={{
+            backgroundImage: `url(${earthImage})`,
+            backgroundSize: '120%',
+            backgroundPosition: 'center',
+          }}
+        />
+        <div className="absolute inset-0 bg-black/70" />
+        <AnimatedStars />
+        
+        <div className="relative z-10 p-4">
+          <ProfileSetupForm
+            userId={user.id}
+            email={user.email || email}
+            onComplete={handleProfileSetupComplete}
+          />
         </div>
       </div>
     );
@@ -176,7 +256,7 @@ export const Login = () => {
         <div className="absolute top-1/4 right-10 w-10 h-10 rounded-full bg-gradient-to-br from-secondary/15 to-accent/15 blur-lg animate-float" style={{ animationDelay: '3s' }} />
       </div>
       
-      {/* Right Side - Login Form (50%) */}
+      {/* Right Side - Login/Register Form (50%) */}
       <div className="relative w-1/2 h-full flex flex-col items-center justify-center overflow-hidden p-6">
         {/* Background with subtle animation */}
         <div 
@@ -213,13 +293,14 @@ export const Login = () => {
               <Shield className="w-7 h-7 text-secondary" />
             </div>
             <CardTitle className="text-xl lg:text-2xl font-bold text-foreground">
-              {step === 'credentials' ? 'Acceso Seguro a IWIE Holding' : 'Verificación Facial'}
+              {step === 'credentials' && 'Acceso Seguro a IWIE Holding'}
+              {step === 'register' && 'Registro de Nuevo Usuario'}
+              {step === 'face-recognition' && 'Verificación Facial'}
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
-              {step === 'credentials' 
-                ? 'Ingresa tus credenciales para acceder al sistema'
-                : 'Verificación de identidad requerida para continuar'
-              }
+              {step === 'credentials' && 'Ingresa tus credenciales para acceder al sistema'}
+              {step === 'register' && 'Crea tu cuenta con un correo autorizado'}
+              {step === 'face-recognition' && 'Verificación de identidad requerida para continuar'}
             </CardDescription>
           </CardHeader>
           
@@ -261,74 +342,97 @@ export const Login = () => {
             )}
             
             {step === 'credentials' ? (
-              <form onSubmit={handleCredentialsSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground text-sm">
-                    Correo Electrónico
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="mauricio@iwie.space"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 bg-input border-border focus:border-primary h-11"
-                      autoComplete="email"
-                    />
+              <>
+                <form onSubmit={handleCredentialsSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-foreground text-sm">
+                      Correo Electrónico
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="tu.email@iwie.space"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 bg-input border-border focus:border-primary h-11"
+                        autoComplete="email"
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-foreground text-sm">
-                    Contraseña
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 bg-input border-border focus:border-primary h-11"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-foreground text-sm">
+                      Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 pr-10 bg-input border-border focus:border-primary h-11"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
+                  
+                  <Button
+                    type="submit"
+                    className="w-full h-12 neon-glow bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Sparkles className="w-5 h-5 animate-spin mr-2" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <Fingerprint className="w-5 h-5 mr-2" />
+                        Continuar con Reconocimiento Facial
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                {/* Register Link */}
+                <div className="pt-4 border-t border-border/50 text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    ¿No tienes cuenta?
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-11"
+                    onClick={() => setStep('register')}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Registrarse
+                  </Button>
                 </div>
-                
-                <Button
-                  type="submit"
-                  className="w-full h-12 neon-glow bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Sparkles className="w-5 h-5 animate-spin mr-2" />
-                      Verificando...
-                    </>
-                  ) : (
-                    <>
-                      <Fingerprint className="w-5 h-5 mr-2" />
-                      Continuar con Reconocimiento Facial
-                    </>
-                  )}
-                </Button>
-              </form>
-            ) : (
+              </>
+            ) : step === 'register' ? (
+              <RegisterForm
+                onBack={() => setStep('credentials')}
+                onSuccess={handleRegisterSuccess}
+              />
+            ) : step === 'face-recognition' ? (
               <FaceRecognition
                 onSuccess={handleFaceRecognitionSuccess}
                 onCancel={handleFaceRecognitionCancel}
               />
-            )}
+            ) : null}
           </CardContent>
         </Card>
         

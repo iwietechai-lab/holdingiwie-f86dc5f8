@@ -2,6 +2,13 @@ import { Company } from '@/types/auth';
 
 export const companies: Company[] = [
   {
+    id: 'iwie-holding',
+    name: 'IWIE Holding',
+    icon: '🚀',
+    color: 'hsl(250, 89%, 65%)',
+    description: 'Holding principal - Dirección General',
+  },
+  {
     id: 'iwie-drones',
     name: 'IWIE Drones',
     icon: '🚁',
@@ -28,6 +35,13 @@ export const companies: Company[] = [
     icon: '⚡',
     color: 'hsl(50, 100%, 50%)',
     description: 'Energías renovables y almacenamiento',
+  },
+  {
+    id: 'iwie-legal',
+    name: 'IWIE Legal',
+    icon: '⚖️',
+    color: 'hsl(220, 60%, 50%)',
+    description: 'Servicios legales y asesoría corporativa',
   },
   {
     id: 'iwie-motors',
