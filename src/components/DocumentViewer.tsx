@@ -1,25 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, Download, FileText } from 'lucide-react';
-
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw } from 'lucide-react';
 
 interface DocumentViewerProps {
   url: string;
   fileName: string;
   mimeType?: string;
-  onDownload?: () => void;
 }
 
-export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: DocumentViewerProps) => {
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.0);
-  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageZoom, setImageZoom] = useState(100);
 
   // Detect file type
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
@@ -28,34 +21,29 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
 
   useEffect(() => {
     let isMounted = true;
+    let objectUrl: string | null = null;
     
     const fetchFile = async () => {
-      if (!isPdf) {
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
         
-        // Fetch the PDF as blob to bypass CORS/blocking issues
+        // Fetch the file as blob to bypass CORS/blocking issues
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('No se pudo descargar el archivo');
         }
         
-        const arrayBuffer = await response.arrayBuffer();
-        // Create a copy as Uint8Array to prevent detached buffer issues
-        const uint8Array = new Uint8Array(arrayBuffer);
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
         
         if (isMounted) {
-          setPdfData(uint8Array);
+          setBlobUrl(objectUrl);
         }
       } catch (err) {
-        console.error('Error fetching PDF:', err);
+        console.error('Error fetching file:', err);
         if (isMounted) {
-          setError('No se pudo cargar el documento. Intenta descargarlo directamente.');
+          setError('No se pudo cargar el documento.');
         }
       } finally {
         if (isMounted) {
@@ -68,18 +56,36 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
     
     return () => {
       isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
-  }, [url, isPdf]);
+  }, [url]);
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setPageNumber(1);
+  const handleRetry = () => {
+    setBlobUrl(null);
+    setError(null);
+    setLoading(true);
+    // Re-trigger by changing state
+    setTimeout(() => {
+      const fetchAgain = async () => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error('Error');
+          const blob = await response.blob();
+          setBlobUrl(URL.createObjectURL(blob));
+        } catch {
+          setError('No se pudo cargar el documento.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchAgain();
+    }, 100);
   };
 
-  const goToPrevPage = () => setPageNumber((prev) => Math.max(prev - 1, 1));
-  const goToNextPage = () => setPageNumber((prev) => Math.min(prev + 1, numPages || 1));
-  const zoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
-  const zoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const zoomIn = () => setImageZoom(prev => Math.min(prev + 25, 300));
+  const zoomOut = () => setImageZoom(prev => Math.max(prev - 25, 50));
 
   if (loading) {
     return (
@@ -90,97 +96,62 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
     );
   }
 
-  if (error) {
+  if (error || !blobUrl) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
         <FileText className="w-16 h-16 mb-4 text-destructive/50" />
         <p className="text-lg font-medium mb-2">Error al cargar</p>
-        <p className="text-sm text-center mb-6">{error}</p>
-        {onDownload && (
-          <Button onClick={onDownload} className="bg-gradient-to-r from-primary to-secondary">
-            <Download className="w-4 h-4 mr-2" />
-            Descargar archivo
-          </Button>
-        )}
+        <p className="text-sm text-center mb-6">{error || 'No se pudo obtener el archivo'}</p>
+        <Button onClick={handleRetry} variant="outline">
+          <RotateCw className="w-4 h-4 mr-2" />
+          Reintentar
+        </Button>
       </div>
     );
   }
 
-  // PDF Viewer
-  if (isPdf && pdfData) {
+  // PDF Viewer using embed element
+  if (isPdf) {
     return (
       <div className="flex flex-col h-full">
-        {/* Controls */}
+        <div className="flex-1 bg-muted/10">
+          <embed
+            src={blobUrl}
+            type="application/pdf"
+            className="w-full h-full"
+            style={{ minHeight: '65vh' }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Image Viewer with zoom controls
+  if (isImage) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Zoom Controls */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToPrevPage}
-            disabled={pageNumber <= 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm px-3">
-            Página {pageNumber} de {numPages || '?'}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToNextPage}
-            disabled={pageNumber >= (numPages || 1)}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <div className="w-px h-6 bg-border mx-2" />
-          <Button variant="outline" size="sm" onClick={zoomOut} disabled={scale <= 0.5}>
+          <Button variant="outline" size="sm" onClick={zoomOut} disabled={imageZoom <= 50}>
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <span className="text-sm px-2">{Math.round(scale * 100)}%</span>
-          <Button variant="outline" size="sm" onClick={zoomIn} disabled={scale >= 3}>
+          <span className="text-sm px-3">{imageZoom}%</span>
+          <Button variant="outline" size="sm" onClick={zoomIn} disabled={imageZoom >= 300}>
             <ZoomIn className="w-4 h-4" />
           </Button>
         </div>
-
-        {/* PDF Document */}
-        <div className="flex-1 overflow-auto flex justify-center p-4 bg-muted/10">
-          <Document
-            file={{ data: pdfData }}
-            onLoadSuccess={onDocumentLoadSuccess}
-            loading={
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Cargando PDF...</span>
-              </div>
-            }
-            error={
-              <div className="text-destructive text-center">
-                <p>Error al renderizar el PDF</p>
-              </div>
-            }
-          >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              className="shadow-lg"
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-            />
-          </Document>
+        
+        <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-muted/10">
+          <img
+            src={blobUrl}
+            alt={fileName}
+            className="object-contain rounded-lg shadow-lg transition-transform"
+            style={{ 
+              maxWidth: `${imageZoom}%`,
+              maxHeight: `${imageZoom}%`,
+            }}
+          />
         </div>
-      </div>
-    );
-  }
-
-  // Image Viewer
-  if (isImage) {
-    return (
-      <div className="flex items-center justify-center h-full p-4 overflow-auto">
-        <img
-          src={url}
-          alt={fileName}
-          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-          onError={() => setError('No se pudo cargar la imagen')}
-        />
       </div>
     );
   }
@@ -188,31 +159,24 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
   // Video Viewer
   if (isVideo) {
     return (
-      <div className="flex items-center justify-center h-full p-4">
+      <div className="flex items-center justify-center h-full p-4 bg-muted/10">
         <video
-          src={url}
+          src={blobUrl}
           controls
           className="max-w-full max-h-full rounded-lg shadow-lg"
-          onError={() => setError('No se pudo cargar el video')}
         />
       </div>
     );
   }
 
-  // Unsupported file type
+  // Unsupported file type - show embedded viewer anyway
   return (
-    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
-      <FileText className="w-16 h-16 mb-4 text-muted-foreground/50" />
-      <p className="text-lg font-medium mb-2">Vista previa no disponible</p>
-      <p className="text-sm text-center mb-6">
-        Este tipo de archivo no puede previsualizarse
-      </p>
-      {onDownload && (
-        <Button onClick={onDownload} className="bg-gradient-to-r from-primary to-secondary">
-          <Download className="w-4 h-4 mr-2" />
-          Descargar archivo
-        </Button>
-      )}
+    <div className="flex-1 bg-muted/10">
+      <embed
+        src={blobUrl}
+        className="w-full h-full"
+        style={{ minHeight: '65vh' }}
+      />
     </div>
   );
 };
