@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Chatbot from "./pages/Chatbot";
 import GestorDocumentos from "./pages/GestorDocumentos";
+import GestorMemes from "./pages/GestorMemes";
 import NotFound from "./pages/NotFound";
 import { IdleOverlay } from "./components/IdleOverlay";
 
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/gestor-documentos" element={<GestorDocumentos />} />
+          <Route path="/gestor-memes" element={<GestorMemes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

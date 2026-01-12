@@ -16,27 +16,46 @@ const IDLE_MESSAGES = [
   "¿Viaje interestelar o siesta cósmica? 💫"
 ];
 
+// Meme type
+interface Meme {
+  id: string;
+  type: 'image' | 'gif' | 'video' | 'youtube';
+  url: string;
+  title: string;
+}
+
+// Helper to extract YouTube video ID
+const getYouTubeVideoId = (url: string): string | null => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
+
 export const IdleOverlay = () => {
   const location = useLocation();
   const [isVisible, setIsVisible] = useState(false);
   const [message, setMessage] = useState(IDLE_MESSAGES[0]);
   const [animationPhase, setAnimationPhase] = useState<'entering' | 'visible' | 'exiting'>('entering');
+  const [customMeme, setCustomMeme] = useState<Meme | null>(null);
 
   // Don't show on login page
   const isLoginPage = location.pathname === '/login' || location.pathname === '/';
 
-  const handleIdle = useCallback(() => {
+  const showOverlay = useCallback((meme?: Meme) => {
     if (!isLoginPage) {
-      // Pick a random message
       const randomMessage = IDLE_MESSAGES[Math.floor(Math.random() * IDLE_MESSAGES.length)];
-      setMessage(randomMessage);
+      setMessage(meme?.title || randomMessage);
+      setCustomMeme(meme || null);
       setAnimationPhase('entering');
       setIsVisible(true);
       
-      // Transition to visible after animation
       setTimeout(() => setAnimationPhase('visible'), 50);
     }
   }, [isLoginPage]);
+
+  const handleIdle = useCallback(() => {
+    showOverlay();
+  }, [showOverlay]);
 
   const handleActive = useCallback(() => {
     if (isVisible) {
@@ -44,17 +63,28 @@ export const IdleOverlay = () => {
     }
   }, [isVisible]);
 
-  const { isIdle, forceActive } = useIdle({
+  const { forceActive } = useIdle({
     timeout: IDLE_TIMEOUT,
     onIdle: handleIdle,
     onActive: handleActive
   });
+
+  // Listen for custom meme trigger events
+  useEffect(() => {
+    const handleMemeEvent = (event: CustomEvent<{ meme: Meme }>) => {
+      showOverlay(event.detail.meme);
+    };
+
+    window.addEventListener('trigger-meme-overlay' as any, handleMemeEvent);
+    return () => window.removeEventListener('trigger-meme-overlay' as any, handleMemeEvent);
+  }, [showOverlay]);
 
   const closeOverlay = useCallback(() => {
     setAnimationPhase('exiting');
     setTimeout(() => {
       setIsVisible(false);
       setAnimationPhase('entering');
+      setCustomMeme(null);
     }, 500);
   }, []);
 
@@ -74,6 +104,67 @@ export const IdleOverlay = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isVisible, handleInteraction]);
+
+  // Render the meme content based on type
+  const renderMemeContent = () => {
+    if (customMeme) {
+      const videoId = customMeme.type === 'youtube' ? getYouTubeVideoId(customMeme.url) : null;
+      
+      switch (customMeme.type) {
+        case 'youtube':
+          return videoId ? (
+            <div className="relative w-[300px] h-[170px] md:w-[480px] md:h-[270px]">
+              <iframe
+                width="100%"
+                height="100%"
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}`}
+                title={customMeme.title}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+              />
+            </div>
+          ) : null;
+        case 'video':
+          return (
+            <video 
+              src={customMeme.url}
+              autoPlay
+              loop
+              controls
+              className="max-w-[480px] max-h-[270px] rounded-lg"
+            />
+          );
+        case 'gif':
+        case 'image':
+        default:
+          return (
+            <img 
+              src={customMeme.url}
+              alt={customMeme.title}
+              className="max-w-[480px] max-h-[400px] rounded-lg object-contain"
+            />
+          );
+      }
+    }
+    
+    // Default: Rick Astley
+    return (
+      <div className="relative w-[300px] h-[170px] md:w-[480px] md:h-[270px]">
+        <iframe
+          width="100%"
+          height="100%"
+          src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ"
+          title="Rick Astley - Never Gonna Give You Up"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="rounded-lg"
+        />
+      </div>
+    );
+  };
 
   if (!isVisible || isLoginPage) return null;
 
@@ -160,7 +251,7 @@ export const IdleOverlay = () => {
           </div>
         </div>
 
-        {/* YouTube Video Embed - Rick Astley */}
+        {/* Meme/Video content */}
         <div 
           className={`relative mb-6 rounded-xl overflow-hidden shadow-2xl shadow-primary/30 border-2 border-primary/50 transition-all duration-1000 ${
             animationPhase === 'visible' ? 'scale-100 rotate-0' : 'scale-50'
@@ -171,19 +262,7 @@ export const IdleOverlay = () => {
             backfaceVisibility: 'hidden'
           }}
         >
-          {/* Video container */}
-          <div className="relative w-[300px] h-[170px] md:w-[480px] md:h-[270px]">
-            <iframe
-              width="100%"
-              height="100%"
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ"
-              title="Rick Astley - Never Gonna Give You Up"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="rounded-lg"
-            />
-          </div>
+          {renderMemeContent()}
           
           {/* Neon glow effect */}
           <div className="absolute inset-0 pointer-events-none rounded-xl ring-2 ring-primary/50 ring-offset-2 ring-offset-black/50" />
