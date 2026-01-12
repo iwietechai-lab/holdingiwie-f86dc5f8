@@ -17,7 +17,7 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
-  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +27,8 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
   const isVideo = mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(fileName);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchFile = async () => {
       if (!isPdf) {
         setLoading(false);
@@ -44,16 +46,29 @@ export const DocumentViewer = ({ url, fileName, mimeType, onDownload }: Document
         }
         
         const arrayBuffer = await response.arrayBuffer();
-        setPdfData(arrayBuffer);
+        // Create a copy as Uint8Array to prevent detached buffer issues
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        if (isMounted) {
+          setPdfData(uint8Array);
+        }
       } catch (err) {
         console.error('Error fetching PDF:', err);
-        setError('No se pudo cargar el documento. Intenta descargarlo directamente.');
+        if (isMounted) {
+          setError('No se pudo cargar el documento. Intenta descargarlo directamente.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchFile();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [url, isPdf]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
