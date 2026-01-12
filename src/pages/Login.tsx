@@ -265,7 +265,7 @@ export const Login = () => {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="correo@iwie.com"
+                      placeholder="mauricio@iwie.space"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-10 bg-input border-border focus:border-primary h-11"

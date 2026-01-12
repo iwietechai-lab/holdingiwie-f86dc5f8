@@ -14,7 +14,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { KPICard } from '@/components/KPICard';
 import { CEOChatbot } from '@/components/CEOChatbot';
 import { SpaceBackground } from '@/components/SpaceBackground';
-import { useAuth } from '@/hooks/useAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { companies, getCompanyById } from '@/data/companies';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -48,7 +48,7 @@ const tasksData = [
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, profile, isAuthenticated, isLoading } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +74,10 @@ export const Dashboard = () => {
   }
 
   const selectedCompanyData = selectedCompany ? getCompanyById(selectedCompany) : null;
+  
+  // Use profile data or fallback to email
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Usuario';
+  const displayRole = profile?.role || 'Usuario';
 
   return (
     <div className="min-h-screen flex">
@@ -101,7 +105,14 @@ export const Dashboard = () => {
             <p className="text-muted-foreground">
               {selectedCompanyData 
                 ? selectedCompanyData.description
-                : `Bienvenido, ${user?.name}. Aquí tienes el resumen de todas las empresas del holding.`
+                : (
+                  <span>
+                    Bienvenido, <span className="text-primary font-semibold">{displayName}</span>
+                    {' - '}
+                    <span className="text-secondary">{displayRole}</span>
+                    . Aquí tienes el resumen de todas las empresas del holding.
+                  </span>
+                )
               }
             </p>
           </header>
