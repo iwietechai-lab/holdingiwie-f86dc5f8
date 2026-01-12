@@ -288,7 +288,7 @@ export const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Companies Overview (only show when no specific company is selected) */}
+          {/* Companies Overview - clicking shows dev modal */}
           {!selectedCompany && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
@@ -300,7 +300,7 @@ export const Dashboard = () => {
                   <Card 
                     key={company.id}
                     className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group"
-                    onClick={() => setSelectedCompany(company.id)}
+                    onClick={() => setShowDevelopmentModal(true)}
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     <CardContent className="p-4">
