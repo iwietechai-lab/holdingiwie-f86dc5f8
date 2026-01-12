@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +28,103 @@ const CEO_RESPONSES = [
   "Cada decisión que tomamos está basada en datos. Los KPIs que ves en el dashboard son nuestra brújula.",
 ];
 
+// Separate ChatContent component to prevent re-renders
+const ChatContentInner = ({
+  messages,
+  isTyping,
+  inputValue,
+  onInputChange,
+  onSend,
+  onKeyDown,
+  scrollRef,
+  textareaRef,
+}: {
+  messages: Message[];
+  isTyping: boolean;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  scrollRef: React.RefObject<HTMLDivElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+}) => (
+  <>
+    <div className="p-4 bg-primary/10 border-b border-border flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+        <Rocket className="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="font-semibold text-foreground">CEO Mauricio</h3>
+        <p className="text-xs text-muted-foreground">Asistente Ejecutivo IA</p>
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+        <span className="text-xs text-muted-foreground">Online</span>
+      </div>
+    </div>
+
+    <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={cn("flex", message.role === 'user' ? "justify-end" : "justify-start")}
+          >
+            <div
+              className={cn(
+                "max-w-[80%] p-3 rounded-lg",
+                message.role === 'user'
+                  ? "bg-primary text-primary-foreground rounded-br-none"
+                  : "bg-muted text-foreground rounded-bl-none"
+              )}
+            >
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-xs opacity-60 mt-1">
+                {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        ))}
+        
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-muted p-3 rounded-lg rounded-bl-none">
+              <div className="flex items-center gap-1">
+                <Sparkles className="w-4 h-4 text-primary animate-spin" />
+                <span className="text-sm text-muted-foreground">Escribiendo...</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </ScrollArea>
+
+    <div className="p-4 border-t border-border">
+      <div className="flex gap-2 items-end">
+        <Textarea
+          ref={textareaRef}
+          value={inputValue}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Escribe tu mensaje..."
+          className="flex-1 bg-input border-border focus:border-primary resize-none min-h-[44px] max-h-[120px] py-3"
+          rows={1}
+        />
+        <Button 
+          onClick={onSend} 
+          disabled={!inputValue.trim() || isTyping} 
+          className="bg-primary hover:bg-primary/80 h-11 w-11 p-0 shrink-0"
+        >
+          <Send className="w-4 h-4" />
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2 text-center">
+        Presiona Enter para enviar, Shift+Enter para nueva línea
+      </p>
+    </div>
+  </>
+);
+
 export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
   const [isOpen, setIsOpen] = useState(fullScreen);
   const [messages, setMessages] = useState<Message[]>([
@@ -54,12 +151,11 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      // Max height of 120px (approximately 5 lines)
       textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`;
     }
   }, [inputValue]);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -85,97 +181,32 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
 
     setMessages(prev => [...prev, assistantMessage]);
     setIsTyping(false);
-  };
+  }, [inputValue]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
 
-  const ChatContent = () => (
-    <>
-      <div className="p-4 bg-primary/10 border-b border-border flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          <Rocket className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-foreground">CEO Mauricio</h3>
-          <p className="text-xs text-muted-foreground">Asistente Ejecutivo IA</p>
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs text-muted-foreground">Online</span>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn("flex", message.role === 'user' ? "justify-end" : "justify-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[80%] p-3 rounded-lg",
-                  message.role === 'user'
-                    ? "bg-primary text-primary-foreground rounded-br-none"
-                    : "bg-muted text-foreground rounded-bl-none"
-                )}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs opacity-60 mt-1">
-                  {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </div>
-          ))}
-          
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-muted p-3 rounded-lg rounded-bl-none">
-                <div className="flex items-center gap-1">
-                  <Sparkles className="w-4 h-4 text-primary animate-spin" />
-                  <span className="text-sm text-muted-foreground">Escribiendo...</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2 items-end">
-          <Textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribe tu mensaje..."
-            className="flex-1 bg-input border-border focus:border-primary resize-none min-h-[44px] max-h-[120px] py-3"
-            rows={1}
-          />
-          <Button 
-            onClick={handleSend} 
-            disabled={!inputValue.trim() || isTyping} 
-            className="bg-primary hover:bg-primary/80 h-11 w-11 p-0 shrink-0"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          Presiona Enter para enviar, Shift+Enter para nueva línea
-        </p>
-      </div>
-    </>
-  );
+  const handleInputChange = useCallback((value: string) => {
+    setInputValue(value);
+  }, []);
 
   if (fullScreen) {
     return (
       <div className="w-full h-full bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        <ChatContent />
+        <ChatContentInner
+          messages={messages}
+          isTyping={isTyping}
+          inputValue={inputValue}
+          onInputChange={handleInputChange}
+          onSend={handleSend}
+          onKeyDown={handleKeyDown}
+          scrollRef={scrollRef}
+          textareaRef={textareaRef}
+        />
       </div>
     );
   }
@@ -194,7 +225,16 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
 
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 animate-scale-in">
-          <ChatContent />
+          <ChatContentInner
+            messages={messages}
+            isTyping={isTyping}
+            inputValue={inputValue}
+            onInputChange={handleInputChange}
+            onSend={handleSend}
+            onKeyDown={handleKeyDown}
+            scrollRef={scrollRef}
+            textareaRef={textareaRef}
+          />
         </div>
       )}
     </>
