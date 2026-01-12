@@ -246,14 +246,15 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                 {/* Render all pages in a vertical list */}
                 {pageNumbers.map((pageNum) => (
                   <div
-                    key={pageNum}
+                    key={`page-${pageNum}-${scale}`}
                     ref={(el) => {
                       if (el) pageRefs.current.set(pageNum, el);
                       else pageRefs.current.delete(pageNum);
                     }}
-                    className="relative"
+                    className="relative mb-4"
                   >
                     <Page
+                      key={`pdf-page-${pageNum}-scale-${scale}`}
                       pageNumber={pageNum}
                       scale={scale}
                       renderTextLayer={false}
