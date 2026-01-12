@@ -64,9 +64,13 @@ export const Dashboard = () => {
 
   // Check if user has full access (CEO or special access list)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && profile && user) {
+    if (!isLoading && isAuthenticated && profile) {
       const isCEO = profile.role === 'CEO Global';
-      const hasAccess = hasFullAccess(user.email || '');
+      // Use user.email for full access check
+      const userEmail = user?.email || '';
+      const hasAccess = hasFullAccess(userEmail);
+      
+      console.log('Dashboard access check:', { userEmail, isCEO, hasAccess, profileRole: profile.role });
       
       if (!isCEO && !hasAccess) {
         // Users without full access: redirect to chatbot only
@@ -97,7 +101,8 @@ export const Dashboard = () => {
   }
 
   // If profile not loaded yet or no access, show loading
-  const userHasAccess = profile?.role === 'CEO Global' || hasFullAccess(user?.email || '');
+  const userEmail = user?.email || '';
+  const userHasAccess = profile?.role === 'CEO Global' || hasFullAccess(userEmail);
   if (!profile || !userHasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
