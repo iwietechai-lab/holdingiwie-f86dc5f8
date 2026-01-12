@@ -118,9 +118,9 @@ export const Login = () => {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col lg:flex-row overflow-hidden">
+    <div className="fixed inset-0 flex flex-row overflow-hidden">
       {/* Left Side - Branding with Earth Background (50%) */}
-      <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-full flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative w-1/2 h-full flex flex-col items-center justify-center overflow-hidden">
         {/* Animated Earth Background */}
         <div 
           className="absolute inset-0 animate-earth-drift"
@@ -138,25 +138,25 @@ export const Login = () => {
         <AnimatedStars />
         
         {/* Content */}
-        <div className="relative z-10 text-center space-y-6 lg:space-y-8 animate-slide-up px-4">
+        <div className="relative z-10 text-center space-y-4 animate-slide-up px-4">
           {/* Logo Icon */}
-          <div className="mx-auto w-20 h-20 lg:w-28 lg:h-28 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center neon-glow animate-pulse-glow border border-primary/30">
-            <Rocket className="w-10 h-10 lg:w-14 lg:h-14 text-primary" />
+          <div className="mx-auto w-20 h-20 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center neon-glow animate-pulse-glow border border-primary/30">
+            <Rocket className="w-10 h-10 text-primary" />
           </div>
           
           {/* Company Name */}
-          <div className="space-y-1 lg:space-y-2">
-            <h1 className="text-3xl lg:text-5xl font-bold neon-text tracking-wider">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-bold neon-text tracking-wider">
               HOLDING
             </h1>
-            <h2 className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent">
+            <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent">
               IWIE
             </h2>
           </div>
           
           {/* Slogan */}
           <div className="relative">
-            <p className="text-lg lg:text-xl text-foreground/90 italic font-light tracking-widest">
+            <p className="text-lg text-foreground/90 italic font-light tracking-widest">
               "Creatividad Colaborativa"
             </p>
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent" />
@@ -165,7 +165,7 @@ export const Login = () => {
           {/* Tagline */}
           <div className="flex items-center justify-center gap-2 text-muted-foreground pt-2">
             <Satellite className="w-4 h-4 text-secondary" />
-            <p className="text-xs lg:text-sm">
+            <p className="text-xs">
               Drones · IA · Energía · Agro · Aeroespacial
             </p>
           </div>
@@ -177,7 +177,7 @@ export const Login = () => {
       </div>
       
       {/* Right Side - Login Form (50%) */}
-      <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-full flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative w-1/2 h-full flex flex-col items-center justify-center overflow-hidden p-6">
         {/* Background with subtle animation */}
         <div 
           className="absolute inset-0 animate-earth-drift opacity-30"
@@ -207,7 +207,7 @@ export const Login = () => {
         </div>
         
         {/* Form Card */}
-        <Card className="relative z-10 w-full max-w-md glass-effect gradient-border animate-slide-up">
+        <Card className="relative z-10 w-full max-w-md glass-effect gradient-border animate-slide-up max-h-[90vh] overflow-y-auto">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-secondary/20 flex items-center justify-center neon-glow-blue border border-secondary/30">
               <Shield className="w-7 h-7 text-secondary" />
