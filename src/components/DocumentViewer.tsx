@@ -1,22 +1,20 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Download, AlertTriangle } from 'lucide-react';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, Hand, AlertTriangle } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
 
 interface DocumentViewerProps {
   url: string;
   fileName: string;
   mimeType?: string;
-  fileSize?: number; // Size in bytes
+  fileSize?: number;
 }
 
-// Threshold for large files (20 MB)
-const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024;
+// Threshold for very large files (50 MB)
+const VERY_LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
 
 // Zoom levels: 50% to 200%
 const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
@@ -32,56 +30,140 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
   const [imageZoom, setImageZoom] = useState(100);
   const [cursorStyle, setCursorStyle] = useState<'grab' | 'grabbing'>('grab');
-  const [useNativeViewer, setUseNativeViewer] = useState(false);
+  const [showLargeFileWarning, setShowLargeFileWarning] = useState(false);
+  const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startXRef = useRef(0);
   const scrollTopRef = useRef(0);
   const scrollLeftRef = useRef(0);
+  const renderTaskRef = useRef<any>(null);
 
   // Detect file type
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
   const isImage = mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
   const isVideo = mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(fileName);
   
-  // Check if file is large (>20MB)
-  const isLargeFile = fileSize && fileSize > LARGE_FILE_THRESHOLD;
+  // Check if file is very large (>50MB)
+  const isVeryLargeFile = fileSize && fileSize > VERY_LARGE_FILE_THRESHOLD;
 
-  // Memoize document options
-  const documentOptions = useMemo(() => ({
-    cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
-    cMapPacked: true,
-    disableRange: false,
-    disableStream: false,
-  }), []);
+  // Load PDF document
+  useEffect(() => {
+    if (!isPdf || !url) return;
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setLoading(false);
-    setError(null);
-  };
+    // Show warning for very large files
+    if (isVeryLargeFile && !showLargeFileWarning) {
+      setShowLargeFileWarning(true);
+      setLoading(false);
+      return;
+    }
 
-  const onDocumentLoadError = (error: Error) => {
-    console.error('PDF load error:', error);
-    setError('No se pudo cargar el documento PDF');
-    setLoading(false);
-    // For large files, suggest native viewer
-    if (isLargeFile) {
-      setUseNativeViewer(true);
+    const loadPdf = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Configure loading with range requests for large files
+        const loadingTask = pdfjsLib.getDocument({
+          url: url,
+          rangeChunkSize: 65536, // 64KB chunks for progressive loading
+          disableAutoFetch: true, // Only fetch pages when needed
+          disableStream: false,
+        });
+
+        const pdf = await loadingTask.promise;
+        setPdfDocument(pdf);
+        setNumPages(pdf.numPages);
+        setLoading(false);
+      } catch (err: any) {
+        console.error('PDF load error:', err);
+        setError('No se pudo cargar el documento PDF');
+        setLoading(false);
+      }
+    };
+
+    loadPdf();
+
+    return () => {
+      if (pdfDocument) {
+        pdfDocument.destroy();
+      }
+    };
+  }, [url, isPdf, isVeryLargeFile, showLargeFileWarning]);
+
+  // Render current page to canvas
+  const renderPage = useCallback(async () => {
+    if (!pdfDocument || !canvasRef.current) return;
+
+    setPageLoading(true);
+
+    try {
+      // Cancel any ongoing render
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+      }
+
+      const page = await pdfDocument.getPage(currentPage);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+
+      if (!context) return;
+
+      // Calculate viewport with scale
+      const viewport = page.getViewport({ scale: scale * 1.5 }); // 1.5x for better quality
+
+      // Set canvas dimensions
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      // Render page
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+        canvas: canvas,
+      };
+
+      renderTaskRef.current = page.render(renderContext as any);
+      await renderTaskRef.current.promise;
+      
+      setPageLoading(false);
+    } catch (err: any) {
+      if (err.name !== 'RenderingCancelledException') {
+        console.error('Page render error:', err);
+        setPageLoading(false);
+      }
+    }
+  }, [pdfDocument, currentPage, scale]);
+
+  // Render page when document, page, or scale changes
+  useEffect(() => {
+    if (pdfDocument && !loading) {
+      renderPage();
+    }
+  }, [pdfDocument, currentPage, scale, loading, renderPage]);
+
+  // Page navigation
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
     }
   };
 
-  // Page navigation
-  const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-  const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, numPages));
+  const goToNextPage = () => {
+    if (currentPage < numPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
   
-  // Zoom handlers
+  // Zoom handlers - limited to 50%-200%
   const zoomIn = () => {
     const currentIndex = ZOOM_LEVELS.findIndex(z => z >= scale);
     const nextIndex = Math.min(currentIndex + 1, ZOOM_LEVELS.length - 1);
@@ -98,15 +180,9 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
   const imageZoomIn = () => setImageZoom(prev => Math.min(prev + 25, 200));
   const imageZoomOut = () => setImageZoom(prev => Math.max(prev - 25, 50));
 
-  const handleRetry = () => {
+  const handleContinueLoading = () => {
+    setShowLargeFileWarning(false);
     setLoading(true);
-    setError(null);
-    setCurrentPage(1);
-    setUseNativeViewer(false);
-  };
-
-  const handleDownload = () => {
-    window.location.href = url;
   };
 
   // Drag to scroll handlers
@@ -160,58 +236,58 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
     };
   }, []);
 
-  // PDF Viewer
+  // PDF Viewer with pdf.js direct rendering
   if (isPdf) {
-    // Large file handling: Show message + native embed + download
-    if (isLargeFile || useNativeViewer) {
+    // Show warning for very large files
+    if (showLargeFileWarning) {
       return (
-        <div className="flex flex-col h-full">
-          {/* Large file notice */}
-          <div className="flex flex-col items-center justify-center p-6 bg-muted/20 border-b border-border">
-            <div className="flex items-center gap-3 text-amber-500 mb-3">
-              <AlertTriangle className="w-6 h-6" />
-              <span className="font-medium">Archivo grande detectado ({fileSize ? formatSize(fileSize) : '>20 MB'})</span>
-            </div>
-            <p className="text-muted-foreground text-center text-sm mb-4">
-              Este archivo es muy grande para renderizarlo en el navegador.<br/>
-              Puedes descargarlo o intentar ver una vista previa básica.
-            </p>
-            <Button 
-              onClick={handleDownload}
-              size="lg"
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Download className="w-5 h-5 mr-2" />
-              Descargar PDF
-            </Button>
-          </div>
-
-          {/* Native browser PDF embed as fallback */}
-          <div className="flex-1 min-h-0" style={{ height: '60vh' }}>
-            <object
-              data={url}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-              className="rounded-lg"
-            >
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <FileText className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-center">
-                  Tu navegador no puede mostrar este PDF.<br/>
-                  Por favor, descárgalo para verlo.
-                </p>
-              </div>
-            </object>
-          </div>
+        <div className="flex flex-col items-center justify-center h-full p-8" style={{ height: '80vh' }}>
+          <AlertTriangle className="w-16 h-16 text-amber-500 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Archivo grande detectado</h3>
+          <p className="text-muted-foreground text-center mb-2">
+            {fileSize ? formatSize(fileSize) : '>50 MB'}
+          </p>
+          <p className="text-muted-foreground text-center text-sm mb-6 max-w-md">
+            Este archivo es muy grande. La carga progresiva puede tardar entre 10-30 segundos.
+            El documento se renderizará página por página para optimizar el rendimiento.
+          </p>
+          <Button onClick={handleContinueLoading} className="bg-primary hover:bg-primary/90">
+            Continuar y cargar documento
+          </Button>
         </div>
       );
     }
 
-    // Normal PDF viewer for small files (<20MB)
+    // Loading state
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full" style={{ height: '80vh' }}>
+          <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
+          <p className="text-muted-foreground">Cargando documento...</p>
+          {isVeryLargeFile && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Archivo grande: puede tardar 10-30 segundos
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Error state
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground" style={{ height: '80vh' }}>
+          <FileText className="w-16 h-16 mb-4 text-destructive/50" />
+          <p className="text-lg font-medium mb-2">Error al cargar PDF</p>
+          <p className="text-sm text-center">{error}</p>
+        </div>
+      );
+    }
+
+    // PDF viewer with canvas
     return (
       <div className="flex flex-col h-full">
-        {/* Controls: Page nav + Zoom */}
+        {/* Controls: Page nav + Zoom only - NO download button */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap shrink-0">
           {/* Page Navigation */}
           <div className="flex items-center gap-2">
@@ -219,30 +295,37 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
               variant="outline" 
               size="sm" 
               onClick={goToPrevPage} 
-              disabled={currentPage <= 1 || loading}
+              disabled={currentPage <= 1 || pageLoading}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-sm px-3 min-w-[100px] text-center">
-              {loading ? '...' : `${currentPage} / ${numPages}`}
+              {pageLoading ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {currentPage} / {numPages}
+                </span>
+              ) : (
+                `${currentPage} / ${numPages}`
+              )}
             </span>
             <Button 
               variant="outline" 
               size="sm" 
               onClick={goToNextPage} 
-              disabled={currentPage >= numPages || loading}
+              disabled={currentPage >= numPages || pageLoading}
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
           
-          {/* Zoom Controls */}
+          {/* Zoom Controls - 50% to 200% */}
           <div className="flex items-center gap-2 ml-4">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={zoomOut} 
-              disabled={scale <= 0.5}
+              disabled={scale <= 0.5 || pageLoading}
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
@@ -253,7 +336,7 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
               variant="outline" 
               size="sm" 
               onClick={zoomIn} 
-              disabled={scale >= 2.0}
+              disabled={scale >= 2.0 || pageLoading}
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
@@ -265,7 +348,7 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
           </div>
         </div>
 
-        {/* PDF Document */}
+        {/* PDF Canvas - single page render for performance */}
         <div 
           ref={containerRef}
           className="flex-1 min-h-0 select-none bg-muted/10 overflow-auto"
@@ -278,56 +361,27 @@ export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentVi
             className="flex justify-center py-4"
             style={{ minWidth: scale > 1 ? 'max-content' : undefined }}
           >
-            {error ? (
-              <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
-                <FileText className="w-16 h-16 mb-4 text-destructive/50" />
-                <p className="text-lg font-medium mb-2">Error al cargar PDF</p>
-                <p className="text-sm text-center mb-6">{error}</p>
-                <div className="flex gap-3">
-                  <Button onClick={handleRetry} variant="outline">
-                    <RotateCw className="w-4 h-4 mr-2" />
-                    Reintentar
-                  </Button>
-                  <Button onClick={handleDownload} variant="default">
-                    <Download className="w-4 h-4 mr-2" />
-                    Descargar
-                  </Button>
+            <div className="relative">
+              {/* Loading overlay for page changes */}
+              {pageLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg z-10">
+                  <div className="flex flex-col items-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                    <span className="text-sm text-muted-foreground">Cargando página...</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <Document
-                file={url}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                options={documentOptions}
-                loading={
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
-                    <p className="text-muted-foreground">Cargando PDF...</p>
-                  </div>
-                }
-                error={
-                  <div className="flex flex-col items-center justify-center py-12 text-destructive">
-                    <FileText className="w-12 h-12 mb-4" />
-                    <p>Error al cargar el documento</p>
-                  </div>
-                }
-              >
-                <Page
-                  key={`page-${currentPage}-scale-${scale}`}
-                  pageNumber={currentPage}
-                  scale={scale}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  loading={
-                    <div className="flex items-center justify-center py-12 min-h-[400px] bg-background/50 rounded-lg">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  }
-                  className="shadow-lg rounded-lg overflow-hidden bg-white"
-                />
-              </Document>
-            )}
+              )}
+              
+              {/* PDF Canvas */}
+              <canvas 
+                ref={canvasRef}
+                className="shadow-lg rounded-lg bg-white"
+                style={{
+                  maxWidth: '100%',
+                  height: 'auto',
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
