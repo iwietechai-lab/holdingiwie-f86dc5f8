@@ -9,9 +9,9 @@ export interface AllowedEmailConfig {
 export const ALLOWED_EMAILS: AllowedEmailConfig[] = [
   {
     email: 'joel@iwie.space',
-    role: 'CEO Global',
-    company_id: 'iwie-holding',
-    department: 'Dirección General',
+    role: 'Gerente Comercial',
+    company_id: 'iwie-drones',
+    department: 'Comercial',
   },
   {
     email: 'hernan@iwie.space',
@@ -45,6 +45,18 @@ export const ALLOWED_EMAILS: AllowedEmailConfig[] = [
     department: 'Dirección General',
   },
 ];
+
+// Users with full platform access (can see all features like CEO)
+export const FULL_ACCESS_EMAILS = [
+  'mauricio@iwie.space',
+  'joel@iwie.space',
+];
+
+export const hasFullAccess = (email: string): boolean => {
+  return FULL_ACCESS_EMAILS.some(
+    (allowedEmail) => allowedEmail.toLowerCase() === email.toLowerCase()
+  );
+};
 
 export const isEmailAllowed = (email: string): boolean => {
   return ALLOWED_EMAILS.some(
