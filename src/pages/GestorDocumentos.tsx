@@ -85,6 +85,7 @@ export const GestorDocumentos = () => {
   const [uploadArea, setUploadArea] = useState('');
   const [uploadIsDevelopment, setUploadIsDevelopment] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Auth check
   useEffect(() => {
@@ -152,13 +153,15 @@ export const GestorDocumentos = () => {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     try {
-      // Upload file
+      // Upload file with progress tracking
       const { path, error: uploadError } = await documentService.uploadFile(
         uploadFile,
         uploadEmpresa,
         uploadArea,
-        user.id
+        user.id,
+        (progress) => setUploadProgress(progress)
       );
 
       if (uploadError) throw uploadError;
@@ -189,6 +192,7 @@ export const GestorDocumentos = () => {
       setUploadEmpresa('');
       setUploadArea('');
       setUploadIsDevelopment(false);
+      setUploadProgress(0);
       setShowUploadModal(false);
 
       // Reload documents
@@ -201,6 +205,7 @@ export const GestorDocumentos = () => {
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -616,6 +621,27 @@ export const GestorDocumentos = () => {
               </Label>
             </div>
 
+            {/* Upload Progress Bar */}
+            {isUploading && (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subiendo archivo...</span>
+                  <span className="font-medium text-primary">{uploadProgress}%</span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {uploadProgress < 100 
+                    ? 'Por favor espera mientras se sube el archivo...' 
+                    : '¡Completado! Guardando registro...'}
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 pt-4">
               <Button
@@ -634,7 +660,7 @@ export const GestorDocumentos = () => {
                 {isUploading ? (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Subiendo...
+                    {uploadProgress}% Subiendo...
                   </>
                 ) : (
                   <>

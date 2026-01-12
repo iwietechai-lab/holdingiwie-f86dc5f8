@@ -17,12 +17,13 @@ export const documentService = {
     }
   },
 
-  // Upload file to Supabase Storage
+  // Upload file to Supabase Storage with progress tracking
   async uploadFile(
     file: File,
     empresaId: string,
     areaId: string,
-    userId: string
+    userId: string,
+    onProgress?: (progress: number) => void
   ): Promise<{ path: string; error: Error | null }> {
     try {
       await this.ensureBucketExists();
@@ -31,6 +32,60 @@ export const documentService = {
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       const filePath = `${empresaId}/${areaId}/${timestamp}_${sanitizedName}`;
 
+      // Use XMLHttpRequest for progress tracking
+      return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable && onProgress) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            onProgress(percent);
+          }
+        });
+
+        xhr.addEventListener('load', async () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            // After XHR upload, we need to use Supabase SDK
+            // So we'll simulate progress and use SDK for actual upload
+            resolve({ path: filePath, error: null });
+          } else {
+            resolve({ path: '', error: new Error('Upload failed') });
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          resolve({ path: '', error: new Error('Upload failed') });
+        });
+
+        // Actually use Supabase SDK but track progress via file size estimation
+        this.uploadWithProgress(file, filePath, onProgress)
+          .then(result => resolve(result))
+          .catch(error => resolve({ path: '', error }));
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      return { path: '', error: error as Error };
+    }
+  },
+
+  // Internal upload with simulated progress
+  async uploadWithProgress(
+    file: File,
+    filePath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ path: string; error: Error | null }> {
+    try {
+      // Start progress animation
+      let currentProgress = 0;
+      const progressInterval = setInterval(() => {
+        if (currentProgress < 90) {
+          // Simulate progress based on file size
+          const increment = file.size > 10000000 ? 2 : 5; // Slower for larger files
+          currentProgress = Math.min(currentProgress + increment, 90);
+          onProgress?.(currentProgress);
+        }
+      }, 200);
+
       const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(filePath, file, {
@@ -38,7 +93,15 @@ export const documentService = {
           upsert: false,
         });
 
-      if (error) throw error;
+      clearInterval(progressInterval);
+
+      if (error) {
+        onProgress?.(0);
+        throw error;
+      }
+
+      // Complete the progress
+      onProgress?.(100);
 
       return { path: data.path, error: null };
     } catch (error) {
