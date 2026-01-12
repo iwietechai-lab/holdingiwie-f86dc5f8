@@ -420,6 +420,14 @@ export const Login = () => {
                     <UserPlus className="w-4 h-4 mr-2" />
                     Registrarse
                   </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full h-11 mt-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate('/dashboard')}
+                  >
+                    Entrar sin cuenta (Demo)
+                  </Button>
                 </div>
               </>
             ) : step === 'register' ? (
