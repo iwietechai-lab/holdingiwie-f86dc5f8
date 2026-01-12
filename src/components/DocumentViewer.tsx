@@ -5,8 +5,9 @@ import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+// Configure PDF.js worker using the exact version that matches react-pdf
+// This prevents "API version does not match Worker version" errors
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface DocumentViewerProps {
   url: string;
@@ -38,10 +39,13 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const isImage = mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
   const isVideo = mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(fileName);
 
-  // Memoize document options for caching
+  // Memoize document options for caching and large file support
   const documentOptions = useMemo(() => ({
-    cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+    cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/cmaps/`,
     cMapPacked: true,
+    // Enable range requests for large files - this allows streaming
+    disableRange: false,
+    disableStream: false,
   }), []);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
