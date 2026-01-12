@@ -363,15 +363,9 @@ export default function GestorMemes() {
                   key={meme.id} 
                   className="border-primary/10 bg-card/50 backdrop-blur hover:border-primary/30 transition-all overflow-hidden"
                 >
-                  {/* Preview section */}
+                  {/* Preview section - no badges, no URLs */}
                   <div className="relative">
                     {renderMemePreview(meme)}
-                    
-                    {/* Platform badge - no URLs shown */}
-                    <div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/70 text-xs flex items-center gap-1 text-white">
-                      {getTypeIcon(meme.type)}
-                      <span>{meme.platform || 'Media'}</span>
-                    </div>
                   </div>
                   
                   <CardContent className="p-3 space-y-2">
