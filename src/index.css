@@ -184,6 +184,24 @@
   100% { transform: rotate(360deg); }
 }
 
+@keyframes earth-drift {
+  0% { 
+    background-position: 50% 50%;
+  }
+  25% { 
+    background-position: 52% 48%;
+  }
+  50% { 
+    background-position: 50% 52%;
+  }
+  75% { 
+    background-position: 48% 50%;
+  }
+  100% { 
+    background-position: 50% 50%;
+  }
+}
+
 .animate-twinkle {
   animation: twinkle 3s ease-in-out infinite;
 }
@@ -202,6 +220,10 @@
 
 .animate-rotate-slow {
   animation: rotate-slow 20s linear infinite;
+}
+
+.animate-earth-drift {
+  animation: earth-drift 30s ease-in-out infinite;
 }
 
 /* Custom scrollbar */

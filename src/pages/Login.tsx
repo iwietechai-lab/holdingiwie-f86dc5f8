@@ -119,73 +119,77 @@ export const Login = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col lg:flex-row overflow-hidden">
-      {/* Left Side - Branding with Earth Background */}
-      <div 
-        className="relative lg:w-1/2 h-[40vh] lg:h-screen flex flex-col items-center justify-center p-8 lg:p-12 flex-shrink-0"
-        style={{
-          backgroundImage: `url(${earthImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
-        }}
-      >
+      {/* Left Side - Branding with Earth Background (50%) */}
+      <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-full flex flex-col items-center justify-center overflow-hidden">
+        {/* Animated Earth Background */}
+        <div 
+          className="absolute inset-0 animate-earth-drift"
+          style={{
+            backgroundImage: `url(${earthImage})`,
+            backgroundSize: '120%',
+            backgroundPosition: 'center',
+          }}
+        />
+        
         {/* Dark overlay */}
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/50" />
         
         {/* Animated stars */}
         <AnimatedStars />
         
         {/* Content */}
-        <div className="relative z-10 text-center space-y-6 lg:space-y-8 animate-slide-up">
+        <div className="relative z-10 text-center space-y-6 lg:space-y-8 animate-slide-up px-4">
           {/* Logo Icon */}
-          <div className="mx-auto w-24 h-24 lg:w-32 lg:h-32 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center neon-glow animate-pulse-glow border border-primary/30">
-            <Rocket className="w-12 h-12 lg:w-16 lg:h-16 text-primary" />
+          <div className="mx-auto w-20 h-20 lg:w-28 lg:h-28 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center neon-glow animate-pulse-glow border border-primary/30">
+            <Rocket className="w-10 h-10 lg:w-14 lg:h-14 text-primary" />
           </div>
           
           {/* Company Name */}
-          <div className="space-y-2 lg:space-y-4">
-            <h1 className="text-4xl lg:text-6xl font-bold neon-text tracking-wider">
+          <div className="space-y-1 lg:space-y-2">
+            <h1 className="text-3xl lg:text-5xl font-bold neon-text tracking-wider">
               HOLDING
             </h1>
-            <h2 className="text-5xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent">
+            <h2 className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent">
               IWIE
             </h2>
           </div>
           
           {/* Slogan */}
           <div className="relative">
-            <p className="text-xl lg:text-2xl text-foreground/90 italic font-light tracking-widest">
+            <p className="text-lg lg:text-xl text-foreground/90 italic font-light tracking-widest">
               "Creatividad Colaborativa"
             </p>
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent" />
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent" />
           </div>
           
           {/* Tagline */}
-          <div className="flex items-center justify-center gap-2 text-muted-foreground pt-4">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground pt-2">
             <Satellite className="w-4 h-4 text-secondary" />
-            <p className="text-xs lg:text-sm max-w-sm">
-              Innovación en Drones · IA · Energía · Agro · Aeroespacial
+            <p className="text-xs lg:text-sm">
+              Drones · IA · Energía · Agro · Aeroespacial
             </p>
           </div>
         </div>
         
         {/* Floating decorative elements */}
-        <div className="absolute bottom-10 left-10 w-16 h-16 lg:w-20 lg:h-20 rounded-full bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 blur-xl animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/4 right-10 w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-secondary/15 to-accent/15 blur-lg animate-float" style={{ animationDelay: '3s' }} />
+        <div className="absolute bottom-10 left-10 w-16 h-16 rounded-full bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 blur-xl animate-float" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/4 right-10 w-10 h-10 rounded-full bg-gradient-to-br from-secondary/15 to-accent/15 blur-lg animate-float" style={{ animationDelay: '3s' }} />
       </div>
       
-      {/* Right Side - Login Form */}
-      <div 
-        className="relative lg:w-1/2 h-[60vh] lg:h-screen flex flex-col items-center justify-center p-6 lg:p-12 flex-shrink-0 overflow-y-auto"
-        style={{
-          backgroundImage: `url(${earthImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
-        }}
-      >
-        {/* Darker overlay for form readability */}
-        <div className="absolute inset-0 bg-background/90 backdrop-blur-sm" />
+      {/* Right Side - Login Form (50%) */}
+      <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-full flex flex-col items-center justify-center overflow-hidden">
+        {/* Background with subtle animation */}
+        <div 
+          className="absolute inset-0 animate-earth-drift opacity-30"
+          style={{
+            backgroundImage: `url(${earthImage})`,
+            backgroundSize: '150%',
+            backgroundPosition: 'center',
+          }}
+        />
+        
+        {/* Dark overlay for readability */}
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm" />
         
         {/* Subtle stars */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
