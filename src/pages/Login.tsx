@@ -118,14 +118,15 @@ export const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
+    <div className="h-screen w-screen flex flex-col lg:flex-row overflow-hidden">
       {/* Left Side - Branding with Earth Background */}
       <div 
-        className="relative lg:w-1/2 min-h-[40vh] lg:min-h-screen flex flex-col items-center justify-center p-8 lg:p-12"
+        className="relative lg:w-1/2 h-[40vh] lg:h-screen flex flex-col items-center justify-center p-8 lg:p-12 flex-shrink-0"
         style={{
           backgroundImage: `url(${earthImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
         }}
       >
         {/* Dark overlay */}
@@ -163,7 +164,7 @@ export const Login = () => {
           <div className="flex items-center justify-center gap-2 text-muted-foreground pt-4">
             <Satellite className="w-4 h-4 text-secondary" />
             <p className="text-xs lg:text-sm max-w-sm">
-              Innovación en Drones • IA • Energía • Agro • Aeroespacial
+              Innovación en Drones · IA · Energía · Agro · Aeroespacial
             </p>
           </div>
         </div>
@@ -175,11 +176,12 @@ export const Login = () => {
       
       {/* Right Side - Login Form */}
       <div 
-        className="relative lg:w-1/2 min-h-[60vh] lg:min-h-screen flex flex-col items-center justify-center p-6 lg:p-12"
+        className="relative lg:w-1/2 h-[60vh] lg:h-screen flex flex-col items-center justify-center p-6 lg:p-12 flex-shrink-0 overflow-y-auto"
         style={{
           backgroundImage: `url(${earthImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
         }}
       >
         {/* Darker overlay for form readability */}
