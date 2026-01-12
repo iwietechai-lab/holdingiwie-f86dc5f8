@@ -12,6 +12,10 @@ interface Message {
   timestamp: Date;
 }
 
+interface CEOChatbotProps {
+  fullScreen?: boolean;
+}
+
 const CEO_RESPONSES = [
   "¡Excelente pregunta! En IWIE siempre buscamos innovar. Déjame explicarte nuestra visión sobre esto...",
   "Como CEO de IWIE, mi enfoque siempre ha sido la tecnología disruptiva. Los drones, la IA y la energía renovable son pilares fundamentales de nuestro holding.",
@@ -24,8 +28,8 @@ const CEO_RESPONSES = [
   "Cada decisión que tomamos está basada en datos. Los KPIs que ves en el dashboard son nuestra brújula.",
 ];
 
-export const CEOChatbot = () => {
-  const [isOpen, setIsOpen] = useState(false);
+export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
+  const [isOpen, setIsOpen] = useState(fullScreen);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -58,7 +62,6 @@ export const CEOChatbot = () => {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate CEO response
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
 
     const responseIndex = Math.floor(Math.random() * CEO_RESPONSES.length);
@@ -80,105 +83,98 @@ export const CEOChatbot = () => {
     }
   };
 
+  const ChatContent = () => (
+    <>
+      <div className="p-4 bg-primary/10 border-b border-border flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+          <Rocket className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-foreground">CEO Mauricio</h3>
+          <p className="text-xs text-muted-foreground">Asistente Ejecutivo IA</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-xs text-muted-foreground">Online</span>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn("flex", message.role === 'user' ? "justify-end" : "justify-start")}
+            >
+              <div
+                className={cn(
+                  "max-w-[80%] p-3 rounded-lg",
+                  message.role === 'user'
+                    ? "bg-primary text-primary-foreground rounded-br-none"
+                    : "bg-muted text-foreground rounded-bl-none"
+                )}
+              >
+                <p className="text-sm">{message.content}</p>
+                <p className="text-xs opacity-60 mt-1">
+                  {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ))}
+          
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="bg-muted p-3 rounded-lg rounded-bl-none">
+                <div className="flex items-center gap-1">
+                  <Sparkles className="w-4 h-4 text-primary animate-spin" />
+                  <span className="text-sm text-muted-foreground">Escribiendo...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="p-4 border-t border-border">
+        <div className="flex gap-2">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe tu mensaje..."
+            className="flex-1 bg-input border-border focus:border-primary"
+          />
+          <Button onClick={handleSend} disabled={!inputValue.trim() || isTyping} className="bg-primary hover:bg-primary/80">
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+
+  if (fullScreen) {
+    return (
+      <div className="w-full h-full bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <ChatContent />
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Chat button */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg transition-all duration-300 z-50",
-          isOpen 
-            ? "bg-destructive hover:bg-destructive/80" 
-            : "bg-primary hover:bg-primary/80 animate-pulse-glow"
+          isOpen ? "bg-destructive hover:bg-destructive/80" : "bg-primary hover:bg-primary/80 animate-pulse-glow"
         )}
       >
-        {isOpen ? (
-          <X className="w-6 h-6" />
-        ) : (
-          <MessageCircle className="w-6 h-6" />
-        )}
+        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
       </Button>
 
-      {/* Chat window */}
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 animate-scale-in">
-          {/* Header */}
-          <div className="p-4 bg-primary/10 border-b border-border flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Rocket className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">CEO Mauricio</h3>
-              <p className="text-xs text-muted-foreground">Asistente Ejecutivo IA</p>
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-muted-foreground">Online</span>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    message.role === 'user' ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[80%] p-3 rounded-lg",
-                      message.role === 'user'
-                        ? "bg-primary text-primary-foreground rounded-br-none"
-                        : "bg-muted text-foreground rounded-bl-none"
-                    )}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs opacity-60 mt-1">
-                      {message.timestamp.toLocaleTimeString('es-ES', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-muted p-3 rounded-lg rounded-bl-none">
-                    <div className="flex items-center gap-1">
-                      <Sparkles className="w-4 h-4 text-primary animate-spin" />
-                      <span className="text-sm text-muted-foreground">Escribiendo...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          {/* Input */}
-          <div className="p-4 border-t border-border">
-            <div className="flex gap-2">
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Escribe tu mensaje..."
-                className="flex-1 bg-input border-border focus:border-primary"
-              />
-              <Button
-                onClick={handleSend}
-                disabled={!inputValue.trim() || isTyping}
-                className="bg-primary hover:bg-primary/80"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+          <ChatContent />
         </div>
       )}
     </>

@@ -8,15 +8,18 @@ import {
   Target,
   Zap,
   PieChart,
-  Activity
+  Activity,
+  LogOut
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { KPICard } from '@/components/KPICard';
 import { CEOChatbot } from '@/components/CEOChatbot';
 import { SpaceBackground } from '@/components/SpaceBackground';
+import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { companies, getCompanyById } from '@/data/companies';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   AreaChart,
   Area,
@@ -48,14 +51,31 @@ const tasksData = [
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, profile, isAuthenticated, isLoading } = useSupabaseAuth();
+  const { user, profile, isAuthenticated, isLoading, logout } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate('/login');
     }
   }, [isLoading, isAuthenticated, navigate]);
+
+  // Check if user is CEO - only CEO can access full dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && profile) {
+      const isCEO = profile.role === 'CEO Global';
+      if (!isCEO) {
+        // Non-CEO users: redirect to chatbot only
+        navigate('/chatbot');
+      }
+    }
+  }, [isLoading, isAuthenticated, profile, navigate]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   if (isLoading) {
     return (
@@ -71,6 +91,19 @@ export const Dashboard = () => {
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  // If profile not loaded yet or not CEO, show loading
+  if (!profile || profile.role !== 'CEO Global') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
   }
 
   const selectedCompanyData = selectedCompany ? getCompanyById(selectedCompany) : null;
@@ -91,30 +124,42 @@ export const Dashboard = () => {
       <main className="flex-1 overflow-auto">
         <div className="p-8 space-y-8">
           {/* Header */}
-          <header className="space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">
-              {selectedCompanyData ? (
-                <span className="flex items-center gap-3">
-                  <span className="text-4xl">{selectedCompanyData.icon}</span>
-                  {selectedCompanyData.name}
-                </span>
-              ) : (
-                'Dashboard Global'
-              )}
-            </h1>
-            <p className="text-muted-foreground">
-              {selectedCompanyData 
-                ? selectedCompanyData.description
-                : (
-                  <span>
-                    Bienvenido, <span className="text-primary font-semibold">{displayName}</span>
-                    {' - '}
-                    <span className="text-secondary">{displayRole}</span>
-                    . Aquí tienes el resumen de todas las empresas del holding.
+          <header className="flex items-center justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-foreground">
+                {selectedCompanyData ? (
+                  <span className="flex items-center gap-3">
+                    <span className="text-4xl">{selectedCompanyData.icon}</span>
+                    {selectedCompanyData.name}
                   </span>
-                )
-              }
-            </p>
+                ) : (
+                  'Dashboard Global'
+                )}
+              </h1>
+              <p className="text-muted-foreground">
+                {selectedCompanyData 
+                  ? selectedCompanyData.description
+                  : (
+                    <span>
+                      Bienvenido, <span className="text-primary font-semibold">{displayName}</span>
+                      {' - '}
+                      <span className="text-secondary">{displayRole}</span>
+                      . Aquí tienes el resumen de todas las empresas del holding.
+                    </span>
+                  )
+                }
+              </p>
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar Sesión
+            </Button>
           </header>
 
           {/* KPI Cards */}
@@ -311,7 +356,7 @@ export const Dashboard = () => {
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-blue-400" />
                 <div>
-                  <p className="text-2xl font-bold text-foreground">9</p>
+                  <p className="text-2xl font-bold text-foreground">10</p>
                   <p className="text-xs text-muted-foreground">Empresas</p>
                 </div>
               </div>
@@ -330,6 +375,11 @@ export const Dashboard = () => {
       </main>
 
       <CEOChatbot />
+      
+      <InDevelopmentModal 
+        open={showDevelopmentModal} 
+        onClose={() => setShowDevelopmentModal(false)} 
+      />
     </div>
   );
 };
