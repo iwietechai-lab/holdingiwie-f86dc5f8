@@ -484,6 +484,15 @@ export const GestorDocumentos = () => {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                onClick={() => handleDownload(doc)}
+                                className="h-8 w-8 hover:bg-secondary/20"
+                                title="Descargar"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => handleDelete(doc)}
                                 className="h-8 w-8 hover:bg-destructive/20 text-destructive"
                                 title="Eliminar"
@@ -697,7 +706,6 @@ export const GestorDocumentos = () => {
                 url={previewUrl}
                 fileName={previewDocument.nombre}
                 mimeType={previewDocument.mime_type}
-                fileSize={previewDocument.file_size}
               />
             )}
           </div>

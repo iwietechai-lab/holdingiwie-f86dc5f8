@@ -10,8 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Rocket,
-  FolderOpen,
-  Smile
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -48,7 +47,6 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: Users, label: 'Usuarios', action: 'dev' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
-    { icon: Smile, label: 'Gestor de Memes', action: 'navigate', path: '/gestor-memes' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
   ];
 
