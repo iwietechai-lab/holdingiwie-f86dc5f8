@@ -640,37 +640,65 @@ export const GestorDocumentos = () => {
 
       {/* Preview Modal */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="sm:max-w-4xl h-[80vh] bg-card border-border">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] bg-card border-border flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-primary" />
               {previewDocument?.nombre}
+              {previewDocument?.is_development && (
+                <span className="ml-2 text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                  v{previewDocument.version}
+                </span>
+              )}
             </DialogTitle>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+              <span>{getEmpresaName(previewDocument?.empresa_id || '')}</span>
+              <span>•</span>
+              <span>{getAreaName(previewDocument?.area_id || '')}</span>
+              {previewDocument?.file_size && (
+                <>
+                  <span>•</span>
+                  <span>{formatFileSize(previewDocument.file_size)}</span>
+                </>
+              )}
+            </div>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden rounded-lg bg-muted/20">
+          
+          <div className="flex-1 min-h-0 bg-muted/10 relative">
             {previewUrl && previewDocument?.tipo === 'pdf' ? (
               <iframe
-                src={previewUrl}
-                className="w-full h-full"
+                src={`${previewUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                className="w-full h-[70vh] border-0"
                 title="Document Preview"
               />
             ) : previewUrl && previewDocument?.tipo === 'image' ? (
-              <img
-                src={previewUrl}
-                alt={previewDocument?.nombre}
-                className="w-full h-full object-contain"
-              />
+              <div className="w-full h-[70vh] flex items-center justify-center p-4 overflow-auto">
+                <img
+                  src={previewUrl}
+                  alt={previewDocument?.nombre}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
             ) : previewUrl && previewDocument?.tipo === 'video' ? (
-              <video src={previewUrl} controls className="w-full h-full" />
+              <div className="w-full h-[70vh] flex items-center justify-center p-4">
+                <video 
+                  src={previewUrl} 
+                  controls 
+                  className="max-w-full max-h-full rounded-lg shadow-lg"
+                  autoPlay={false}
+                />
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-3" />
-                  <p>Vista previa no disponible para este tipo de archivo</p>
+              <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                <div className="text-center p-8">
+                  <AlertCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <p className="text-lg font-medium mb-2">Vista previa no disponible</p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Este tipo de archivo no puede previsualizarse en el navegador
+                  </p>
                   <Button
-                    variant="outline"
                     onClick={() => previewUrl && window.open(previewUrl, '_blank')}
-                    className="mt-4"
+                    className="bg-gradient-to-r from-primary to-secondary"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Descargar archivo
@@ -678,6 +706,25 @@ export const GestorDocumentos = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="px-6 py-3 border-t border-border shrink-0 flex justify-between items-center bg-card">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreviewModal(false)}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cerrar
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => previewDocument && handleDownload(previewDocument)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Descargar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
