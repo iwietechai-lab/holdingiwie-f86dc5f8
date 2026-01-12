@@ -1,24 +1,34 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Download, AlertTriangle } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker - use unpkg as primary source with correct version format
-// The react-pdf v10+ uses pdfjs-dist 4.x internally
+// Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
 
 interface DocumentViewerProps {
   url: string;
   fileName: string;
   mimeType?: string;
+  fileSize?: number; // Size in bytes
 }
+
+// Threshold for large files (20 MB)
+const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024;
 
 // Zoom levels: 50% to 200%
 const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
-export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps) => {
+// Format file size for display
+const formatSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
+export const DocumentViewer = ({ url, fileName, mimeType, fileSize }: DocumentViewerProps) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [loading, setLoading] = useState(true);
@@ -26,6 +36,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const [scale, setScale] = useState(1.0);
   const [imageZoom, setImageZoom] = useState(100);
   const [cursorStyle, setCursorStyle] = useState<'grab' | 'grabbing'>('grab');
+  const [useNativeViewer, setUseNativeViewer] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -38,12 +49,14 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
   const isImage = mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
   const isVideo = mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(fileName);
+  
+  // Check if file is large (>20MB)
+  const isLargeFile = fileSize && fileSize > LARGE_FILE_THRESHOLD;
 
-  // Memoize document options for caching and large file support
+  // Memoize document options
   const documentOptions = useMemo(() => ({
-    cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/cmaps/`,
+    cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
     cMapPacked: true,
-    // Enable range requests for large files - this allows streaming
     disableRange: false,
     disableStream: false,
   }), []);
@@ -58,13 +71,17 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     console.error('PDF load error:', error);
     setError('No se pudo cargar el documento PDF');
     setLoading(false);
+    // For large files, suggest native viewer
+    if (isLargeFile) {
+      setUseNativeViewer(true);
+    }
   };
 
-  // Page navigation - only render current page for performance
+  // Page navigation
   const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
   const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, numPages));
   
-  // Zoom handlers - limited to 50%-200%
+  // Zoom handlers
   const zoomIn = () => {
     const currentIndex = ZOOM_LEVELS.findIndex(z => z >= scale);
     const nextIndex = Math.min(currentIndex + 1, ZOOM_LEVELS.length - 1);
@@ -85,6 +102,11 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     setLoading(true);
     setError(null);
     setCurrentPage(1);
+    setUseNativeViewer(false);
+  };
+
+  const handleDownload = () => {
+    window.location.href = url;
   };
 
   // Drag to scroll handlers
@@ -138,11 +160,58 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     };
   }, []);
 
-  // PDF Viewer - renders only current page for optimal performance
+  // PDF Viewer
   if (isPdf) {
+    // Large file handling: Show message + native embed + download
+    if (isLargeFile || useNativeViewer) {
+      return (
+        <div className="flex flex-col h-full">
+          {/* Large file notice */}
+          <div className="flex flex-col items-center justify-center p-6 bg-muted/20 border-b border-border">
+            <div className="flex items-center gap-3 text-amber-500 mb-3">
+              <AlertTriangle className="w-6 h-6" />
+              <span className="font-medium">Archivo grande detectado ({fileSize ? formatSize(fileSize) : '>20 MB'})</span>
+            </div>
+            <p className="text-muted-foreground text-center text-sm mb-4">
+              Este archivo es muy grande para renderizarlo en el navegador.<br/>
+              Puedes descargarlo o intentar ver una vista previa básica.
+            </p>
+            <Button 
+              onClick={handleDownload}
+              size="lg"
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Descargar PDF
+            </Button>
+          </div>
+
+          {/* Native browser PDF embed as fallback */}
+          <div className="flex-1 min-h-0" style={{ height: '60vh' }}>
+            <object
+              data={url}
+              type="application/pdf"
+              width="100%"
+              height="100%"
+              className="rounded-lg"
+            >
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <FileText className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-center">
+                  Tu navegador no puede mostrar este PDF.<br/>
+                  Por favor, descárgalo para verlo.
+                </p>
+              </div>
+            </object>
+          </div>
+        </div>
+      );
+    }
+
+    // Normal PDF viewer for small files (<20MB)
     return (
       <div className="flex flex-col h-full">
-        {/* Controls: Page nav + Zoom only (NO download button) */}
+        {/* Controls: Page nav + Zoom */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap shrink-0">
           {/* Page Navigation */}
           <div className="flex items-center gap-2">
@@ -167,7 +236,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
             </Button>
           </div>
           
-          {/* Zoom Controls - 50% to 200% */}
+          {/* Zoom Controls */}
           <div className="flex items-center gap-2 ml-4">
             <Button 
               variant="outline" 
@@ -196,7 +265,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           </div>
         </div>
 
-        {/* PDF Document - single page render for speed */}
+        {/* PDF Document */}
         <div 
           ref={containerRef}
           className="flex-1 min-h-0 select-none bg-muted/10 overflow-auto"
@@ -214,10 +283,16 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                 <FileText className="w-16 h-16 mb-4 text-destructive/50" />
                 <p className="text-lg font-medium mb-2">Error al cargar PDF</p>
                 <p className="text-sm text-center mb-6">{error}</p>
-                <Button onClick={handleRetry} variant="outline">
-                  <RotateCw className="w-4 h-4 mr-2" />
-                  Reintentar
-                </Button>
+                <div className="flex gap-3">
+                  <Button onClick={handleRetry} variant="outline">
+                    <RotateCw className="w-4 h-4 mr-2" />
+                    Reintentar
+                  </Button>
+                  <Button onClick={handleDownload} variant="default">
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar
+                  </Button>
+                </div>
               </div>
             ) : (
               <Document
@@ -238,7 +313,6 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                   </div>
                 }
               >
-                {/* Only render current page - key includes scale to force re-render on zoom */}
                 <Page
                   key={`page-${currentPage}-scale-${scale}`}
                   pageNumber={currentPage}
@@ -260,11 +334,10 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     );
   }
 
-  // Image Viewer with zoom controls and drag-to-scroll
+  // Image Viewer
   if (isImage) {
     return (
       <div className="flex flex-col h-full">
-        {/* Zoom Controls */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border shrink-0">
           <Button variant="outline" size="sm" onClick={imageZoomOut} disabled={imageZoom <= 50}>
             <ZoomOut className="w-4 h-4" />
