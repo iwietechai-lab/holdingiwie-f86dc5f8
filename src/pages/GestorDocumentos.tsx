@@ -15,6 +15,7 @@ import {
   Check,
   AlertCircle,
   LogOut,
+  ExternalLink,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -675,11 +676,29 @@ export const GestorDocumentos = () => {
           
           <div className="flex-1 min-h-0 bg-muted/10 relative">
             {previewUrl && previewDocument?.tipo === 'pdf' ? (
-              <iframe
-                src={`${previewUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-                className="w-full h-[70vh] border-0"
-                title="Document Preview"
-              />
+              <div className="w-full h-[70vh] flex flex-col items-center justify-center">
+                <object
+                  data={previewUrl}
+                  type="application/pdf"
+                  className="w-full h-full"
+                >
+                  {/* Fallback when object fails */}
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                    <FileText className="w-20 h-20 mb-4 text-primary/50" />
+                    <p className="text-lg font-medium mb-2">No se puede mostrar el PDF aquí</p>
+                    <p className="text-sm text-muted-foreground mb-6 text-center">
+                      El navegador bloqueó la vista previa. Usa el botón para abrir en una nueva pestaña.
+                    </p>
+                    <Button
+                      onClick={() => window.open(previewUrl, '_blank')}
+                      className="bg-gradient-to-r from-primary to-secondary"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Abrir PDF en nueva pestaña
+                    </Button>
+                  </div>
+                </object>
+              </div>
             ) : previewUrl && previewDocument?.tipo === 'image' ? (
               <div className="w-full h-[70vh] flex items-center justify-center p-4 overflow-auto">
                 <img
