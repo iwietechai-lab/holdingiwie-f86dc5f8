@@ -648,9 +648,9 @@ export const GestorDocumentos = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Preview Modal */}
+      {/* Preview Modal - Full Screen */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] bg-card border-border flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] max-h-[95vh] bg-card border-border flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-primary" />
