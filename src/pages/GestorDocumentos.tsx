@@ -680,12 +680,11 @@ export const GestorDocumentos = () => {
                 url={previewUrl}
                 fileName={previewDocument.nombre}
                 mimeType={previewDocument.mime_type}
-                onDownload={() => handleDownload(previewDocument)}
               />
             )}
           </div>
 
-          <div className="px-6 py-3 border-t border-border shrink-0 flex justify-between items-center bg-card">
+          <div className="px-6 py-3 border-t border-border shrink-0 flex justify-center items-center bg-card">
             <Button
               variant="outline"
               onClick={() => setShowPreviewModal(false)}
@@ -693,15 +692,6 @@ export const GestorDocumentos = () => {
               <X className="w-4 h-4 mr-2" />
               Cerrar
             </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => previewDocument && handleDownload(previewDocument)}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Descargar
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
