@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Maximize2 } from 'lucide-react';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 // Configure PDF.js worker using Vite's URL import
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -17,7 +19,7 @@ interface DocumentViewerProps {
 
 export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps) => {
   const [numPages, setNumPages] = useState<number>(0);
-  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
@@ -25,6 +27,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   
   // Drag to scroll state using refs for real-time updates
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startXRef = useRef(0);
@@ -36,6 +39,11 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const isPdf = mimeType?.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
   const isImage = mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
   const isVideo = mimeType?.startsWith('video/') || /\.(mp4|webm|mov|avi)$/i.test(fileName);
+
+  // Generate array of page numbers
+  const pageNumbers = useMemo(() => {
+    return Array.from({ length: numPages }, (_, i) => i + 1);
+  }, [numPages]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -49,8 +57,18 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     setLoading(false);
   };
 
-  const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
-  const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages));
+  // Navigate to specific page by scrolling
+  const goToPage = useCallback((pageNum: number) => {
+    const pageElement = pageRefs.current.get(pageNum);
+    if (pageElement && containerRef.current) {
+      pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setCurrentPage(pageNum);
+    }
+  }, []);
+
+  const goToPrevPage = () => goToPage(Math.max(currentPage - 1, 1));
+  const goToNextPage = () => goToPage(Math.min(currentPage + 1, numPages));
+  
   const zoomIn = () => setScale(prev => Math.min(prev + 0.25, 3));
   const zoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
   const imageZoomIn = () => setImageZoom(prev => Math.min(prev + 25, 300));
@@ -59,8 +77,30 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const handleRetry = () => {
     setLoading(true);
     setError(null);
-    setPageNumber(1);
+    setCurrentPage(1);
   };
+
+  // Track current page based on scroll position
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !isPdf) return;
+
+    const handleScroll = () => {
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.top + containerRect.height / 2;
+
+      for (const [pageNum, element] of pageRefs.current.entries()) {
+        const rect = element.getBoundingClientRect();
+        if (rect.top <= containerCenter && rect.bottom >= containerCenter) {
+          setCurrentPage(pageNum);
+          break;
+        }
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isPdf, numPages]);
 
   // Drag to scroll handlers using native event listeners for better performance
   useEffect(() => {
@@ -86,8 +126,12 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
       const deltaY = e.clientY - startYRef.current;
       const deltaX = e.clientX - startXRef.current;
       
+      // Always allow vertical scroll
       container.scrollTop = scrollTopRef.current - deltaY;
-      container.scrollLeft = scrollLeftRef.current - deltaX;
+      // Only allow horizontal scroll when content overflows (zoom > 100%)
+      if (container.scrollWidth > container.clientWidth) {
+        container.scrollLeft = scrollLeftRef.current - deltaX;
+      }
     };
 
     const handleMouseUp = () => {
@@ -122,20 +166,20 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     };
   }, []);
 
-  // PDF Viewer with react-pdf
+  // PDF Viewer with all pages rendered vertically
   if (isPdf) {
     return (
       <div className="flex flex-col h-full">
         {/* Controls */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={pageNumber <= 1}>
+            <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={currentPage <= 1 || loading}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-sm px-3 min-w-[100px] text-center">
-              {loading ? '...' : `${pageNumber} / ${numPages}`}
+              {loading ? '...' : `${currentPage} / ${numPages}`}
             </span>
-            <Button variant="outline" size="sm" onClick={goToNextPage} disabled={pageNumber >= numPages}>
+            <Button variant="outline" size="sm" onClick={goToNextPage} disabled={currentPage >= numPages || loading}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -144,7 +188,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
             <Button variant="outline" size="sm" onClick={zoomOut} disabled={scale <= 0.5}>
               <ZoomOut className="w-4 h-4" />
             </Button>
-            <span className="text-sm px-2">{Math.round(scale * 100)}%</span>
+            <span className="text-sm px-2 min-w-[50px] text-center">{Math.round(scale * 100)}%</span>
             <Button variant="outline" size="sm" onClick={zoomIn} disabled={scale >= 3}>
               <ZoomIn className="w-4 h-4" />
             </Button>
@@ -156,13 +200,21 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           </div>
         </div>
 
-        {/* PDF Document with drag-to-scroll */}
+        {/* PDF Document with all pages - vertical scroll container */}
         <div 
           ref={containerRef}
-          className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0 select-none"
-          style={{ cursor: cursorStyle }}
+          className="flex-1 min-h-0 select-none bg-muted/10"
+          style={{ 
+            cursor: cursorStyle,
+            height: '80vh',
+            overflowY: 'auto',
+            overflowX: scale > 1 ? 'auto' : 'hidden',
+          }}
         >
-          <div className="inline-flex justify-center w-full" style={{ minHeight: 'max-content' }}>
+          <div 
+            className="flex flex-col items-center py-4 gap-4"
+            style={{ minWidth: scale > 1 ? 'max-content' : undefined }}
+          >
             {error ? (
               <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
                 <FileText className="w-16 h-16 mb-4 text-destructive/50" />
@@ -191,18 +243,33 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
                   </div>
                 }
               >
-                <Page
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  loading={
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                {/* Render all pages in a vertical list */}
+                {pageNumbers.map((pageNum) => (
+                  <div
+                    key={pageNum}
+                    ref={(el) => {
+                      if (el) pageRefs.current.set(pageNum, el);
+                      else pageRefs.current.delete(pageNum);
+                    }}
+                    className="relative"
+                  >
+                    <Page
+                      pageNumber={pageNum}
+                      scale={scale}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                      loading={
+                        <div className="flex items-center justify-center py-12 min-h-[400px] bg-background/50 rounded-lg">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        </div>
+                      }
+                      className="shadow-lg rounded-lg overflow-hidden bg-white"
+                    />
+                    <div className="absolute bottom-2 right-2 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
+                      {pageNum} / {numPages}
                     </div>
-                  }
-                  className="shadow-lg rounded-lg overflow-hidden"
-                />
+                  </div>
+                ))}
               </Document>
             )}
           </div>
@@ -233,7 +300,10 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
         <div 
           ref={containerRef}
           className="flex-1 overflow-auto p-4 bg-muted/10 select-none"
-          style={{ cursor: cursorStyle }}
+          style={{ 
+            cursor: cursorStyle,
+            height: '80vh',
+          }}
         >
           <div className="flex justify-center items-center min-h-full min-w-max">
             <img
@@ -256,7 +326,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   // Video Viewer
   if (isVideo) {
     return (
-      <div className="flex items-center justify-center h-full p-4 bg-muted/10">
+      <div className="flex items-center justify-center h-full p-4 bg-muted/10" style={{ height: '80vh' }}>
         <video
           src={url}
           controls
@@ -268,7 +338,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
 
   // Unsupported file type fallback
   return (
-    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8" style={{ height: '80vh' }}>
       <FileText className="w-16 h-16 mb-4 text-muted-foreground/50" />
       <p className="text-lg font-medium mb-2">Formato no soportado para vista previa</p>
       <p className="text-sm text-center">Este tipo de archivo no puede previsualizarse directamente.</p>
