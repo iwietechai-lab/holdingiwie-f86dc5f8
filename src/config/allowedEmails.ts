@@ -9,9 +9,9 @@ export interface AllowedEmailConfig {
 export const ALLOWED_EMAILS: AllowedEmailConfig[] = [
   {
     email: 'joel@iwie.space',
-    role: 'Gerente Comercial',
-    company_id: 'iwie-drones',
-    department: 'Comercial',
+    role: 'CEO Global',
+    company_id: 'iwie-holding',
+    department: 'Dirección General',
   },
   {
     email: 'hernan@iwie.space',
