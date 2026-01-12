@@ -403,19 +403,19 @@ export const GestorDocumentos = () => {
                 Documentos ({filteredDocuments.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px]">
-                <Table>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="border-border">
-                      <TableHead className="text-muted-foreground">Tipo</TableHead>
-                      <TableHead className="text-muted-foreground">Nombre</TableHead>
+                      <TableHead className="text-muted-foreground w-16">Tipo</TableHead>
+                      <TableHead className="text-muted-foreground min-w-[150px]">Nombre</TableHead>
                       <TableHead className="text-muted-foreground">Empresa</TableHead>
                       <TableHead className="text-muted-foreground">Área</TableHead>
-                      <TableHead className="text-muted-foreground">Versión</TableHead>
-                      <TableHead className="text-muted-foreground">Tamaño</TableHead>
-                      <TableHead className="text-muted-foreground">Fecha</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Acciones</TableHead>
+                      <TableHead className="text-muted-foreground w-20">Versión</TableHead>
+                      <TableHead className="text-muted-foreground w-24">Tamaño</TableHead>
+                      <TableHead className="text-muted-foreground w-28">Fecha</TableHead>
+                      <TableHead className="text-muted-foreground text-right w-32">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -431,17 +431,23 @@ export const GestorDocumentos = () => {
                       </TableRow>
                     ) : (
                       filteredDocuments.map((doc) => (
-                        <TableRow key={doc.id} className="border-border hover:bg-muted/20">
+                        <TableRow 
+                          key={doc.id} 
+                          className="border-border hover:bg-muted/20 cursor-pointer group"
+                          onClick={() => handlePreview(doc)}
+                        >
                           <TableCell>
                             <span className="text-2xl">{getDocumentIcon(doc.tipo)}</span>
                           </TableCell>
                           <TableCell className="font-medium text-foreground">
-                            {doc.nombre}
-                            {doc.is_development && (
-                              <span className="ml-2 text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                Dev
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <span>{doc.nombre}</span>
+                              {doc.is_development && (
+                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                                  Dev
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {getEmpresaName(doc.empresa_id)}
@@ -458,13 +464,14 @@ export const GestorDocumentos = () => {
                           <TableCell className="text-muted-foreground">
                             {new Date(doc.created_at).toLocaleDateString('es-ES')}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handlePreview(doc)}
                                 className="h-8 w-8 hover:bg-primary/20"
+                                title="Ver documento"
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -473,6 +480,7 @@ export const GestorDocumentos = () => {
                                 size="icon"
                                 onClick={() => handleDownload(doc)}
                                 className="h-8 w-8 hover:bg-secondary/20"
+                                title="Descargar"
                               >
                                 <Download className="w-4 h-4" />
                               </Button>
@@ -481,6 +489,7 @@ export const GestorDocumentos = () => {
                                 size="icon"
                                 onClick={() => handleDelete(doc)}
                                 className="h-8 w-8 hover:bg-destructive/20 text-destructive"
+                                title="Eliminar"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -491,7 +500,7 @@ export const GestorDocumentos = () => {
                     )}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </div>
