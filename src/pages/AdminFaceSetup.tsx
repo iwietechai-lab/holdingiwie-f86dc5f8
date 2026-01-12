@@ -162,24 +162,16 @@ export default function AdminFaceSetup() {
   };
 
   // Save embedding to user_profiles
+  // SECURITY: Embeddings are now stored ONLY in the database, not in localStorage
   const saveEmbeddingToProfile = async (
     email: string, 
     embedding: number[], 
     fullName: string, 
     role: string, 
     companyId: string
-  ): Promise<boolean> => {
+  ): Promise<{ success: boolean; userNotFound?: boolean }> => {
     try {
-      // Check if a profile exists for a user with this email by checking auth
-      // Since we can't access auth.users directly, we'll store a mapping
-      
-      // First, let's check if there's already a profile with this embedding
-      // We'll need to find users by checking if they exist
-      
-      // Alternative approach: Store embeddings in a separate table mapped by email
-      // For now, let's try to update existing profiles or create a placeholder
-      
-      // Check existing profiles
+      // Check existing profiles to find a match by email or name
       const { data: existingProfiles, error: fetchError } = await supabase
         .from('user_profiles')
         .select('id, full_name, email')
@@ -187,18 +179,17 @@ export default function AdminFaceSetup() {
 
       if (fetchError) {
         console.error('Error fetching profiles:', fetchError);
+        return { success: false };
       }
 
-      console.log('Existing profiles:', existingProfiles);
-
-      // Try to find matching profile by full_name (as fallback since email might not be in profiles)
+      // Try to find matching profile by full_name or email
       const matchingProfile = existingProfiles?.find(p => 
         p.full_name?.toLowerCase() === fullName.toLowerCase() ||
         p.email?.toLowerCase() === email.toLowerCase()
       );
 
       if (matchingProfile) {
-        // Update existing profile
+        // Update existing profile with embedding
         const { error: updateError } = await supabase
           .from('user_profiles')
           .update({ 
@@ -210,35 +201,20 @@ export default function AdminFaceSetup() {
 
         if (updateError) {
           console.error('Error updating profile:', updateError);
-          return false;
+          return { success: false };
         }
         
         console.log(`Updated facial embedding for ${fullName} (${matchingProfile.id})`);
-        return true;
+        return { success: true };
       }
 
-      // If no matching profile, we need to store it in a way that can be linked later
-      // Option: Create a facial_embeddings_pending table or store in a temp location
-      // For now, let's log this and inform the user
-      
-      console.log(`No existing profile found for ${email}. User needs to sign up first.`);
-      
-      // Store in localStorage as temporary measure (will be applied on first login)
-      const pendingEmbeddings = JSON.parse(localStorage.getItem('pendingFacialEmbeddings') || '{}');
-      pendingEmbeddings[email] = {
-        embedding,
-        fullName,
-        role,
-        companyId,
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem('pendingFacialEmbeddings', JSON.stringify(pendingEmbeddings));
-      
-      console.log(`Stored pending embedding for ${email} in localStorage`);
-      return true;
+      // SECURITY: No longer storing in localStorage for security reasons
+      // User must sign up first, then admin can re-process to store embedding
+      console.warn(`No existing profile found for ${email}. User needs to sign up first.`);
+      return { success: false, userNotFound: true };
     } catch (err) {
       console.error('Error saving embedding:', err);
-      return false;
+      return { success: false };
     }
   };
 
@@ -276,7 +252,7 @@ export default function AdminFaceSetup() {
         }
 
         // Save to profile
-        const saved = await saveEmbeddingToProfile(
+        const saveResult = await saveEmbeddingToProfile(
           member.email,
           embedding,
           member.fullName,
@@ -284,11 +260,17 @@ export default function AdminFaceSetup() {
           member.companyId
         );
 
-        if (saved) {
+        if (saveResult.success) {
           updatedMembers[i] = { 
             ...member, 
             status: 'success', 
             embedding 
+          };
+        } else if (saveResult.userNotFound) {
+          updatedMembers[i] = { 
+            ...member, 
+            status: 'error', 
+            errorMessage: 'Usuario no registrado - debe crear cuenta primero' 
           };
         } else {
           updatedMembers[i] = { 
@@ -343,7 +325,7 @@ export default function AdminFaceSetup() {
         return;
       }
 
-      const saved = await saveEmbeddingToProfile(
+      const saveResult = await saveEmbeddingToProfile(
         member.email,
         embedding,
         member.fullName,
@@ -351,11 +333,17 @@ export default function AdminFaceSetup() {
         member.companyId
       );
 
-      if (saved) {
+      if (saveResult.success) {
         updatedMembers[index] = { 
           ...member, 
           status: 'success', 
           embedding 
+        };
+      } else if (saveResult.userNotFound) {
+        updatedMembers[index] = { 
+          ...member, 
+          status: 'error', 
+          errorMessage: 'Usuario no registrado - debe crear cuenta primero' 
         };
       } else {
         updatedMembers[index] = { 
@@ -470,7 +458,8 @@ export default function AdminFaceSetup() {
                 <p className="font-medium text-yellow-600">Nota importante:</p>
                 <p className="text-muted-foreground mt-1">
                   Los embeddings se guardarán en <code className="bg-muted px-1 rounded">user_profiles.facial_embedding</code> 
-                  si el usuario ya existe. Si no existe, se almacenarán temporalmente y se aplicarán cuando el usuario inicie sesión por primera vez.
+                  <strong> solo si el usuario ya existe en la base de datos</strong>. 
+                  Si el usuario no está registrado, primero debe crear su cuenta y luego volver a procesar.
                 </p>
               </div>
             </div>

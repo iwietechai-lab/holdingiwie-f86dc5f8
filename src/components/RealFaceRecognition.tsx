@@ -66,12 +66,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
-  // Check if user has stored facial embedding (or pending from admin setup)
+  // Check if user has stored facial embedding
+  // NOTE: Pending embeddings via localStorage removed for security reasons
+  // Admin setup must store embeddings directly in database
   const checkStoredEmbedding = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('facial_embedding, email, role, company_id')
+        .select('facial_embedding')
         .eq('id', userId)
         .maybeSingle();
 
@@ -80,39 +82,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         return false;
       }
 
-      let hasEmbedding = data?.facial_embedding && 
+      const hasEmbedding = data?.facial_embedding && 
         Array.isArray(data.facial_embedding) && 
         data.facial_embedding.length > 0;
-
-      // If no embedding stored, check if there's a pending one from admin setup
-      if (!hasEmbedding && data?.email) {
-        const pendingEmbeddings = JSON.parse(localStorage.getItem('pendingFacialEmbeddings') || '{}');
-        const pending = pendingEmbeddings[data.email];
-        
-        if (pending?.embedding && Array.isArray(pending.embedding)) {
-          console.log('Found pending embedding for', data.email, '- applying now');
-          
-          // Apply the pending embedding to user_profiles
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update({ 
-              facial_embedding: pending.embedding,
-              role: pending.role || data.role,
-              company_id: pending.companyId || data.company_id,
-            })
-            .eq('id', userId);
-
-          if (!updateError) {
-            // Remove from pending
-            delete pendingEmbeddings[data.email];
-            localStorage.setItem('pendingFacialEmbeddings', JSON.stringify(pendingEmbeddings));
-            hasEmbedding = true;
-            console.log('Pending embedding applied successfully');
-          } else {
-            console.error('Failed to apply pending embedding:', updateError);
-          }
-        }
-      }
       
       setHasStoredEmbedding(hasEmbedding);
       return hasEmbedding;

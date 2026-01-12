@@ -3,6 +3,60 @@ import { Document, DocumentUpload, getDocumentTypeFromMime } from '@/types/docum
 
 const BUCKET_NAME = 'documentos';
 
+// Security: Allowed file extensions whitelist
+const ALLOWED_EXTENSIONS = [
+  // Documents
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.odt', '.ods', '.odp',
+  // Images
+  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico',
+  // Videos
+  '.mp4', '.webm', '.mov', '.avi', '.mkv',
+  // Engineering/CAD
+  '.dwg', '.dxf', '.step', '.stp', '.igs', '.iges',
+  // Archives
+  '.zip', '.rar', '.7z', '.tar', '.gz',
+];
+
+// Security: Blocked extensions (even if disguised)
+const BLOCKED_EXTENSIONS = [
+  '.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.msi', '.dll', '.com', '.scr',
+  '.php', '.py', '.rb', '.pl', '.cgi', '.asp', '.aspx', '.jsp', '.htaccess',
+];
+
+// Security: Validate file before upload
+const validateFile = (file: File): { valid: boolean; error?: string } => {
+  const fileName = file.name.toLowerCase();
+  const extension = '.' + fileName.split('.').pop();
+  
+  // Check for blocked extensions
+  if (BLOCKED_EXTENSIONS.includes(extension)) {
+    return { valid: false, error: `Tipo de archivo no permitido: ${extension}` };
+  }
+  
+  // Check for path traversal attempts in filename
+  if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+    return { valid: false, error: 'Nombre de archivo inválido' };
+  }
+  
+  // Check if extension is in allowed list
+  if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    return { valid: false, error: `Extensión no soportada: ${extension}. Contacta al administrador.` };
+  }
+  
+  // Validate file size (max 100MB)
+  const maxSize = 100 * 1024 * 1024; // 100MB
+  if (file.size > maxSize) {
+    return { valid: false, error: 'El archivo excede el tamaño máximo de 100MB' };
+  }
+  
+  // Validate filename length
+  if (file.name.length > 255) {
+    return { valid: false, error: 'El nombre del archivo es demasiado largo' };
+  }
+  
+  return { valid: true };
+};
+
 export const documentService = {
   // Initialize bucket if needed (should be created via SQL migration)
   async ensureBucketExists(): Promise<void> {
@@ -26,11 +80,24 @@ export const documentService = {
     onProgress?: (progress: number) => void
   ): Promise<{ path: string; error: Error | null }> {
     try {
+      // Security: Validate file before upload
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        return { path: '', error: new Error(validation.error) };
+      }
+      
       await this.ensureBucketExists();
       
       const timestamp = Date.now();
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = `${empresaId}/${areaId}/${timestamp}_${sanitizedName}`;
+      // Security: Strict sanitization - only alphanumeric, dots, and underscores
+      const sanitizedName = file.name
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/\.{2,}/g, '.') // Remove consecutive dots
+        .replace(/^\.+|\.+$/g, ''); // Remove leading/trailing dots
+      
+      // Security: Use UUID prefix to prevent filename collisions and make paths unpredictable
+      const uniqueId = crypto.randomUUID().slice(0, 8);
+      const filePath = `${empresaId}/${areaId}/${timestamp}_${uniqueId}_${sanitizedName}`;
 
       // Use XMLHttpRequest for progress tracking
       return new Promise((resolve) => {
