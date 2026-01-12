@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FaceRecognition } from '@/components/FaceRecognition';
+import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { RegisterForm } from '@/components/RegisterForm';
 import { ProfileSetupForm } from '@/components/ProfileSetupForm';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -427,11 +427,6 @@ export const Login = () => {
                 onBack={() => setStep('credentials')}
                 onSuccess={handleRegisterSuccess}
               />
-            ) : step === 'face-recognition' ? (
-              <FaceRecognition
-                onSuccess={handleFaceRecognitionSuccess}
-                onCancel={handleFaceRecognitionCancel}
-              />
             ) : null}
           </CardContent>
         </Card>
@@ -441,6 +436,15 @@ export const Login = () => {
           © 2025 IWIE Holding. Todos los derechos reservados.
         </p>
       </div>
+      
+      {/* Face Recognition Overlay - Full Screen */}
+      {step === 'face-recognition' && user && (
+        <RealFaceRecognition
+          userId={user.id}
+          onSuccess={handleFaceRecognitionSuccess}
+          onCancel={handleFaceRecognitionCancel}
+        />
+      )}
     </div>
   );
 };
