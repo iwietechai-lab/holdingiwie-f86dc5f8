@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
@@ -41,12 +41,23 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      // Max height of 120px (approximately 5 lines)
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`;
+    }
+  }, [inputValue]);
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
@@ -114,7 +125,7 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
                     : "bg-muted text-foreground rounded-bl-none"
                 )}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 <p className="text-xs opacity-60 mt-1">
                   {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                 </p>
@@ -136,18 +147,27 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
       </ScrollArea>
 
       <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
-          <Input
+        <div className="flex gap-2 items-end">
+          <Textarea
+            ref={textareaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu mensaje..."
-            className="flex-1 bg-input border-border focus:border-primary"
+            className="flex-1 bg-input border-border focus:border-primary resize-none min-h-[44px] max-h-[120px] py-3"
+            rows={1}
           />
-          <Button onClick={handleSend} disabled={!inputValue.trim() || isTyping} className="bg-primary hover:bg-primary/80">
+          <Button 
+            onClick={handleSend} 
+            disabled={!inputValue.trim() || isTyping} 
+            className="bg-primary hover:bg-primary/80 h-11 w-11 p-0 shrink-0"
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Presiona Enter para enviar, Shift+Enter para nueva línea
+        </p>
       </div>
     </>
   );
