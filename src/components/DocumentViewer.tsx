@@ -3,8 +3,11 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw } from 'lucide-react';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configure PDF.js worker using Vite's URL import
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
 interface DocumentViewerProps {
   url: string;
