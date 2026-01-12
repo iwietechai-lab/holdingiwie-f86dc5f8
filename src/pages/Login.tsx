@@ -334,7 +334,7 @@ export const Login = () => {
         
         {/* Footer */}
         <p className="relative z-10 text-xs text-muted-foreground/50 mt-6 text-center">
-          © 2024 IWIE Holding. Todos los derechos reservados.
+          © 2025 IWIE Holding. Todos los derechos reservados.
         </p>
       </div>
     </div>
