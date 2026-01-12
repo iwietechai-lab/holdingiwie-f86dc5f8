@@ -44,7 +44,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
-    { icon: Users, label: 'Usuarios', action: 'dev' },
+    { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
     { icon: Settings, label: 'Configuración', action: 'dev' },

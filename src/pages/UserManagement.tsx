@@ -1,0 +1,581 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Users, 
+  Shield, 
+  ShieldCheck, 
+  ShieldAlert,
+  Clock, 
+  MapPin, 
+  Trash2, 
+  Eye,
+  ArrowLeft,
+  RefreshCw,
+  UserCog,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { Sidebar } from '@/components/Sidebar';
+import { SpaceBackground } from '@/components/SpaceBackground';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useUserManagement, UserWithDetails, AccessLog } from '@/hooks/useUserManagement';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+const AVAILABLE_ROLES = [
+  { value: 'superadmin', label: 'Super Admin', icon: ShieldAlert, color: 'text-red-500' },
+  { value: 'manager', label: 'Manager', icon: ShieldCheck, color: 'text-yellow-500' },
+  { value: 'employee', label: 'Empleado', icon: Shield, color: 'text-blue-500' },
+] as const;
+
+export const UserManagement = () => {
+  const navigate = useNavigate();
+  const { profile, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
+  const { users, isLoading, error, fetchUsers, addRole, removeRole, deleteUser, getAccessLogsByUser } = useUserManagement();
+  
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
+  const [showAccessLogs, setShowAccessLogs] = useState(false);
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserWithDetails | null>(null);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+
+  const handleViewAccessLogs = async (user: UserWithDetails) => {
+    setSelectedUser(user);
+    setLogsLoading(true);
+    setShowAccessLogs(true);
+    
+    const result = await getAccessLogsByUser(user.id);
+    if (result.success) {
+      setAccessLogs(result.data);
+    } else {
+      toast.error(result.error || 'Error al cargar logs');
+    }
+    setLogsLoading(false);
+  };
+
+  const handleAddRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    const result = await addRole(userId, role);
+    if (result.success) {
+      toast.success(`Rol ${role} agregado correctamente`);
+    } else {
+      toast.error(result.error || 'Error al agregar rol');
+    }
+  };
+
+  const handleRemoveRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    const result = await removeRole(userId, role);
+    if (result.success) {
+      toast.success(`Rol ${role} eliminado correctamente`);
+    } else {
+      toast.error(result.error || 'Error al eliminar rol');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
+    
+    const result = await deleteUser(deleteConfirmUser.id);
+    if (result.success) {
+      toast.success('Usuario eliminado correctamente');
+      setDeleteConfirmUser(null);
+    } else {
+      toast.error(result.error || 'Error al eliminar usuario');
+    }
+  };
+
+  const toggleUserExpand = (userId: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  const getRoleBadge = (role: string) => {
+    const roleConfig = AVAILABLE_ROLES.find(r => r.value === role);
+    if (!roleConfig) return null;
+    
+    const Icon = roleConfig.icon;
+    return (
+      <Badge key={role} variant="outline" className={`${roleConfig.color} border-current`}>
+        <Icon className="w-3 h-3 mr-1" />
+        {roleConfig.label}
+      </Badge>
+    );
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    navigate('/login');
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen flex">
+      <SpaceBackground />
+      
+      <Sidebar 
+        selectedCompany={selectedCompany} 
+        onSelectCompany={setSelectedCompany} 
+      />
+
+      <main className="flex-1 overflow-auto">
+        <div className="p-8 space-y-6">
+          {/* Header */}
+          <header className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                  <UserCog className="w-8 h-8 text-primary" />
+                  Gestión de Usuarios
+                </h1>
+              </div>
+              <p className="text-muted-foreground ml-12">
+                Administra usuarios, permisos y visualiza logs de acceso
+              </p>
+            </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => fetchUsers()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          </header>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Users className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{users.length}</p>
+                    <p className="text-xs text-muted-foreground">Usuarios Totales</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="w-8 h-8 text-red-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {users.filter(u => u.roles.some(r => r.role === 'superadmin')).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Super Admins</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-8 h-8 text-yellow-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {users.filter(u => u.roles.some(r => r.role === 'manager')).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Managers</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-8 h-8 text-green-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {users.filter(u => u.lastAccess && new Date(u.lastAccess) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Activos (24h)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <Card className="bg-destructive/10 border-destructive">
+              <CardContent className="p-4">
+                <p className="text-destructive">{error}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Users Table */}
+          <Card className="bg-card/50 backdrop-blur-sm border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Lista de Usuarios
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay usuarios registrados
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Roles</TableHead>
+                      <TableHead>Último Acceso</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <>
+                        <TableRow key={user.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => toggleUserExpand(user.id)}
+                            >
+                              {expandedUsers.has(user.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-foreground">{user.full_name || 'Sin nombre'}</p>
+                              <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {user.company_id || '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {user.roles.length > 0 ? (
+                                user.roles.map((r) => getRoleBadge(r.role))
+                              ) : (
+                                <span className="text-sm text-muted-foreground">Sin roles</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {user.lastAccess ? (
+                              <span className="text-sm">
+                                {format(new Date(user.lastAccess), "dd MMM yyyy, HH:mm", { locale: es })}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Nunca</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewAccessLogs(user)}
+                                title="Ver logs de acceso"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" title="Gestionar roles">
+                                    <Shield className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-popover">
+                                  <div className="px-2 py-1.5 text-sm font-semibold">Agregar Rol</div>
+                                  {AVAILABLE_ROLES.map((role) => {
+                                    const hasRole = user.roles.some(r => r.role === role.value);
+                                    const Icon = role.icon;
+                                    return (
+                                      <DropdownMenuItem
+                                        key={role.value}
+                                        onClick={() => !hasRole && handleAddRole(user.id, role.value)}
+                                        disabled={hasRole}
+                                        className="cursor-pointer"
+                                      >
+                                        <Icon className={`w-4 h-4 mr-2 ${role.color}`} />
+                                        {role.label}
+                                        {hasRole && <CheckCircle className="w-4 h-4 ml-auto text-green-500" />}
+                                      </DropdownMenuItem>
+                                    );
+                                  })}
+                                  
+                                  {user.roles.length > 0 && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <div className="px-2 py-1.5 text-sm font-semibold text-destructive">Eliminar Rol</div>
+                                      {user.roles.map((userRole) => {
+                                        const roleConfig = AVAILABLE_ROLES.find(r => r.value === userRole.role);
+                                        if (!roleConfig) return null;
+                                        const Icon = roleConfig.icon;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={userRole.id}
+                                            onClick={() => handleRemoveRole(user.id, userRole.role)}
+                                            className="cursor-pointer text-destructive"
+                                          >
+                                            <Icon className="w-4 h-4 mr-2" />
+                                            Quitar {roleConfig.label}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteConfirmUser(user)}
+                                title="Eliminar usuario"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {/* Expanded details row */}
+                        {expandedUsers.has(user.id) && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="bg-muted/30 p-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <h4 className="font-medium mb-2">Información del Usuario</h4>
+                                  <div className="space-y-1 text-sm">
+                                    <p><span className="text-muted-foreground">ID:</span> {user.id}</p>
+                                    <p><span className="text-muted-foreground">Rol en App:</span> {user.role || 'No definido'}</p>
+                                    <p><span className="text-muted-foreground">Creado:</span> {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : 'N/A'}</p>
+                                  </div>
+                                </div>
+                                <div>
+                                  <h4 className="font-medium mb-2">Últimos Accesos ({user.accessLogs.length})</h4>
+                                  <div className="space-y-1 text-sm max-h-32 overflow-y-auto">
+                                    {user.accessLogs.slice(0, 5).map((log) => (
+                                      <div key={log.id} className="flex items-center gap-2">
+                                        {log.success ? (
+                                          <CheckCircle className="w-3 h-3 text-green-500" />
+                                        ) : (
+                                          <XCircle className="w-3 h-3 text-red-500" />
+                                        )}
+                                        <span>{format(new Date(log.timestamp), "dd/MM HH:mm", { locale: es })}</span>
+                                        {log.city && (
+                                          <span className="text-muted-foreground flex items-center gap-1">
+                                            <MapPin className="w-3 h-3" />
+                                            {log.city}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {user.accessLogs.length === 0 && (
+                                      <p className="text-muted-foreground">Sin registros de acceso</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+
+      {/* Access Logs Dialog */}
+      <Dialog open={showAccessLogs} onOpenChange={setShowAccessLogs}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Logs de Acceso - {selectedUser?.full_name || selectedUser?.email}
+            </DialogTitle>
+            <DialogDescription>
+              Historial de accesos del usuario al sistema
+            </DialogDescription>
+          </DialogHeader>
+          
+          {logsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : accessLogs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay registros de acceso
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Fecha/Hora</TableHead>
+                  <TableHead>Ubicación</TableHead>
+                  <TableHead>Dispositivo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {accessLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>
+                      {log.success ? (
+                        <Badge className="bg-green-500/20 text-green-500 border-green-500">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Exitoso
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-red-500/20 text-red-500 border-red-500">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Fallido
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm:ss", { locale: es })}
+                    </TableCell>
+                    <TableCell>
+                      {log.city || log.country ? (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {[log.city, log.country].filter(Boolean).join(', ')}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Desconocida</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
+                        {log.user_agent || 'N/A'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAccessLogs(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmUser} onOpenChange={() => setDeleteConfirmUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el usuario{' '}
+              <strong>{deleteConfirmUser?.full_name || deleteConfirmUser?.email}</strong> y todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default UserManagement;
