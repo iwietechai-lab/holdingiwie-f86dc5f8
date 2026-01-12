@@ -110,15 +110,15 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     );
   }
 
-  // PDF Viewer using embed element
+  // PDF Viewer using iframe with blob URL
   if (isPdf) {
     return (
       <div className="flex flex-col h-full">
         <div className="flex-1 bg-muted/10">
-          <embed
-            src={blobUrl}
-            type="application/pdf"
-            className="w-full h-full"
+          <iframe
+            src={`${blobUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+            title={fileName}
+            className="w-full h-full border-0"
             style={{ minHeight: '65vh' }}
           />
         </div>
