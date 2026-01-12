@@ -706,6 +706,7 @@ export const GestorDocumentos = () => {
                 url={previewUrl}
                 fileName={previewDocument.nombre}
                 mimeType={previewDocument.mime_type}
+                fileSize={previewDocument.file_size}
               />
             )}
           </div>
