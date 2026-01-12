@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Chatbot from "./pages/Chatbot";
 import GestorDocumentos from "./pages/GestorDocumentos";
 import NotFound from "./pages/NotFound";
+import { IdleOverlay } from "./components/IdleOverlay";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        {/* Global idle overlay - only shows after login */}
+        <IdleOverlay />
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
