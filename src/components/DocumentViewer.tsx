@@ -58,7 +58,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     return (
       <div className="flex flex-col h-full">
         {/* Controls */}
-        <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap">
+        <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap shrink-0">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={pageNumber <= 1}>
               <ChevronLeft className="w-4 h-4" />
@@ -82,50 +82,52 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           </div>
         </div>
 
-        {/* PDF Document */}
-        <div className="flex-1 overflow-auto flex justify-center p-4 bg-muted/10">
-          {error ? (
-            <div className="flex flex-col items-center justify-center text-muted-foreground">
-              <FileText className="w-16 h-16 mb-4 text-destructive/50" />
-              <p className="text-lg font-medium mb-2">Error al cargar PDF</p>
-              <p className="text-sm text-center mb-6">{error}</p>
-              <Button onClick={handleRetry} variant="outline">
-                <RotateCw className="w-4 h-4 mr-2" />
-                Reintentar
-              </Button>
-            </div>
-          ) : (
-            <Document
-              file={url}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading={
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
-                  <p className="text-muted-foreground">Cargando PDF...</p>
-                </div>
-              }
-              error={
-                <div className="flex flex-col items-center justify-center py-12 text-destructive">
-                  <FileText className="w-12 h-12 mb-4" />
-                  <p>Error al cargar el documento</p>
-                </div>
-              }
-            >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
+        {/* PDF Document with scroll */}
+        <div className="flex-1 overflow-auto p-4 bg-muted/10 min-h-0">
+          <div className="flex justify-center">
+            {error ? (
+              <div className="flex flex-col items-center justify-center text-muted-foreground py-12">
+                <FileText className="w-16 h-16 mb-4 text-destructive/50" />
+                <p className="text-lg font-medium mb-2">Error al cargar PDF</p>
+                <p className="text-sm text-center mb-6">{error}</p>
+                <Button onClick={handleRetry} variant="outline">
+                  <RotateCw className="w-4 h-4 mr-2" />
+                  Reintentar
+                </Button>
+              </div>
+            ) : (
+              <Document
+                file={url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
                 loading={
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
+                    <p className="text-muted-foreground">Cargando PDF...</p>
                   </div>
                 }
-                className="shadow-lg rounded-lg overflow-hidden"
-              />
-            </Document>
-          )}
+                error={
+                  <div className="flex flex-col items-center justify-center py-12 text-destructive">
+                    <FileText className="w-12 h-12 mb-4" />
+                    <p>Error al cargar el documento</p>
+                  </div>
+                }
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                  loading={
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  }
+                  className="shadow-lg rounded-lg overflow-hidden"
+                />
+              </Document>
+            )}
+          </div>
         </div>
       </div>
     );
