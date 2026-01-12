@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Maximize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Maximize2, Minimize2 } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -21,9 +21,11 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
   const [imageZoom, setImageZoom] = useState(100);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Drag to scroll state using refs for real-time updates
   const containerRef = useRef<HTMLDivElement>(null);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
@@ -76,6 +78,32 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
     setError(null);
     setCurrentPage(1);
   };
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
+
+  // Handle ESC key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    if (isFullscreen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isFullscreen]);
 
   // Track current page based on scroll position
   useEffect(() => {
@@ -165,8 +193,11 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
 
   // PDF Viewer with all pages rendered vertically
   if (isPdf) {
-    return (
-      <div className="flex flex-col h-full">
+    const pdfContent = (
+      <div 
+        ref={fullscreenRef}
+        className={`flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'}`}
+      >
         {/* Controls */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border flex-wrap shrink-0">
           <div className="flex items-center gap-2">
@@ -195,6 +226,18 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
             <Hand className="w-3 h-3" />
             <span>Arrastra para desplazar</span>
           </div>
+
+          {/* Fullscreen toggle */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleFullscreen}
+            className="ml-4"
+            title={isFullscreen ? 'Salir de pantalla completa (ESC)' : 'Pantalla completa'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span className="ml-1 hidden sm:inline">{isFullscreen ? 'Salir' : 'Completa'}</span>
+          </Button>
         </div>
 
         {/* PDF Document with all pages - vertical scroll container */}
@@ -203,7 +246,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           className="flex-1 min-h-0 select-none bg-muted/10"
           style={{ 
             cursor: cursorStyle,
-            height: '80vh',
+            height: isFullscreen ? 'calc(100vh - 60px)' : '80vh',
             overflowY: 'auto',
             overflowX: scale > 1 ? 'auto' : 'hidden',
           }}
@@ -274,12 +317,17 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
         </div>
       </div>
     );
+
+    return pdfContent;
   }
 
   // Image Viewer with zoom controls and drag-to-scroll
   if (isImage) {
-    return (
-      <div className="flex flex-col h-full">
+    const imageContent = (
+      <div 
+        ref={fullscreenRef}
+        className={`flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'}`}
+      >
         {/* Zoom Controls */}
         <div className="flex items-center justify-center gap-2 p-3 bg-muted/20 border-b border-border shrink-0">
           <Button variant="outline" size="sm" onClick={imageZoomOut} disabled={imageZoom <= 50}>
@@ -293,6 +341,18 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
             <Hand className="w-3 h-3" />
             <span>Arrastra para desplazar</span>
           </div>
+          
+          {/* Fullscreen toggle */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleFullscreen}
+            className="ml-4"
+            title={isFullscreen ? 'Salir de pantalla completa (ESC)' : 'Pantalla completa'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span className="ml-1 hidden sm:inline">{isFullscreen ? 'Salir' : 'Completa'}</span>
+          </Button>
         </div>
         
         <div 
@@ -300,7 +360,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
           className="flex-1 overflow-auto p-4 bg-muted/10 select-none"
           style={{ 
             cursor: cursorStyle,
-            height: '80vh',
+            height: isFullscreen ? 'calc(100vh - 60px)' : '80vh',
           }}
         >
           <div className="flex justify-center items-center min-h-full min-w-max">
@@ -319,6 +379,8 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
         </div>
       </div>
     );
+
+    return imageContent;
   }
 
   // Video Viewer
