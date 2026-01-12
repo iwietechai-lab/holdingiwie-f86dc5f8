@@ -48,11 +48,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { companies } from '@/data/companies';
 import { documentService } from '@/services/documentService';
+import { DocumentViewer } from '@/components/DocumentViewer';
 import {
-  Document,
+  Document as DocType,
   AREAS,
   DOCUMENT_TYPES,
   getDocumentIcon,
@@ -65,12 +65,12 @@ export const GestorDocumentos = () => {
   const { toast } = useToast();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocType[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<DocType | null>(null);
 
   // Filters
   const [filterEmpresa, setFilterEmpresa] = useState<string>('all');
@@ -204,7 +204,7 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handlePreview = async (doc: Document) => {
+  const handlePreview = async (doc: DocType) => {
     const url = await documentService.getDownloadUrl(doc.file_path);
     if (url) {
       setPreviewUrl(url);
@@ -219,7 +219,7 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handleDownload = async (doc: Document) => {
+  const handleDownload = async (doc: DocType) => {
     const url = await documentService.getDownloadUrl(doc.file_path);
     if (url) {
       window.open(url, '_blank');
@@ -232,7 +232,7 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handleDelete = async (doc: Document) => {
+  const handleDelete = async (doc: DocType) => {
     if (!confirm('¿Estás seguro de eliminar este documento?')) return;
 
     const { error } = await documentService.deleteDocument(doc.id, doc.file_path);
@@ -674,65 +674,14 @@ export const GestorDocumentos = () => {
             </div>
           </DialogHeader>
           
-          <div className="flex-1 min-h-0 bg-muted/10 relative">
-            {previewUrl && previewDocument?.tipo === 'pdf' ? (
-              <div className="w-full h-[70vh] flex flex-col items-center justify-center">
-                <object
-                  data={previewUrl}
-                  type="application/pdf"
-                  className="w-full h-full"
-                >
-                  {/* Fallback when object fails */}
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
-                    <FileText className="w-20 h-20 mb-4 text-primary/50" />
-                    <p className="text-lg font-medium mb-2">No se puede mostrar el PDF aquí</p>
-                    <p className="text-sm text-muted-foreground mb-6 text-center">
-                      El navegador bloqueó la vista previa. Usa el botón para abrir en una nueva pestaña.
-                    </p>
-                    <Button
-                      onClick={() => window.open(previewUrl, '_blank')}
-                      className="bg-gradient-to-r from-primary to-secondary"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Abrir PDF en nueva pestaña
-                    </Button>
-                  </div>
-                </object>
-              </div>
-            ) : previewUrl && previewDocument?.tipo === 'image' ? (
-              <div className="w-full h-[70vh] flex items-center justify-center p-4 overflow-auto">
-                <img
-                  src={previewUrl}
-                  alt={previewDocument?.nombre}
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-                />
-              </div>
-            ) : previewUrl && previewDocument?.tipo === 'video' ? (
-              <div className="w-full h-[70vh] flex items-center justify-center p-4">
-                <video 
-                  src={previewUrl} 
-                  controls 
-                  className="max-w-full max-h-full rounded-lg shadow-lg"
-                  autoPlay={false}
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
-                <div className="text-center p-8">
-                  <AlertCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-lg font-medium mb-2">Vista previa no disponible</p>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Este tipo de archivo no puede previsualizarse en el navegador
-                  </p>
-                  <Button
-                    onClick={() => previewUrl && window.open(previewUrl, '_blank')}
-                    className="bg-gradient-to-r from-primary to-secondary"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Descargar archivo
-                  </Button>
-                </div>
-              </div>
+          <div className="flex-1 min-h-0 h-[70vh]">
+            {previewUrl && previewDocument && (
+              <DocumentViewer
+                url={previewUrl}
+                fileName={previewDocument.nombre}
+                mimeType={previewDocument.mime_type}
+                onDownload={() => handleDownload(previewDocument)}
+              />
             )}
           </div>
 
