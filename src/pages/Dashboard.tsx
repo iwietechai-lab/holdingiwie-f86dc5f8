@@ -18,6 +18,7 @@ import { SpaceBackground } from '@/components/SpaceBackground';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { companies, getCompanyById } from '@/data/companies';
+import { hasFullAccess } from '@/config/allowedEmails';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -61,16 +62,18 @@ export const Dashboard = () => {
     }
   }, [isLoading, isAuthenticated, navigate]);
 
-  // Check if user is CEO - only CEO can access full dashboard
+  // Check if user has full access (CEO or special access list)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && profile) {
+    if (!isLoading && isAuthenticated && profile && user) {
       const isCEO = profile.role === 'CEO Global';
-      if (!isCEO) {
-        // Non-CEO users: redirect to chatbot only
+      const hasAccess = hasFullAccess(user.email || '');
+      
+      if (!isCEO && !hasAccess) {
+        // Users without full access: redirect to chatbot only
         navigate('/chatbot');
       }
     }
-  }, [isLoading, isAuthenticated, profile, navigate]);
+  }, [isLoading, isAuthenticated, profile, user, navigate]);
 
   const handleLogout = async () => {
     await logout();
@@ -93,8 +96,9 @@ export const Dashboard = () => {
     return null;
   }
 
-  // If profile not loaded yet or not CEO, show loading
-  if (!profile || profile.role !== 'CEO Global') {
+  // If profile not loaded yet or no access, show loading
+  const userHasAccess = profile?.role === 'CEO Global' || hasFullAccess(user?.email || '');
+  if (!profile || !userHasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <SpaceBackground />
