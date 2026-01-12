@@ -105,24 +105,28 @@ export const IdleOverlay = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isVisible, handleInteraction]);
 
-  // Render the meme content based on type
+  // Render the meme content based on type - YouTube with minimal branding
   const renderMemeContent = () => {
+    // YouTube embed params to hide branding: modestbranding=1, rel=0, showinfo=0, controls=0
+    const youtubeParams = 'autoplay=1&mute=0&loop=1&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1';
+    
     if (customMeme) {
       const videoId = customMeme.type === 'youtube' ? getYouTubeVideoId(customMeme.url) : null;
       
       switch (customMeme.type) {
         case 'youtube':
           return videoId ? (
-            <div className="relative w-[300px] h-[170px] md:w-[480px] md:h-[270px]">
+            <div className="relative w-[300px] h-[170px] md:w-[560px] md:h-[315px] bg-black rounded-lg overflow-hidden">
               <iframe
                 width="100%"
                 height="100%"
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}`}
-                title={customMeme.title}
+                src={`https://www.youtube-nocookie.com/embed/${videoId}?${youtubeParams}&playlist=${videoId}`}
+                title="Video"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="rounded-lg"
+                style={{ border: 'none' }}
               />
             </div>
           ) : null;
@@ -132,8 +136,10 @@ export const IdleOverlay = () => {
               src={customMeme.url}
               autoPlay
               loop
-              controls
-              className="max-w-[480px] max-h-[270px] rounded-lg"
+              muted={false}
+              playsInline
+              className="max-w-[560px] max-h-[315px] rounded-lg bg-black"
+              style={{ objectFit: 'contain' }}
             />
           );
         case 'gif':
@@ -142,25 +148,26 @@ export const IdleOverlay = () => {
           return (
             <img 
               src={customMeme.url}
-              alt={customMeme.title}
-              className="max-w-[480px] max-h-[400px] rounded-lg object-contain"
+              alt="Meme"
+              className="max-w-[560px] max-h-[400px] rounded-lg object-contain bg-black"
             />
           );
       }
     }
     
-    // Default: Rick Astley
+    // Default: Rick Astley with minimal branding
     return (
-      <div className="relative w-[300px] h-[170px] md:w-[480px] md:h-[270px]">
+      <div className="relative w-[300px] h-[170px] md:w-[560px] md:h-[315px] bg-black rounded-lg overflow-hidden">
         <iframe
           width="100%"
           height="100%"
-          src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ"
-          title="Rick Astley - Never Gonna Give You Up"
+          src={`https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?${youtubeParams}&playlist=dQw4w9WgXcQ`}
+          title="Video"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           className="rounded-lg"
+          style={{ border: 'none' }}
         />
       </div>
     );
