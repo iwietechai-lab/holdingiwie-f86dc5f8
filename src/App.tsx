@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Chatbot from "./pages/Chatbot";
 import GestorDocumentos from "./pages/GestorDocumentos";
+import AdminFaceSetup from "./pages/AdminFaceSetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/gestor-documentos" element={<GestorDocumentos />} />
+          <Route path="/admin/face-setup" element={<AdminFaceSetup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
