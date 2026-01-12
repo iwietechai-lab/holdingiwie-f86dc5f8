@@ -12,18 +12,19 @@ import {
   Image as ImageIcon, 
   Video, 
   Smile,
-  ExternalLink,
-  Rocket
+  Rocket,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Types for memes
+// Types for memes - expanded to support social media
 interface Meme {
   id: string;
-  type: 'image' | 'gif' | 'video' | 'youtube';
+  type: 'image' | 'gif' | 'video' | 'youtube' | 'tiktok' | 'instagram' | 'twitter' | 'facebook' | 'vimeo';
   url: string;
   title: string;
   createdAt: Date;
+  platform?: string;
 }
 
 // Local storage key
@@ -31,30 +32,98 @@ const MEMES_STORAGE_KEY = 'iwie-memes-collection';
 
 // Helper to extract YouTube video ID
 const getYouTubeVideoId = (url: string): string | null => {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
   const match = url.match(regExp);
   return match && match[2].length === 11 ? match[2] : null;
 };
 
-// Detect content type from URL
-const detectContentType = (url: string): Meme['type'] => {
+// Helper to extract TikTok video ID
+const getTikTokVideoId = (url: string): string | null => {
+  const regExp = /tiktok\.com\/@[\w.-]+\/video\/(\d+)/;
+  const match = url.match(regExp);
+  return match ? match[1] : null;
+};
+
+// Helper to extract Vimeo video ID
+const getVimeoVideoId = (url: string): string | null => {
+  const regExp = /vimeo\.com\/(\d+)/;
+  const match = url.match(regExp);
+  return match ? match[1] : null;
+};
+
+// Detect content type and platform from URL
+const detectContentType = (url: string): { type: Meme['type'], platform: string } => {
   const lowerUrl = url.toLowerCase();
   
+  // YouTube
   if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
-    return 'youtube';
-  }
-  if (lowerUrl.endsWith('.gif') || lowerUrl.includes('.gif?')) {
-    return 'gif';
-  }
-  if (lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.webm') || lowerUrl.endsWith('.mov')) {
-    return 'video';
-  }
-  if (lowerUrl.match(/\.(jpg|jpeg|png|webp|bmp|svg)(\?|$)/i)) {
-    return 'image';
+    return { type: 'youtube', platform: 'YouTube' };
   }
   
-  // Default to image
-  return 'image';
+  // TikTok
+  if (lowerUrl.includes('tiktok.com')) {
+    return { type: 'tiktok', platform: 'TikTok' };
+  }
+  
+  // Instagram
+  if (lowerUrl.includes('instagram.com')) {
+    return { type: 'instagram', platform: 'Instagram' };
+  }
+  
+  // Twitter/X
+  if (lowerUrl.includes('twitter.com') || lowerUrl.includes('x.com')) {
+    return { type: 'twitter', platform: 'X/Twitter' };
+  }
+  
+  // Facebook
+  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch')) {
+    return { type: 'facebook', platform: 'Facebook' };
+  }
+  
+  // Vimeo
+  if (lowerUrl.includes('vimeo.com')) {
+    return { type: 'vimeo', platform: 'Vimeo' };
+  }
+  
+  // Direct media files
+  if (lowerUrl.endsWith('.gif') || lowerUrl.includes('.gif?')) {
+    return { type: 'gif', platform: 'GIF' };
+  }
+  if (lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.webm') || lowerUrl.endsWith('.mov')) {
+    return { type: 'video', platform: 'Video' };
+  }
+  if (lowerUrl.match(/\.(jpg|jpeg|png|webp|bmp|svg)(\?|$)/i)) {
+    return { type: 'image', platform: 'Imagen' };
+  }
+  
+  // Default to video for unknown social media links
+  return { type: 'video', platform: 'Enlace' };
+};
+
+// Get embed URL for different platforms
+const getEmbedUrl = (meme: Meme): string | null => {
+  switch (meme.type) {
+    case 'youtube':
+      const ytId = getYouTubeVideoId(meme.url);
+      return ytId ? `https://www.youtube.com/embed/${ytId}?autoplay=1&modestbranding=1&rel=0` : null;
+    
+    case 'vimeo':
+      const vimeoId = getVimeoVideoId(meme.url);
+      return vimeoId ? `https://player.vimeo.com/video/${vimeoId}?autoplay=1` : null;
+    
+    case 'tiktok':
+      // TikTok requires oEmbed - we'll open in new tab
+      return null;
+    
+    case 'instagram':
+    case 'twitter':
+    case 'facebook':
+      // These require authentication - open in new tab
+      return null;
+    
+    default:
+      return meme.url;
+  }
 };
 
 export default function GestorMemes() {
@@ -62,8 +131,8 @@ export default function GestorMemes() {
   const [memes, setMemes] = useState<Meme[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [newTitle, setNewTitle] = useState('');
-  const [newType, setNewType] = useState<Meme['type']>('image');
-  const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [newType, setNewType] = useState<Meme['type']>('video');
+  const [newPlatform, setNewPlatform] = useState<string>('Video');
 
   // Load memes from localStorage
   useEffect(() => {
@@ -89,14 +158,15 @@ export default function GestorMemes() {
       return;
     }
 
-    const detectedType = detectContentType(newUrl);
+    const { type, platform } = detectContentType(newUrl);
     
     const meme: Meme = {
       id: Date.now().toString(),
-      type: newType || detectedType,
+      type: newType || type,
       url: newUrl.trim(),
       title: newTitle.trim() || `Meme ${memes.length + 1}`,
-      createdAt: new Date()
+      createdAt: new Date(),
+      platform: newPlatform || platform
     };
 
     setMemes(prev => [meme, ...prev]);
@@ -111,7 +181,13 @@ export default function GestorMemes() {
   };
 
   const handlePlayMeme = (meme: Meme) => {
-    setIsPlaying(meme.id);
+    // For platforms that can't be embedded, open in new tab
+    const nonEmbeddable = ['tiktok', 'instagram', 'twitter', 'facebook'];
+    if (nonEmbeddable.includes(meme.type)) {
+      window.open(meme.url, '_blank');
+      toast.info('Abriendo en nueva pestaña...');
+      return;
+    }
     
     // Dispatch custom event to trigger the idle overlay with this meme
     window.dispatchEvent(new CustomEvent('trigger-meme-overlay', { 
@@ -123,20 +199,17 @@ export default function GestorMemes() {
     switch (type) {
       case 'youtube':
       case 'video':
+      case 'tiktok':
+      case 'vimeo':
         return <Video className="w-4 h-4" />;
+      case 'instagram':
+      case 'twitter':
+      case 'facebook':
+        return <Globe className="w-4 h-4" />;
       case 'gif':
         return <Smile className="w-4 h-4" />;
       default:
         return <ImageIcon className="w-4 h-4" />;
-    }
-  };
-
-  const getTypeLabel = (type: Meme['type']) => {
-    switch (type) {
-      case 'youtube': return 'YouTube';
-      case 'video': return 'Video';
-      case 'gif': return 'GIF';
-      default: return 'Imagen';
     }
   };
 
@@ -155,6 +228,27 @@ export default function GestorMemes() {
             <Video className="w-8 h-8 text-muted-foreground" />
           </div>
         );
+      
+      case 'tiktok':
+      case 'instagram':
+      case 'twitter':
+      case 'facebook':
+        return (
+          <div className="w-full h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded flex flex-col items-center justify-center">
+            <Globe className="w-8 h-8 text-primary/60 mb-2" />
+            <span className="text-xs text-muted-foreground">{meme.platform}</span>
+          </div>
+        );
+      
+      case 'vimeo':
+        const vimeoId = getVimeoVideoId(meme.url);
+        return (
+          <div className="w-full h-32 bg-gradient-to-br from-blue-500/20 to-blue-500/5 rounded flex flex-col items-center justify-center">
+            <Video className="w-8 h-8 text-blue-400/60 mb-2" />
+            <span className="text-xs text-muted-foreground">Vimeo</span>
+          </div>
+        );
+      
       case 'video':
         return (
           <video 
@@ -163,6 +257,7 @@ export default function GestorMemes() {
             muted
           />
         );
+      
       case 'gif':
       case 'image':
       default:
@@ -210,25 +305,30 @@ export default function GestorMemes() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
                   <Label htmlFor="meme-url">URL del meme</Label>
                   <Input
                     id="meme-url"
-                    placeholder="https://youtube.com/watch?v=... o URL de imagen/GIF"
+                    placeholder="Pega cualquier enlace de YouTube, TikTok, Instagram, Twitter, etc."
                     value={newUrl}
                     onChange={(e) => {
                       setNewUrl(e.target.value);
                       // Auto-detect type
                       if (e.target.value) {
-                        setNewType(detectContentType(e.target.value));
+                        const { type, platform } = detectContentType(e.target.value);
+                        setNewType(type);
+                        setNewPlatform(platform);
                       }
                     }}
                     className="bg-background/50"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Soporta: YouTube, TikTok, Instagram, Twitter/X, Facebook, Vimeo, GIFs, imágenes y videos
+                  </p>
                 </div>
                 <div>
-                  <Label htmlFor="meme-title">Título (opcional)</Label>
+                  <Label htmlFor="meme-title">Título</Label>
                   <Input
                     id="meme-title"
                     placeholder="Mi meme favorito"
@@ -236,20 +336,6 @@ export default function GestorMemes() {
                     onChange={(e) => setNewTitle(e.target.value)}
                     className="bg-background/50"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="meme-type">Tipo</Label>
-                  <Select value={newType} onValueChange={(v) => setNewType(v as Meme['type'])}>
-                    <SelectTrigger className="bg-background/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="youtube">YouTube</SelectItem>
-                      <SelectItem value="video">Video</SelectItem>
-                      <SelectItem value="gif">GIF</SelectItem>
-                      <SelectItem value="image">Imagen</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
               <Button onClick={handleAddMeme} className="w-full md:w-auto">
@@ -281,51 +367,37 @@ export default function GestorMemes() {
                   <div className="relative">
                     {renderMemePreview(meme)}
                     
-                    {/* Type badge */}
+                    {/* Platform badge - no URLs shown */}
                     <div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/70 text-xs flex items-center gap-1 text-white">
                       {getTypeIcon(meme.type)}
-                      {getTypeLabel(meme.type)}
+                      <span>{meme.platform || 'Media'}</span>
                     </div>
                   </div>
                   
-                  <CardContent className="p-3 space-y-3">
-                    {/* Title and delete */}
+                  <CardContent className="p-3 space-y-2">
+                    {/* Title only - no URL displayed */}
                     <div className="flex items-center justify-between">
                       <p className="font-medium truncate flex-1">{meme.title}</p>
                       <Button 
                         size="icon" 
                         variant="ghost" 
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
                         onClick={() => handleDeleteMeme(meme.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                     
-                    <p className="text-xs text-muted-foreground">
-                      {meme.createdAt.toLocaleDateString()}
-                    </p>
-                    
-                    {/* Always visible action buttons */}
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => handlePlayMeme(meme)}
-                        className="flex-1 bg-primary hover:bg-primary/90"
-                      >
-                        <Play className="w-4 h-4 mr-1" />
-                        Activar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => window.open(meme.url, '_blank')}
-                        title="Abrir en nueva pestaña"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {/* Action button */}
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={() => handlePlayMeme(meme)}
+                      className="w-full bg-primary hover:bg-primary/90"
+                    >
+                      <Play className="w-4 h-4 mr-1" />
+                      Activar
+                    </Button>
                   </CardContent>
                 </Card>
               ))
