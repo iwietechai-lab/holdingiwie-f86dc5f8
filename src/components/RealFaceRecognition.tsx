@@ -384,6 +384,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           
           // Log successful access with location
           await logAccessWithLocation(true, locationData || {});
+          
+          // Update last facial verification timestamp
+          await supabase
+            .from('user_profiles')
+            .update({ last_facial_verification: new Date().toISOString() })
+            .eq('id', userId);
 
           setTimeout(onSuccess, 1500);
         } else {
@@ -422,6 +428,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
         // Log successful access with location
         await logAccessWithLocation(true, locationData || {});
+        
+        // Update last facial verification timestamp
+        await supabase
+          .from('user_profiles')
+          .update({ last_facial_verification: new Date().toISOString() })
+          .eq('id', userId);
 
         setTimeout(onSuccess, 1500);
       } catch (err) {
