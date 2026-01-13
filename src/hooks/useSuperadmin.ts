@@ -41,7 +41,7 @@ export function useSuperadmin(): UseSuperadminReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if current user is superadmin
+  // Check if current user is superadmin using RPC to avoid RLS recursion
   useEffect(() => {
     const checkSuperadmin = async () => {
       if (authLoading) return;
@@ -60,13 +60,9 @@ export function useSuperadmin(): UseSuperadminReturn {
       }
 
       try {
-        // Check if user has superadmin role in database
+        // Use RPC to call the has_role function - avoids RLS recursion
         const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'superadmin')
-          .maybeSingle();
+          .rpc('has_role', { _user_id: user.id, _role: 'superadmin' });
 
         if (error) {
           console.error('Error checking superadmin role:', error);
