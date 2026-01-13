@@ -5,12 +5,11 @@ import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 
 interface UserProfile {
   id: string;
-  full_name: string;
-  role: string;
-  company_id: string;
-  department: string;
+  full_name: string | null;
+  role: string | null;
+  company_id: string | null;
   has_full_access: boolean;
-  avatar_url?: string;
+  avatar_url?: string | null;
 }
 
 interface AuthState {
@@ -39,52 +38,35 @@ export const useSupabaseAuth = () => {
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      // Use RPC function to get profile (bypasses RLS recursion)
-      const { data, error } = await supabase.rpc('get_my_profile');
+      // Direct query for user profile
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, role, company_id')
+        .eq('id', userId)
+        .maybeSingle();
 
       if (error) {
-        console.error('Error fetching user profile via RPC:', error);
-        
-        // Fallback: try direct query for superadmin
+        console.error('Error fetching user profile:', error);
+        // For superadmin, return default profile
         if (userId === SUPERADMIN_USER_ID) {
-          // Return hardcoded profile for superadmin to avoid blocking
           return {
             id: userId,
             full_name: 'Mauricio Ortiz Tamayo',
             role: 'superadmin',
-            company_id: '',
-            department: '',
+            company_id: null,
             has_full_access: true,
           };
         }
-        
-        // Try direct query as fallback (may work for users with simple RLS)
-        const { data: directData, error: directError } = await supabase
-          .from('user_profiles')
-          .select('id, full_name, role, company_id, department, has_full_access, avatar_url')
-          .eq('id', userId)
-          .maybeSingle();
-        
-        if (directError) {
-          console.error('Direct query also failed:', directError);
-          // For superadmin, return default profile
-          if (userId === SUPERADMIN_USER_ID) {
-            return {
-              id: userId,
-              full_name: 'Mauricio Ortiz Tamayo',
-              role: 'superadmin',
-              company_id: '',
-              department: '',
-              has_full_access: true,
-            };
-          }
-          return null;
-        }
-        
-        return directData;
+        return null;
       }
 
-      return data;
+      return {
+        id: data?.id || userId,
+        full_name: data?.full_name || null,
+        role: data?.role || 'user',
+        company_id: data?.company_id || null,
+        has_full_access: userId === SUPERADMIN_USER_ID,
+      };
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // For superadmin, always return a profile to prevent blocking
@@ -93,8 +75,7 @@ export const useSupabaseAuth = () => {
           id: userId,
           full_name: 'Mauricio Ortiz Tamayo',
           role: 'superadmin',
-          company_id: '',
-          department: '',
+          company_id: null,
           has_full_access: true,
         };
       }
@@ -267,7 +248,7 @@ export const useSupabaseAuth = () => {
     } catch (error) {
       return { success: false, error: 'Error de conexión' };
     }
-  }, [logAccess]);
+  }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {

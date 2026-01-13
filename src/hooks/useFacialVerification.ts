@@ -50,8 +50,10 @@ export function useFacialVerification(userId: string | undefined) {
     }
 
     try {
-      // Use RPC to get profile (bypasses RLS)
-      const { data: profile, error } = await supabase.rpc('get_my_profile');
+      // Use RPC to get facial data (bypasses RLS)
+      const { data, error } = await supabase.rpc('get_user_facial_embedding', {
+        target_user_id: userId
+      });
 
       if (error) {
         console.error('Error checking facial verification:', error);
@@ -59,6 +61,8 @@ export function useFacialVerification(userId: string | undefined) {
         return;
       }
 
+      // RPC returns array, get first element
+      const profile = data?.[0];
       if (!profile?.last_facial_verification) {
         // No verification recorded
         setState({
@@ -104,17 +108,25 @@ export function useFacialVerification(userId: string | undefined) {
     if (!userId) return false;
 
     try {
-      const now = new Date().toISOString();
-      
-      // Use direct update for own profile
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ last_facial_verification: now })
-        .eq('id', userId);
+      // Use RPC to save timestamp (bypasses RLS)
+      const { error } = await supabase.rpc('save_facial_embedding', {
+        target_user_id: userId,
+        new_embedding: null,
+        update_timestamp: true
+      });
 
       if (error) {
-        console.error('Error recording facial verification:', error);
-        return false;
+        console.error('Error recording facial verification via RPC:', error);
+        // Fallback to direct update
+        const { error: directError } = await supabase
+          .from('user_profiles')
+          .update({ last_facial_verification: new Date().toISOString() })
+          .eq('id', userId);
+
+        if (directError) {
+          console.error('Direct update also failed:', directError);
+          return false;
+        }
       }
 
       // Mark this session as verified
@@ -123,7 +135,7 @@ export function useFacialVerification(userId: string | undefined) {
       // Update local state
       setState({
         isVerified: true,
-        lastVerification: new Date(now),
+        lastVerification: new Date(),
         isLoading: false,
         timeRemaining: VERIFICATION_TIMEOUT_MINUTES,
       });

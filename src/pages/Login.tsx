@@ -66,32 +66,23 @@ export const Login = () => {
         setPendingProfileCheck(true);
         
         try {
-          // Use RPC function to get profile (bypasses RLS recursion)
-          const { data: existingProfile, error } = await supabase.rpc('get_my_profile');
+          // Direct query for user profile
+          const { data: existingProfile, error } = await supabase
+            .from('user_profiles')
+            .select('id, full_name, email')
+            .eq('id', user.id)
+            .maybeSingle();
 
           if (error) {
-            console.error('Error checking profile via RPC:', error);
-            // If there's an RLS error, check if it's the superadmin by UUID
+            console.error('Error checking profile:', error);
+            // If there's an error, check if it's the superadmin by UUID
             if (user.id === SUPERADMIN_USER_ID) {
               console.log('Superadmin detected, skipping to face recognition');
               setStep('face-recognition');
               setPendingProfileCheck(false);
               return;
             }
-            // For non-superadmin with error, try direct query as fallback
-            const { data: directProfile } = await supabase
-              .from('user_profiles')
-              .select('id, full_name, has_full_access')
-              .eq('id', user.id)
-              .maybeSingle();
-            
-            if (!directProfile) {
-              setStep('profile-setup');
-            } else if (directProfile.full_name && directProfile.full_name.trim() !== '') {
-              setStep('face-recognition');
-            } else {
-              setStep('profile-setup');
-            }
+            setStep('profile-setup');
             setPendingProfileCheck(false);
             return;
           }

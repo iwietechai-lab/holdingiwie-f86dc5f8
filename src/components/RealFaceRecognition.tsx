@@ -177,7 +177,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         return false;
       }
 
-      const embedding = data?.facial_embedding;
+      // RPC returns an array, get first element
+      const embedding = data?.[0]?.facial_embedding;
       const hasEmbedding = embedding && Array.isArray(embedding) && embedding.length > 0;
       
       console.log('📊 Has stored embedding:', hasEmbedding);
@@ -377,7 +378,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           target_user_id: userId
         });
 
-        if (error || !data?.facial_embedding) {
+        // RPC returns an array, get first element
+        const embeddingData = data?.[0];
+        if (error || !embeddingData?.facial_embedding) {
           console.error('❌ Error getting facial embedding:', error);
           setError('Error al obtener datos faciales. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
@@ -386,7 +389,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           return;
         }
 
-        const storedEmbedding = data.facial_embedding as number[];
+        const storedEmbedding = embeddingData.facial_embedding as number[];
         console.log('📊 Embedding guardado', storedEmbedding.slice(0, 5), '... (length:', storedEmbedding.length, ')');
         
         const similarity = cosineSimilarity(embedding, storedEmbedding);

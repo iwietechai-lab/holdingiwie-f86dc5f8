@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import { VerificationStatusBadge } from '@/components/FacialVerificationGuard';
 
@@ -35,29 +34,9 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
-
-  // Check if current user is superadmin using RPC to avoid RLS recursion
-  useEffect(() => {
-    const checkSuperadmin = async () => {
-      if (!user || user.id !== SUPERADMIN_USER_ID) {
-        setIsSuperadmin(false);
-        return;
-      }
-
-      try {
-        // Use RPC to call has_role function - avoids RLS recursion
-        const { data } = await supabase
-          .rpc('has_role', { _user_id: user.id, _role: 'superadmin' });
-
-        setIsSuperadmin(!!data);
-      } catch {
-        setIsSuperadmin(false);
-      }
-    };
-
-    checkSuperadmin();
-  }, [user]);
+  
+  // Check if current user is superadmin by UUID
+  const isSuperadmin = user?.id === SUPERADMIN_USER_ID;
 
   const handleLogout = async () => {
     await logout();

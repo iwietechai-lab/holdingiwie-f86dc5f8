@@ -57,6 +57,9 @@ const validateFile = (file: File): { valid: boolean; error?: string } => {
   return { valid: true };
 };
 
+// Helper to make typed queries to documentos table (not in auto-generated types yet)
+const documentosTable = () => supabase.from('documentos' as any);
+
 export const documentService = {
   // Initialize bucket if needed (should be created via SQL migration)
   async ensureBucketExists(): Promise<void> {
@@ -186,8 +189,7 @@ export const documentService = {
     try {
       const tipo = getDocumentTypeFromMime(upload.file.type);
 
-      const { data, error } = await supabase
-        .from('documentos')
+      const { data, error } = await documentosTable()
         .insert({
           nombre: upload.nombre || upload.file.name,
           tipo,
@@ -205,7 +207,7 @@ export const documentService = {
 
       if (error) throw error;
 
-      return { data, error: null };
+      return { data: data as unknown as Document, error: null };
     } catch (error) {
       console.error('Create document error:', error);
       return { data: null, error: error as Error };
@@ -219,8 +221,7 @@ export const documentService = {
     tipo?: string;
   }): Promise<{ data: Document[]; error: Error | null }> {
     try {
-      let query = supabase
-        .from('documentos')
+      let query = documentosTable()
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -238,7 +239,7 @@ export const documentService = {
 
       if (error) throw error;
 
-      return { data: data || [], error: null };
+      return { data: (data || []) as unknown as Document[], error: null };
     } catch (error) {
       console.error('Get documents error:', error);
       return { data: [], error: error as Error };
@@ -272,8 +273,7 @@ export const documentService = {
       if (storageError) throw storageError;
 
       // Delete from database
-      const { error: dbError } = await supabase
-        .from('documentos')
+      const { error: dbError } = await documentosTable()
         .delete()
         .eq('id', id);
 
@@ -300,19 +300,17 @@ export const documentService = {
       if (uploadError) throw uploadError;
 
       // Get current version
-      const { data: current } = await supabase
-        .from('documentos')
+      const { data: current } = await documentosTable()
         .select('version')
         .eq('id', id)
         .single();
 
       // Update record with new version
-      const { data, error } = await supabase
-        .from('documentos')
+      const { data, error } = await documentosTable()
         .update({
           file_path: path,
           file_size: file.size,
-          version: (current?.version || 0) + 1,
+          version: ((current as any)?.version || 0) + 1,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -321,7 +319,7 @@ export const documentService = {
 
       if (error) throw error;
 
-      return { data, error: null };
+      return { data: data as unknown as Document, error: null };
     } catch (error) {
       console.error('Update version error:', error);
       return { data: null, error: error as Error };
