@@ -149,8 +149,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     try {
       console.log('🔍 Checking stored embedding for user:', userId);
       
-      // Use RPC to get profile (bypasses RLS)
-      const { data: profile, error } = await supabase.rpc('get_my_profile');
+      // Use RPC get_user_facial_embedding to bypass RLS
+      const { data, error } = await supabase.rpc('get_user_facial_embedding', {
+        target_user_id: userId
+      });
 
       if (error) {
         console.error('Error checking embedding via RPC:', error);
@@ -159,9 +161,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         return false;
       }
 
-      const hasEmbedding = profile?.facial_embedding && 
-        Array.isArray(profile.facial_embedding) && 
-        profile.facial_embedding.length > 0;
+      const embedding = data?.facial_embedding;
+      const hasEmbedding = embedding && 
+        Array.isArray(embedding) && 
+        embedding.length > 0;
       
       console.log('📊 Has stored embedding:', hasEmbedding);
       setHasStoredEmbedding(hasEmbedding);
@@ -404,10 +407,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       setInstruction('Comparando con tu rostro registrado...');
 
       try {
-        // Use RPC to get profile with embedding
-        const { data: profile, error } = await supabase.rpc('get_my_profile');
+        // Use RPC get_user_facial_embedding to bypass RLS
+        const { data, error } = await supabase.rpc('get_user_facial_embedding', {
+          target_user_id: userId
+        });
 
-        if (error || !profile?.facial_embedding) {
+        if (error || !data?.facial_embedding) {
           console.error('Error getting facial embedding:', error);
           setError('Error al obtener datos faciales. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
@@ -415,7 +420,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           return;
         }
 
-        const storedEmbedding = profile.facial_embedding as number[];
+        const storedEmbedding = data.facial_embedding as number[];
         
         // Calculate Euclidean distance
         const distance = Math.sqrt(
@@ -428,7 +433,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Match successful
           console.log('✅ Face match successful!');
           setStatus('success');
-          setInstruction('¡Identidad verificada!');
+          setInstruction('¡Verificación completada!');
           stopCamera();
           
           // Log successful access with location
