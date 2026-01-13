@@ -103,12 +103,12 @@ export function useFacialVerification(userId: string | undefined) {
     }
   }, [userId]);
 
-  // Update verification timestamp in database
+  // Update verification timestamp in database using RPC (SECURITY DEFINER)
   const recordVerification = useCallback(async () => {
     if (!userId) return false;
 
     try {
-      // Use RPC to save timestamp (bypasses RLS)
+      // Use RPC to save timestamp (SECURITY DEFINER - bypasses RLS)
       const { error } = await supabase.rpc('save_facial_embedding', {
         target_user_id: userId,
         new_embedding: null,
@@ -117,16 +117,7 @@ export function useFacialVerification(userId: string | undefined) {
 
       if (error) {
         console.error('Error recording facial verification via RPC:', error);
-        // Fallback to direct update
-        const { error: directError } = await supabase
-          .from('user_profiles')
-          .update({ last_facial_verification: new Date().toISOString() })
-          .eq('id', userId);
-
-        if (directError) {
-          console.error('Direct update also failed:', directError);
-          return false;
-        }
+        return false;
       }
 
       // Mark this session as verified

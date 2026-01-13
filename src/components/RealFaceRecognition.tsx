@@ -403,7 +403,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           
           await logAccessWithLocation(true, locationData || {});
           
-          // Use RPC to update timestamp (bypasses RLS issues)
+          // Use RPC to update timestamp (bypasses RLS issues - SECURITY DEFINER)
           const { error: updateError } = await supabase.rpc('save_facial_embedding', {
             target_user_id: userId,
             new_embedding: null, // Don't update embedding, just timestamp
@@ -412,16 +412,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           
           if (updateError) {
             console.error('❌ Error updating timestamp via RPC:', updateError);
-            // Fallback to direct update
-            const { error: directError } = await supabase
-              .from('user_profiles')
-              .update({ last_facial_verification: new Date().toISOString() })
-              .eq('id', userId);
-            if (directError) {
-              console.error('❌ Direct update also failed:', directError);
-            }
           } else {
-            console.log('✅ Guardando timestamp', new Date().toISOString());
+            console.log('✅ Timestamp actualizado via RPC:', new Date().toISOString());
           }
 
           setTimeout(onSuccess, 1500);
@@ -444,7 +436,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       setInstruction('Registrando tu rostro por primera vez...');
 
       try {
-        // Use RPC to save embedding (bypasses RLS issues)
+        // Use RPC to save embedding (SECURITY DEFINER - bypasses RLS)
         const { error: rpcError } = await supabase.rpc('save_facial_embedding', {
           target_user_id: userId,
           new_embedding: embedding,
@@ -452,24 +444,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         });
 
         if (rpcError) {
-          console.error('❌ Error saving via RPC:', rpcError);
-          // Fallback to direct update
-          const { error: directError } = await supabase
-            .from('user_profiles')
-            .update({ 
-              facial_embedding: embedding,
-              last_facial_verification: new Date().toISOString()
-            })
-            .eq('id', userId);
-
-          if (directError) {
-            console.error('❌ Direct update also failed:', directError);
-            setError('Error al registrar rostro. Verifica permisos en la base de datos.');
-            setAttempts(prev => prev + 1);
-            setStatus('failed');
-            setIsProcessing(false);
-            return;
-          }
+          console.error('❌ Error saving embedding via RPC:', rpcError);
+          setError('Error al registrar rostro. Intenta de nuevo.');
+          setAttempts(prev => prev + 1);
+          setStatus('failed');
+          setIsProcessing(false);
+          return;
         }
 
         console.log('✅ Embedding registrado!');
