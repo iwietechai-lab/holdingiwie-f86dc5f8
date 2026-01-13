@@ -66,24 +66,34 @@ export const Login = () => {
         setPendingProfileCheck(true);
         
         try {
-          // For superadmin, check if profile is complete (has full_name and has_full_access)
-          // Use maybeSingle to avoid errors when no profile exists
-          const { data: existingProfile, error } = await supabase
-            .from('user_profiles')
-            .select('id, full_name, has_full_access')
-            .eq('id', user.id)
-            .maybeSingle();
+          // Use RPC function to get profile (bypasses RLS recursion)
+          const { data: existingProfile, error } = await supabase.rpc('get_my_profile');
 
           if (error) {
-            console.error('Error checking profile:', error);
+            console.error('Error checking profile via RPC:', error);
             // If there's an RLS error, check if it's the superadmin by UUID
-            // Superadmin with known complete profile should skip to face recognition
             if (user.id === SUPERADMIN_USER_ID) {
               console.log('Superadmin detected, skipping to face recognition');
               setStep('face-recognition');
               setPendingProfileCheck(false);
               return;
             }
+            // For non-superadmin with error, try direct query as fallback
+            const { data: directProfile } = await supabase
+              .from('user_profiles')
+              .select('id, full_name, has_full_access')
+              .eq('id', user.id)
+              .maybeSingle();
+            
+            if (!directProfile) {
+              setStep('profile-setup');
+            } else if (directProfile.full_name && directProfile.full_name.trim() !== '') {
+              setStep('face-recognition');
+            } else {
+              setStep('profile-setup');
+            }
+            setPendingProfileCheck(false);
+            return;
           }
 
           // Check if profile is complete enough to skip setup
