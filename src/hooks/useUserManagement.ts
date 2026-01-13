@@ -8,7 +8,6 @@ export interface UserProfile {
   email: string | null;
   role: string | null;
   company_id: string | null;
-  department: string | null;
   avatar_url: string | null;
   created_at: string | null;
   has_full_access: boolean;
@@ -23,13 +22,13 @@ export interface UserRole {
 export interface AccessLog {
   id: string;
   user_id: string;
-  timestamp: string;
+  timestampt: string | null;
   city: string | null;
   country: string | null;
   latitude: number | null;
   longitude: number | null;
-  user_agent: string | null;
-  success: boolean;
+  device_info: string | null;
+  success: boolean | null;
 }
 
 export interface UserWithDetails extends UserProfile {
@@ -55,86 +54,49 @@ export function useUserManagement() {
         throw new Error('No authenticated user');
       }
 
-      // Check if current user is superadmin using RPC (avoids RLS recursion)
-      const { data: isSuperadmin } = await supabase.rpc('has_role', {
-        _user_id: currentUser.id,
-        _role: 'superadmin'
-      });
-
-      // Also check by UUID for hardcoded superadmin
+      // Check by UUID for hardcoded superadmin
       const isHardcodedSuperadmin = currentUser.id === SUPERADMIN_USER_ID;
       
-      if (!isSuperadmin && !isHardcodedSuperadmin) {
+      if (!isHardcodedSuperadmin) {
         throw new Error('No tienes permisos para ver usuarios');
       }
 
-      // Try to fetch using RPC function first (if it exists)
-      // This bypasses RLS for superadmin
-      let profiles: any[] = [];
-      let roles: any[] = [];
-      let accessLogs: any[] = [];
-
-      // Try RPC call for profiles (security definer)
-      const { data: rpcProfiles, error: rpcProfilesError } = await supabase.rpc('get_all_user_profiles');
+      // Fetch profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      if (rpcProfilesError) {
-        console.log('RPC get_all_user_profiles not available, using direct query');
-        // Fallback to direct query - will work if user has RLS permissions
-        const { data: directProfiles, error: profilesError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          throw profilesError;
-        }
-        profiles = directProfiles || [];
-      } else {
-        profiles = rpcProfiles || [];
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
       }
 
-      // Try RPC call for roles (security definer)
-      const { data: rpcRoles, error: rpcRolesError } = await supabase.rpc('get_all_user_roles');
-      
-      if (rpcRolesError) {
-        console.log('RPC get_all_user_roles not available, using direct query');
-        // Fallback - this may fail with RLS recursion
-        const { data: directRoles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('*');
-        
-        if (rolesError) {
-          console.warn('Could not fetch roles:', rolesError);
-          // Don't throw - continue with empty roles
-        } else {
-          roles = directRoles || [];
-        }
-      } else {
-        roles = rpcRoles || [];
-      }
-
-      // Fetch access logs (usually has simpler RLS)
+      // Fetch access logs
       const { data: logsData, error: logsError } = await supabase
         .from('access_logs')
         .select('*')
-        .order('timestamp', { ascending: false })
+        .order('timestampt', { ascending: false })
         .limit(500);
       
-      if (!logsError) {
-        accessLogs = logsData || [];
-      }
+      const accessLogs = logsError ? [] : (logsData || []);
 
       // Combine data
-      const usersWithDetails: UserWithDetails[] = profiles.map((profile) => {
-        const userRoles = roles.filter((r) => r.user_id === profile.id);
+      const usersWithDetails: UserWithDetails[] = (profiles || []).map((profile) => {
         const userLogs = accessLogs.filter((l) => l.user_id === profile.id);
-        const lastAccess = userLogs.length > 0 ? userLogs[0].timestamp : null;
+        const lastAccess = userLogs.length > 0 ? userLogs[0].timestampt : null;
 
         return {
-          ...profile,
-          roles: userRoles,
-          accessLogs: userLogs,
+          id: profile.id,
+          full_name: profile.full_name,
+          email: profile.email,
+          role: profile.role,
+          company_id: profile.company_id,
+          avatar_url: null,
+          created_at: profile.created_at,
+          has_full_access: profile.id === SUPERADMIN_USER_ID,
+          roles: [],
+          accessLogs: userLogs as AccessLog[],
           lastAccess,
         };
       });
@@ -154,9 +116,11 @@ export function useUserManagement() {
 
   const addRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
     try {
+      // Update role in user_profiles
       const { error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: userId, role });
+        .from('user_profiles')
+        .update({ role })
+        .eq('id', userId);
 
       if (error) throw error;
       await fetchUsers();
@@ -170,10 +134,9 @@ export function useUserManagement() {
   const removeRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
     try {
       const { error } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId)
-        .eq('role', role);
+        .from('user_profiles')
+        .update({ role: 'user' })
+        .eq('id', userId);
 
       if (error) throw error;
       await fetchUsers();
@@ -186,7 +149,7 @@ export function useUserManagement() {
 
   const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
     try {
-      // Remove has_full_access from updates if it exists - it's stored separately
+      // Remove has_full_access from updates if it exists - it's computed
       const { has_full_access, ...profileUpdates } = updates as any;
       
       const { error } = await supabase
@@ -209,23 +172,19 @@ export function useUserManagement() {
       full_name: string;
       role: string;
       company_id: string;
-      department: string;
-      has_full_access: boolean;
     }
   ) => {
     try {
-      const { has_full_access, ...profileUpdates } = updates;
-      
-      // Update profile
-      const { error: profileError } = await supabase
+      const { error } = await supabase
         .from('user_profiles')
         .update({
-          ...profileUpdates,
-          has_full_access,
+          full_name: updates.full_name,
+          role: updates.role,
+          company_id: updates.company_id,
         })
         .eq('id', userId);
 
-      if (profileError) throw profileError;
+      if (error) throw error;
 
       await fetchUsers();
       return { success: true };
@@ -237,13 +196,7 @@ export function useUserManagement() {
 
   const deleteUser = async (userId: string) => {
     try {
-      // First delete roles
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Delete profile (this may cascade delete other related data)
+      // Delete profile
       const { error } = await supabase
         .from('user_profiles')
         .delete()
@@ -264,7 +217,7 @@ export function useUserManagement() {
         .from('access_logs')
         .select('*')
         .eq('user_id', userId)
-        .order('timestamp', { ascending: false })
+        .order('timestampt', { ascending: false })
         .limit(50);
 
       if (error) throw error;
