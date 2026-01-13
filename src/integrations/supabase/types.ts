@@ -14,13 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      access_logs: {
+        Row: {
+          city: string | null
+          country: string | null
+          device_info: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          success: boolean | null
+          timestampt: string | null
+          user_id: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          device_info?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          success?: boolean | null
+          timestampt?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          device_info?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          success?: boolean | null
+          timestampt?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          email: string | null
+          facial_embedding: Json | null
+          full_name: string | null
+          id: string
+          last_facial_verification: string | null
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          facial_embedding?: Json | null
+          full_name?: string | null
+          id: string
+          last_facial_verification?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          facial_embedding?: Json | null
+          full_name?: string | null
+          id?: string
+          last_facial_verification?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_facial_embedding: {
+        Args: { target_user_id: string }
+        Returns: {
+          facial_embedding: Json
+          last_facial_verification: string
+        }[]
+      }
+      save_facial_embedding: {
+        Args: {
+          new_embedding?: Json
+          target_user_id: string
+          update_timestamp?: boolean
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
