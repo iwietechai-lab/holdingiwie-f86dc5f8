@@ -64,12 +64,22 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const [livenessProgress, setLivenessProgress] = useState(0);
   const [currentChallenge, setCurrentChallenge] = useState<LivenessChallenge | null>(null);
 
+  // Use refs to track state in detection loop (avoid stale closures)
+  const statusRef = useRef<RecognitionStatus>('loading-models');
+  const isProcessingRef = useRef(false);
+  const livenessConfirmedRef = useRef(false);
+
+  // Sync refs with state
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { isProcessingRef.current = isProcessing; }, [isProcessing]);
+
   // Liveness detection state
   const nosePositionsRef = useRef<{x: number, y: number}[]>([]);
   const eyeRatioHistoryRef = useRef<number[]>([]);
   const initialNosePositionRef = useRef<{x: number, y: number} | null>(null);
   const livenessStartTimeRef = useRef<number>(0);
   const challengeCompletedRef = useRef(false);
+  const currentChallengeRef = useRef<LivenessChallenge | null>(null);
 
   // Get user location
   const getLocation = useCallback(async (): Promise<LocationData> => {
@@ -262,9 +272,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     return challenges[Math.floor(Math.random() * challenges.length)];
   };
 
-  // Check liveness based on current challenge
+  // Check liveness based on current challenge (uses ref for loop)
   const checkLiveness = useCallback((landmarks: faceapi.FaceLandmarks68): boolean => {
-    if (!currentChallenge) return false;
+    const challenge = currentChallengeRef.current;
+    if (!challenge) return false;
 
     const nose = landmarks.getNose();
     const noseCenter = nose[3]; // Tip of nose
@@ -297,34 +308,37 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     
     // Movement threshold (adjust based on video resolution)
     const MOVEMENT_THRESHOLD = 25;
+    let progress = 0;
 
-    switch (currentChallenge) {
+    switch (challenge) {
       case 'turn-left':
         // Nose moves RIGHT in mirrored video when turning left
+        progress = Math.min(100, Math.max(0, (deltaX / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progress);
         if (deltaX > MOVEMENT_THRESHOLD) {
           console.log('✅ LIVENESS: Turn left detected! DeltaX:', deltaX.toFixed(2));
           return true;
         }
-        // Update progress
-        setLivenessProgress(Math.min(100, (deltaX / MOVEMENT_THRESHOLD) * 100));
         break;
 
       case 'turn-right':
         // Nose moves LEFT in mirrored video when turning right
+        progress = Math.min(100, Math.max(0, (Math.abs(deltaX) / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progress);
         if (deltaX < -MOVEMENT_THRESHOLD) {
           console.log('✅ LIVENESS: Turn right detected! DeltaX:', deltaX.toFixed(2));
           return true;
         }
-        setLivenessProgress(Math.min(100, (Math.abs(deltaX) / MOVEMENT_THRESHOLD) * 100));
         break;
 
       case 'nod':
         // Head moves down then up
+        progress = Math.min(100, Math.max(0, (Math.abs(deltaY) / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progress);
         if (Math.abs(deltaY) > MOVEMENT_THRESHOLD) {
           console.log('✅ LIVENESS: Nod detected! DeltaY:', deltaY.toFixed(2));
           return true;
         }
-        setLivenessProgress(Math.min(100, (Math.abs(deltaY) / MOVEMENT_THRESHOLD) * 100));
         break;
 
       case 'blink':
@@ -337,6 +351,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           eyeRatioHistoryRef.current.shift();
         }
 
+        // Show progress based on eye closure
+        const earProgress = Math.min(100, Math.max(0, ((0.3 - avgEAR) / 0.1) * 100));
+        setLivenessProgress(earProgress);
+
         // Detect blink pattern
         if (eyeRatioHistoryRef.current.length >= 8) {
           const recent = eyeRatioHistoryRef.current.slice(-8);
@@ -347,6 +365,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Blink: significant EAR drop followed by recovery
           if (max - min > 0.06 && min < 0.25 && current > min + 0.03) {
             console.log('✅ LIVENESS: Blink detected! EAR min:', min.toFixed(3), 'max:', max.toFixed(3));
+            setLivenessProgress(100);
             return true;
           }
         }
@@ -355,22 +374,24 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     // Log progress periodically
     if (nosePositionsRef.current.length % 15 === 0) {
-      console.log(`🔍 Liveness check - Challenge: ${currentChallenge}, DeltaX: ${deltaX.toFixed(2)}, DeltaY: ${deltaY.toFixed(2)}`);
+      console.log(`🔍 Liveness check - Challenge: ${challenge}, DeltaX: ${deltaX.toFixed(2)}, DeltaY: ${deltaY.toFixed(2)}, Progress: ${progress.toFixed(0)}%`);
     }
 
     return false;
-  }, [currentChallenge]);
+  }, []);
 
   // Process embedding
   const processEmbedding = useCallback(async (descriptor: Float32Array) => {
-    if (isProcessing) return;
+    if (isProcessingRef.current) return;
     setIsProcessing(true);
+    isProcessingRef.current = true;
     
     const embedding = Array.from(descriptor);
     console.log('🔐 Embedding generado', embedding.slice(0, 5), '... (length:', embedding.length, ')');
 
     if (hasStoredEmbedding) {
       setStatus('comparing');
+      statusRef.current = 'comparing';
       setInstruction('Comparando con tu rostro registrado...');
 
       try {
@@ -385,7 +406,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setError('Error al obtener datos faciales. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
+          statusRef.current = 'failed';
           setIsProcessing(false);
+          isProcessingRef.current = false;
           return;
         }
 
@@ -398,6 +421,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
           setStatus('success');
+          statusRef.current = 'success';
           setInstruction('¡Verificación completada!');
           stopCamera();
           
@@ -422,17 +446,22 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setError(`Rostro no coincide (similitud: ${(similarity * 100).toFixed(1)}%). Intenta de nuevo.`);
           setAttempts(prev => prev + 1);
           setStatus('failed');
+          statusRef.current = 'failed';
+          stopCamera();
         }
       } catch (err) {
         console.error('❌ Comparison error:', err);
         setError('Error al comparar rostros. Intenta de nuevo.');
         setAttempts(prev => prev + 1);
         setStatus('failed');
+        statusRef.current = 'failed';
+        stopCamera();
       }
     } else {
       console.log('📝 Registrando nuevo embedding facial...');
       console.log('📊 Guardando embedding', embedding.slice(0, 5), '...');
       setStatus('registering');
+      statusRef.current = 'registering';
       setInstruction('Registrando tu rostro por primera vez...');
 
       try {
@@ -448,13 +477,17 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setError('Error al registrar rostro. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
+          statusRef.current = 'failed';
           setIsProcessing(false);
+          isProcessingRef.current = false;
+          stopCamera();
           return;
         }
 
         console.log('✅ Embedding registrado!');
         console.log('✅ Guardando timestamp', new Date().toISOString());
         setStatus('success');
+        statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
         stopCamera();
 
@@ -465,9 +498,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setError('Error al registrar rostro. Intenta de nuevo.');
         setAttempts(prev => prev + 1);
         setStatus('failed');
+        statusRef.current = 'failed';
+        stopCamera();
       }
     }
     setIsProcessing(false);
+    isProcessingRef.current = false;
   }, [hasStoredEmbedding, userId, stopCamera, logAccessWithLocation, locationData, onSuccess, isProcessing]);
 
   // Draw landmarks
@@ -509,25 +545,32 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     console.log('🚀 Starting face detection with liveness check...');
     setStatus('detecting');
+    statusRef.current = 'detecting';
     setInstruction('Posiciona tu rostro dentro del círculo');
     setLivenessProgress(0);
     nosePositionsRef.current = [];
     eyeRatioHistoryRef.current = [];
     initialNosePositionRef.current = null;
     challengeCompletedRef.current = false;
+    livenessConfirmedRef.current = false;
 
-    // Select random challenge
+    // Select random challenge and store in ref
     const challenge = selectRandomChallenge();
     setCurrentChallenge(challenge);
+    currentChallengeRef.current = challenge;
     console.log('🎯 Selected liveness challenge:', challenge);
 
     let consecutiveDetections = 0;
-    let lastValidDescriptor: Float32Array | null = null;
     let frameCount = 0;
-    let livenessConfirmed = false;
+    let hasStartedLiveness = false;
 
     const detect = async () => {
-      if (!videoRef.current || status === 'success' || isProcessing) {
+      // Use refs to check current state (avoids stale closures)
+      const currentStatus = statusRef.current;
+      const processing = isProcessingRef.current;
+      
+      if (!videoRef.current || currentStatus === 'success' || currentStatus === 'failed' || processing) {
+        console.log('🛑 Detection loop stopped:', { currentStatus, processing });
         return;
       }
 
@@ -544,31 +587,32 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
         if (detection) {
           consecutiveDetections++;
-          lastValidDescriptor = detection.descriptor;
           setFaceDetected(true);
           setLandmarksCount(detection.landmarks.positions.length);
           
           drawLandmarks(detection);
 
-          // Phase 1: Detect face stably
-          if (consecutiveDetections >= 5 && status === 'detecting') {
+          // Phase 1: Detect face stably (5 consecutive detections)
+          if (consecutiveDetections >= 5 && !hasStartedLiveness) {
             console.log('✅ Stable face detected, starting liveness check');
+            hasStartedLiveness = true;
             setStatus('liveness-check');
+            statusRef.current = 'liveness-check';
             setInstruction(CHALLENGE_MESSAGES[challenge]);
             livenessStartTimeRef.current = Date.now();
           }
 
           // Phase 2: Liveness check
-          if (status === 'liveness-check' && !livenessConfirmed) {
+          if (hasStartedLiveness && !livenessConfirmedRef.current) {
             if (checkLiveness(detection.landmarks)) {
               console.log('🎉 Liveness confirmed!');
-              livenessConfirmed = true;
+              livenessConfirmedRef.current = true;
               challengeCompletedRef.current = true;
               setLivenessProgress(100);
               
               // Proceed to embedding
               await processEmbedding(detection.descriptor);
-              return;
+              return; // Exit loop
             }
 
             // Check timeout
@@ -578,7 +622,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
               setError('No se detectó movimiento. Intenta de nuevo siguiendo las instrucciones.');
               setAttempts(prev => prev + 1);
               setStatus('failed');
-              return;
+              statusRef.current = 'failed';
+              stopCamera();
+              return; // Exit loop
             }
           }
         } else {
@@ -600,16 +646,18 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     };
 
     detect();
-  }, [modelsLoaded, status, checkLiveness, drawLandmarks, processEmbedding, isProcessing]);
+  }, [modelsLoaded, checkLiveness, drawLandmarks, processEmbedding, stopCamera]);
 
   // Handle retry
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     console.log('🔄 Retrying...');
     setError(null);
     setFaceDetected(false);
     setLandmarksCount(0);
     setLivenessProgress(0);
     setIsProcessing(false);
+    isProcessingRef.current = false;
+    livenessConfirmedRef.current = false;
     nosePositionsRef.current = [];
     eyeRatioHistoryRef.current = [];
     initialNosePositionRef.current = null;
@@ -618,12 +666,18 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     if (attempts < MAX_ATTEMPTS) {
       const newChallenge = selectRandomChallenge();
       setCurrentChallenge(newChallenge);
+      currentChallengeRef.current = newChallenge;
       console.log('🎯 New challenge:', newChallenge);
-      setStatus('detecting');
+      setStatus('ready');
+      statusRef.current = 'ready';
       setInstruction('Posiciona tu rostro dentro del círculo');
-      startDetection();
+      
+      // Restart camera if stopped
+      if (!streamRef.current) {
+        await startCamera();
+      }
     }
-  }, [attempts, startDetection]);
+  }, [attempts, startCamera]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -728,19 +782,34 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           </div>
         </div>
 
-        {/* Liveness progress bar */}
-        {status === 'liveness-check' && (
-          <div className="w-64 mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <MoveHorizontal className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm text-yellow-400">Prueba de vida</span>
+        {/* Liveness progress bar - show during liveness check OR detecting with face */}
+        {(status === 'liveness-check' || (status === 'detecting' && faceDetected)) && (
+          <div className="w-72 mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MoveHorizontal className="w-4 h-4 text-yellow-400" />
+                <span className="text-sm text-yellow-400 font-medium">
+                  {status === 'liveness-check' ? 'Prueba de vida' : 'Detectando rostro...'}
+                </span>
+              </div>
+              <span className="text-sm font-bold text-yellow-400">
+                {status === 'liveness-check' ? `${Math.round(livenessProgress)}%` : '✓'}
+              </span>
             </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div className="h-3 bg-muted rounded-full overflow-hidden border border-yellow-500/30">
               <div 
-                className="h-full bg-yellow-500 transition-all duration-200"
-                style={{ width: `${Math.max(0, livenessProgress)}%` }}
+                className="h-full bg-gradient-to-r from-yellow-500 to-green-500 transition-all duration-200 ease-out"
+                style={{ width: `${status === 'liveness-check' ? Math.max(5, livenessProgress) : 100}%` }}
               />
             </div>
+            {status === 'liveness-check' && currentChallenge && (
+              <p className="text-xs text-muted-foreground mt-1 text-center">
+                {currentChallenge === 'blink' && 'Parpadea lentamente'}
+                {currentChallenge === 'turn-left' && 'Gira hacia tu izquierda'}
+                {currentChallenge === 'turn-right' && 'Gira hacia tu derecha'}
+                {currentChallenge === 'nod' && 'Asiente con la cabeza'}
+              </p>
+            )}
           </div>
         )}
 
