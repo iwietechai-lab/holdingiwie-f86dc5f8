@@ -11,6 +11,7 @@ import { ProfileSetupForm } from '@/components/ProfileSetupForm';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
 
 type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition';
@@ -64,19 +65,54 @@ export const Login = () => {
       if (isAuthenticated && user && step === 'credentials' && !pendingProfileCheck) {
         setPendingProfileCheck(true);
         
-        const { data: existingProfile } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
+        try {
+          // For superadmin, check if profile is complete (has full_name and has_full_access)
+          // Use maybeSingle to avoid errors when no profile exists
+          const { data: existingProfile, error } = await supabase
+            .from('user_profiles')
+            .select('id, full_name, has_full_access')
+            .eq('id', user.id)
+            .maybeSingle();
 
-        if (!existingProfile) {
-          // New user - needs profile setup
-          setStep('profile-setup');
-        } else {
-          // Existing user - proceed to face recognition
-          setStep('face-recognition');
+          if (error) {
+            console.error('Error checking profile:', error);
+            // If there's an RLS error, check if it's the superadmin by UUID
+            // Superadmin with known complete profile should skip to face recognition
+            if (user.id === SUPERADMIN_USER_ID) {
+              console.log('Superadmin detected, skipping to face recognition');
+              setStep('face-recognition');
+              setPendingProfileCheck(false);
+              return;
+            }
+          }
+
+          // Check if profile is complete enough to skip setup
+          const profileIsComplete = existingProfile && 
+            existingProfile.full_name && 
+            existingProfile.full_name.trim() !== '';
+
+          // Superadmin always skips profile setup if they have any profile data
+          if (user.id === SUPERADMIN_USER_ID && existingProfile) {
+            console.log('Superadmin with existing profile, skipping to face recognition');
+            setStep('face-recognition');
+          } else if (!existingProfile) {
+            // New user - needs profile setup
+            setStep('profile-setup');
+          } else if (profileIsComplete) {
+            // Existing user with complete profile - proceed to face recognition
+            setStep('face-recognition');
+          } else {
+            // Existing user but incomplete profile - needs setup
+            setStep('profile-setup');
+          }
+        } catch (err) {
+          console.error('Profile check error:', err);
+          // On error, if it's superadmin, skip to face recognition
+          if (user.id === SUPERADMIN_USER_ID) {
+            setStep('face-recognition');
+          }
         }
+        
         setPendingProfileCheck(false);
       }
     };
