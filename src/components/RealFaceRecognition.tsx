@@ -30,7 +30,8 @@ type RecognitionStatus =
 
 const FACE_API_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 const MATCH_THRESHOLD = 0.6;
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 5;
+const DETECTION_TIMEOUT_SECONDS = 15;
 
 export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRecognitionProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -242,28 +243,36 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     eyeRatioHistory.current.push(avgEAR);
     
-    // Log every 10 frames for debugging
-    if (eyeRatioHistory.current.length % 10 === 0) {
-      console.log('👁️ EAR values:', { leftEAR: leftEAR.toFixed(3), rightEAR: rightEAR.toFixed(3), avgEAR: avgEAR.toFixed(3) });
+    // Log every 15 frames for debugging
+    if (eyeRatioHistory.current.length % 15 === 0) {
+      console.log('👁️ EAR:', avgEAR.toFixed(3), '| History:', eyeRatioHistory.current.slice(-5).map(v => v.toFixed(2)).join(', '));
     }
     
-    // Keep last 15 frames for better detection
-    if (eyeRatioHistory.current.length > 15) {
+    // Keep last 20 frames for better detection
+    if (eyeRatioHistory.current.length > 20) {
       eyeRatioHistory.current.shift();
     }
 
-    // Detect blink: EAR drops below threshold then rises back
-    // More lenient thresholds for better detection
-    if (eyeRatioHistory.current.length >= 5) {
-      const recent = eyeRatioHistory.current.slice(-5);
+    // Detect blink: Look for a significant dip in EAR followed by recovery
+    // Much more lenient thresholds for easier detection
+    if (eyeRatioHistory.current.length >= 6) {
+      const recent = eyeRatioHistory.current.slice(-6);
       const min = Math.min(...recent);
       const max = Math.max(...recent);
       const current = recent[recent.length - 1];
+      const diff = max - min;
       
-      // Blink detected if there's significant variation (eyes closed then opened)
-      // Lowered thresholds for easier detection
-      if (min < 0.25 && max > 0.28 && current > 0.25) {
-        console.log('✅ BLINK DETECTED!', { min: min.toFixed(3), max: max.toFixed(3), current: current.toFixed(3) });
+      // Blink detected if:
+      // 1. There's a significant variation (at least 0.05 difference)
+      // 2. Current value is higher than the minimum (eyes are open again)
+      // 3. Minimum was below 0.28 (eyes were at least partially closed)
+      if (diff > 0.04 && min < 0.30 && current > min + 0.02) {
+        console.log('✅ BLINK DETECTED!', { 
+          min: min.toFixed(3), 
+          max: max.toFixed(3), 
+          current: current.toFixed(3),
+          diff: diff.toFixed(3)
+        });
         blinkCount.current += 1;
         eyeRatioHistory.current = []; // Reset after blink
         return true;
@@ -273,46 +282,56 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     return false;
   }, []);
 
-  // Main face detection and verification loop
+  // Main face detection and verification loop - keeps camera always active
   const startDetection = useCallback(async () => {
     if (!videoRef.current || !modelsLoaded) return;
 
-    console.log('🚀 Starting face detection...');
+    console.log('🚀 Starting face detection... Camera will stay active until success.');
     setStatus('detecting');
-    setInstruction('Buscando tu rostro...');
+    setInstruction('Mantén la cámara activa y parpadea lentamente');
     setBlinkDetected(false);
     blinkCount.current = 0;
     eyeRatioHistory.current = [];
 
     let livenessConfirmed = false;
     let detectionAttempts = 0;
-    const maxDetectionAttempts = 300; // ~10 seconds at 30fps
+    const maxDetectionAttempts = DETECTION_TIMEOUT_SECONDS * 30; // ~15 seconds at 30fps
     let faceDetectedCount = 0;
+    let lastFaceDetectedTime = 0;
 
     const detect = async () => {
-      if (!videoRef.current || status === 'success' || status === 'failed') return;
+      // Only stop on success - camera stays active otherwise
+      if (!videoRef.current || status === 'success') return;
+      
+      // If status is failed, we still keep the loop but pause detection
+      if (status === 'failed') {
+        // Keep trying to detect while showing retry button
+        animationRef.current = requestAnimationFrame(detect);
+        return;
+      }
 
       detectionAttempts++;
 
       try {
         const detection = await faceapi
           .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({
-            inputSize: 320, // Slightly smaller for faster detection
-            scoreThreshold: 0.4, // Lower threshold for better detection
+            inputSize: 224, // Smaller for faster detection
+            scoreThreshold: 0.3, // Lower threshold for better detection in various lighting
           }))
           .withFaceLandmarks()
           .withFaceDescriptor();
 
         if (detection) {
           faceDetectedCount++;
+          lastFaceDetectedTime = Date.now();
           setFaceDetected(true);
           
           if (faceDetectedCount === 1) {
-            console.log('👤 Face detected!', detection.detection.score.toFixed(2));
+            console.log('👤 Face detected! Score:', detection.detection.score.toFixed(2));
           }
 
           // Draw face detection on canvas
-          if (canvasRef.current) {
+          if (canvasRef.current && videoRef.current) {
             const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
             const resized = faceapi.resizeResults(detection, dims);
             
@@ -326,7 +345,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Liveness check - detect blink
           if (!livenessConfirmed) {
             setStatus('liveness-check');
-            setInstruction('¡Rostro detectado! Parpadea lentamente para verificar');
+            setInstruction('¡Rostro detectado! Parpadea lentamente 1 vez');
             
             if (detectBlink(detection.landmarks)) {
               console.log('🎉 Liveness confirmed via blink!');
@@ -335,27 +354,33 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
               
               // Proceed to embedding comparison/registration
               await processEmbedding(detection.descriptor);
-              return;
+              return; // Stop detection loop on success
             }
           }
         } else {
-          setFaceDetected(false);
+          // Only mark as not detected if no face for more than 500ms
+          if (Date.now() - lastFaceDetectedTime > 500) {
+            setFaceDetected(false);
+          }
           if (status === 'detecting') {
             setInstruction('Posiciona tu rostro dentro del círculo');
           }
         }
 
-        // Log progress every 50 frames
-        if (detectionAttempts % 50 === 0) {
-          console.log(`⏱️ Detection attempt ${detectionAttempts}/${maxDetectionAttempts}, faces detected: ${faceDetectedCount}`);
+        // Log progress every 60 frames (~2 seconds)
+        if (detectionAttempts % 60 === 0) {
+          const elapsed = Math.floor(detectionAttempts / 30);
+          console.log(`⏱️ ${elapsed}s elapsed, faces detected: ${faceDetectedCount}, waiting for blink...`);
         }
 
+        // Timeout - but don't stop camera
         if (detectionAttempts >= maxDetectionAttempts && !livenessConfirmed) {
-          console.log('❌ Timeout - no blink detected after max attempts');
-          setError('No se detectó parpadeo. Intenta de nuevo mirando la cámara y parpadeando lentamente.');
+          console.log('❌ Timeout - no blink detected after', DETECTION_TIMEOUT_SECONDS, 'seconds');
+          setError('No se detectó parpadeo. Mantén la cámara activa y parpadea lentamente.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
-          return;
+          // Don't stop camera - user can retry
+          // Don't return - keep the animation frame going for retry
         }
 
         animationRef.current = requestAnimationFrame(detect);
@@ -475,8 +500,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   };
 
-  // Handle retry
+  // Handle retry - camera stays active, just reset detection state
   const handleRetry = useCallback(() => {
+    console.log('🔄 Retrying detection...');
     setError(null);
     setBlinkDetected(false);
     blinkCount.current = 0;
@@ -484,9 +510,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     setFaceDetected(false);
     
     if (attempts < MAX_ATTEMPTS) {
-      startCamera().then(() => startDetection());
+      // Camera is still active, just restart detection
+      setStatus('detecting');
+      setInstruction('Mantén la cámara activa y parpadea lentamente');
+      startDetection();
     }
-  }, [attempts, startCamera, startDetection]);
+  }, [attempts, startDetection]);
 
   // Initialize
   useEffect(() => {
