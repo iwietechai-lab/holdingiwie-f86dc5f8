@@ -36,7 +36,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
   const [isSuperadmin, setIsSuperadmin] = useState(false);
 
-  // Check if current user is superadmin
+  // Check if current user is superadmin using RPC to avoid RLS recursion
   useEffect(() => {
     const checkSuperadmin = async () => {
       if (!user || user.id !== SUPERADMIN_USER_ID) {
@@ -45,12 +45,9 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
       }
 
       try {
+        // Use RPC to call has_role function - avoids RLS recursion
         const { data } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'superadmin')
-          .maybeSingle();
+          .rpc('has_role', { _user_id: user.id, _role: 'superadmin' });
 
         setIsSuperadmin(!!data);
       } catch {
