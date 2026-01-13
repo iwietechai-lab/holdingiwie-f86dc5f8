@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -10,7 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Rocket,
-  FolderOpen
+  FolderOpen,
+  ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -18,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { supabase } from '@/lib/supabase';
+import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 
 interface SidebarProps {
   selectedCompany: string | null;
@@ -27,10 +30,36 @@ interface SidebarProps {
 export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, logout } = useSupabaseAuth();
+  const { profile, logout, user } = useSupabaseAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+
+  // Check if current user is superadmin
+  useEffect(() => {
+    const checkSuperadmin = async () => {
+      if (!user || user.id !== SUPERADMIN_USER_ID) {
+        setIsSuperadmin(false);
+        return;
+      }
+
+      try {
+        const { data } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'superadmin')
+          .maybeSingle();
+
+        setIsSuperadmin(!!data);
+      } catch {
+        setIsSuperadmin(false);
+      }
+    };
+
+    checkSuperadmin();
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -48,6 +77,13 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
+    // Only show superadmin panel to the superadmin user
+    ...(isSuperadmin ? [{ 
+      icon: ShieldAlert, 
+      label: 'Panel Super Admin', 
+      action: 'navigate' as const, 
+      path: '/superadmin' 
+    }] : []),
   ];
 
   return (
