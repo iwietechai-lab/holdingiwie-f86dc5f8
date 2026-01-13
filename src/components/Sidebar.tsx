@@ -21,6 +21,7 @@ import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
+import { VerificationStatusBadge } from '@/components/FacialVerificationGuard';
 
 interface SidebarProps {
   selectedCompany: string | null;
@@ -230,6 +231,13 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
             })}
           </div>
         </nav>
+
+        {/* Verification status */}
+        {!isCollapsed && (
+          <div className="px-4 pb-2">
+            <VerificationStatusBadge userId={user?.id} />
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border">
