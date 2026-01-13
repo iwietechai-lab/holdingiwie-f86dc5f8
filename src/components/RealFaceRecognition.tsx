@@ -366,7 +366,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     setIsProcessing(true);
     
     const embedding = Array.from(descriptor);
-    console.log('🔐 Processing embedding, length:', embedding.length);
+    console.log('🔐 Embedding generado', embedding.slice(0, 5), '... (length:', embedding.length, ')');
 
     if (hasStoredEmbedding) {
       setStatus('comparing');
@@ -387,9 +387,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
 
         const storedEmbedding = data.facial_embedding as number[];
+        console.log('📊 Embedding guardado', storedEmbedding.slice(0, 5), '... (length:', storedEmbedding.length, ')');
+        
         const similarity = cosineSimilarity(embedding, storedEmbedding);
-
-        console.log('📏 Cosine similarity:', similarity.toFixed(4), '(threshold:', SIMILARITY_THRESHOLD, ')');
+        console.log('📏 Similitud calculada:', similarity.toFixed(4), '(umbral:', SIMILARITY_THRESHOLD, ')');
 
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
@@ -399,15 +400,25 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           
           await logAccessWithLocation(true, locationData || {});
           
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update({ last_facial_verification: new Date().toISOString() })
-            .eq('id', userId);
+          // Use RPC to update timestamp (bypasses RLS issues)
+          const { error: updateError } = await supabase.rpc('save_facial_embedding', {
+            target_user_id: userId,
+            new_embedding: null, // Don't update embedding, just timestamp
+            update_timestamp: true
+          });
           
           if (updateError) {
-            console.error('❌ Error updating timestamp:', updateError);
+            console.error('❌ Error updating timestamp via RPC:', updateError);
+            // Fallback to direct update
+            const { error: directError } = await supabase
+              .from('user_profiles')
+              .update({ last_facial_verification: new Date().toISOString() })
+              .eq('id', userId);
+            if (directError) {
+              console.error('❌ Direct update also failed:', directError);
+            }
           } else {
-            console.log('✅ Timestamp saved:', new Date().toISOString());
+            console.log('✅ Guardando timestamp', new Date().toISOString());
           }
 
           setTimeout(onSuccess, 1500);
@@ -424,29 +435,42 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setStatus('failed');
       }
     } else {
-      console.log('📝 Registering new facial embedding...');
+      console.log('📝 Registrando nuevo embedding facial...');
+      console.log('📊 Guardando embedding', embedding.slice(0, 5), '...');
       setStatus('registering');
       setInstruction('Registrando tu rostro por primera vez...');
 
       try {
-        const { error } = await supabase
-          .from('user_profiles')
-          .update({ 
-            facial_embedding: embedding,
-            last_facial_verification: new Date().toISOString()
-          })
-          .eq('id', userId);
+        // Use RPC to save embedding (bypasses RLS issues)
+        const { error: rpcError } = await supabase.rpc('save_facial_embedding', {
+          target_user_id: userId,
+          new_embedding: embedding,
+          update_timestamp: true
+        });
 
-        if (error) {
-          console.error('❌ Error saving embedding:', error);
-          setError('Error al registrar rostro. Intenta de nuevo.');
-          setAttempts(prev => prev + 1);
-          setStatus('failed');
-          setIsProcessing(false);
-          return;
+        if (rpcError) {
+          console.error('❌ Error saving via RPC:', rpcError);
+          // Fallback to direct update
+          const { error: directError } = await supabase
+            .from('user_profiles')
+            .update({ 
+              facial_embedding: embedding,
+              last_facial_verification: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+          if (directError) {
+            console.error('❌ Direct update also failed:', directError);
+            setError('Error al registrar rostro. Verifica permisos en la base de datos.');
+            setAttempts(prev => prev + 1);
+            setStatus('failed');
+            setIsProcessing(false);
+            return;
+          }
         }
 
-        console.log('✅ Embedding registered!');
+        console.log('✅ Embedding registrado!');
+        console.log('✅ Guardando timestamp', new Date().toISOString());
         setStatus('success');
         setInstruction('¡Rostro registrado exitosamente!');
         stopCamera();
