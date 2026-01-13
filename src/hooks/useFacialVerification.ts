@@ -11,16 +11,6 @@ interface FacialVerificationState {
   timeRemaining: number | null; // minutes remaining
 }
 
-// Generate a unique session ID for this browser session
-const getSessionId = () => {
-  let sessionId = sessionStorage.getItem(SESSION_KEY);
-  if (!sessionId) {
-    sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-    sessionStorage.setItem(SESSION_KEY, sessionId);
-  }
-  return sessionId;
-};
-
 export function useFacialVerification(userId: string | undefined) {
   const [state, setState] = useState<FacialVerificationState>({
     isVerified: false,
@@ -31,7 +21,26 @@ export function useFacialVerification(userId: string | undefined) {
   
   // Track if we've verified in this specific browser session
   const sessionVerifiedRef = useRef<boolean>(false);
-  const currentSessionId = useRef<string>(getSessionId());
+  const initializedRef = useRef<boolean>(false);
+  
+  // Initialize session tracking on mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
+    try {
+      // Check if this is a new session
+      const existingSession = sessionStorage.getItem(SESSION_KEY);
+      if (!existingSession) {
+        const newSessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        sessionStorage.setItem(SESSION_KEY, newSessionId);
+        sessionVerifiedRef.current = false;
+      }
+    } catch {
+      // sessionStorage might not be available
+      console.warn('sessionStorage not available');
+    }
+  }, []);
 
   // Check if verification is still valid (must be recent AND in same session)
   const checkVerificationStatus = useCallback(async () => {
