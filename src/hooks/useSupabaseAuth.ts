@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 
 interface UserProfile {
   id: string;
@@ -38,18 +39,15 @@ export const useSupabaseAuth = () => {
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, full_name, role, company_id, department, has_full_access, avatar_url')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use RPC function to get profile (bypasses RLS recursion)
+      const { data, error } = await supabase.rpc('get_my_profile');
 
       if (error) {
-        // Log error but don't fail - profile might not exist yet or RLS issue
-        console.error('Error fetching user profile:', error);
+        console.error('Error fetching user profile via RPC:', error);
         
-        // For superadmin (known UUID), return a default profile to avoid blocking
-        if (userId === 'cbd3f2f3-b5c1-4346-b925-ba1a7888bae8') {
+        // Fallback: try direct query for superadmin
+        if (userId === SUPERADMIN_USER_ID) {
+          // Return hardcoded profile for superadmin to avoid blocking
           return {
             id: userId,
             full_name: 'Mauricio Ortiz Tamayo',
@@ -59,12 +57,47 @@ export const useSupabaseAuth = () => {
             has_full_access: true,
           };
         }
-        return null;
+        
+        // Try direct query as fallback (may work for users with simple RLS)
+        const { data: directData, error: directError } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, role, company_id, department, has_full_access, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+        
+        if (directError) {
+          console.error('Direct query also failed:', directError);
+          // For superadmin, return default profile
+          if (userId === SUPERADMIN_USER_ID) {
+            return {
+              id: userId,
+              full_name: 'Mauricio Ortiz Tamayo',
+              role: 'superadmin',
+              company_id: '',
+              department: '',
+              has_full_access: true,
+            };
+          }
+          return null;
+        }
+        
+        return directData;
       }
 
       return data;
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // For superadmin, always return a profile to prevent blocking
+      if (userId === SUPERADMIN_USER_ID) {
+        return {
+          id: userId,
+          full_name: 'Mauricio Ortiz Tamayo',
+          role: 'superadmin',
+          company_id: '',
+          department: '',
+          has_full_access: true,
+        };
+      }
       return null;
     }
   }, []);
