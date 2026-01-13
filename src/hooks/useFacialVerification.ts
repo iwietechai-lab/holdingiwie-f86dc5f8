@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const VERIFICATION_TIMEOUT_MINUTES = 30;
+const SESSION_KEY = 'facial_verification_session';
 
 interface FacialVerificationState {
   isVerified: boolean;
@@ -10,6 +11,16 @@ interface FacialVerificationState {
   timeRemaining: number | null; // minutes remaining
 }
 
+// Generate a unique session ID for this browser session
+const getSessionId = () => {
+  let sessionId = sessionStorage.getItem(SESSION_KEY);
+  if (!sessionId) {
+    sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    sessionStorage.setItem(SESSION_KEY, sessionId);
+  }
+  return sessionId;
+};
+
 export function useFacialVerification(userId: string | undefined) {
   const [state, setState] = useState<FacialVerificationState>({
     isVerified: false,
@@ -17,8 +28,12 @@ export function useFacialVerification(userId: string | undefined) {
     isLoading: true,
     timeRemaining: null,
   });
+  
+  // Track if we've verified in this specific browser session
+  const sessionVerifiedRef = useRef<boolean>(false);
+  const currentSessionId = useRef<string>(getSessionId());
 
-  // Check if verification is still valid
+  // Check if verification is still valid (must be recent AND in same session)
   const checkVerificationStatus = useCallback(async () => {
     if (!userId) {
       setState(prev => ({ ...prev, isLoading: false, isVerified: false }));
@@ -51,7 +66,8 @@ export function useFacialVerification(userId: string | undefined) {
       const diffMs = now.getTime() - lastVerification.getTime();
       const diffMinutes = diffMs / (1000 * 60);
 
-      if (diffMinutes <= VERIFICATION_TIMEOUT_MINUTES) {
+      // Check if verified recently AND in this browser session
+      if (diffMinutes <= VERIFICATION_TIMEOUT_MINUTES && sessionVerifiedRef.current) {
         const remaining = Math.ceil(VERIFICATION_TIMEOUT_MINUTES - diffMinutes);
         setState({
           isVerified: true,
@@ -60,7 +76,7 @@ export function useFacialVerification(userId: string | undefined) {
           timeRemaining: remaining,
         });
       } else {
-        // Verification expired
+        // Verification expired or not done in this session
         setState({
           isVerified: false,
           lastVerification,
@@ -92,6 +108,9 @@ export function useFacialVerification(userId: string | undefined) {
         return false;
       }
 
+      // Mark this session as verified
+      sessionVerifiedRef.current = true;
+
       // Update local state
       setState({
         isVerified: true,
@@ -109,6 +128,7 @@ export function useFacialVerification(userId: string | undefined) {
 
   // Invalidate verification (force re-verification)
   const invalidateVerification = useCallback(() => {
+    sessionVerifiedRef.current = false;
     setState({
       isVerified: false,
       lastVerification: null,
