@@ -46,14 +46,25 @@ export const ALLOWED_EMAILS: AllowedEmailConfig[] = [
   },
 ];
 
-// Users with full platform access (can see all features like CEO)
-export const FULL_ACCESS_EMAILS = [
+// Default users with full platform access (can see all features like CEO)
+// This list is used as fallback. Actual access is managed in user_profiles.has_full_access
+export const DEFAULT_FULL_ACCESS_EMAILS = [
   'mauricio@iwie.space',
   'joel@iwie.space',
 ];
 
-export const hasFullAccess = (email: string): boolean => {
-  return FULL_ACCESS_EMAILS.some(
+// Get full access emails list (for UI display)
+export const getFullAccessEmails = (): string[] => {
+  return [...DEFAULT_FULL_ACCESS_EMAILS];
+};
+
+export const hasFullAccess = (email: string, dbHasFullAccess?: boolean): boolean => {
+  // If database value is provided, use it
+  if (typeof dbHasFullAccess === 'boolean') {
+    return dbHasFullAccess;
+  }
+  // Otherwise fall back to default list
+  return DEFAULT_FULL_ACCESS_EMAILS.some(
     (allowedEmail) => allowedEmail.toLowerCase() === email.toLowerCase()
   );
 };
