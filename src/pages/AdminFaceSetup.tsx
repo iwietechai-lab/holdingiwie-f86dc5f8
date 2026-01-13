@@ -12,6 +12,7 @@ import christopherImg from '@/assets/faces/christopher.jpeg';
 import hernanImg from '@/assets/faces/hernan.jpg';
 import sebastianImg from '@/assets/faces/sebastian.jpg';
 import brunoImg from '@/assets/faces/bruno.jpg';
+import mauricioImg from '@/assets/faces/mauricio.jpg';
 
 const FACE_API_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 
@@ -27,6 +28,14 @@ interface TeamMember {
 }
 
 const TEAM_MEMBERS: TeamMember[] = [
+  {
+    email: 'mauricio@iwie.space',
+    fullName: 'Mauricio Ortiz Tamayo',
+    role: 'CEO Global',
+    companyId: 'iwie-holding',
+    imageSrc: mauricioImg,
+    status: 'pending',
+  },
   {
     email: 'joel@iwie.space',
     fullName: 'Joel Diaz Nuñez',
