@@ -143,30 +143,31 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
-  // Check if user has stored facial embedding
-  // NOTE: Pending embeddings via localStorage removed for security reasons
-  // Admin setup must store embeddings directly in database
+  // Check if user has stored facial embedding using RPC to bypass RLS
   const checkStoredEmbedding = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('facial_embedding')
-        .eq('id', userId)
-        .maybeSingle();
+      console.log('🔍 Checking stored embedding for user:', userId);
+      
+      // Use RPC to get profile (bypasses RLS)
+      const { data: profile, error } = await supabase.rpc('get_my_profile');
 
       if (error) {
-        console.error('Error checking embedding:', error);
+        console.error('Error checking embedding via RPC:', error);
+        // Fallback: assume no embedding
+        setHasStoredEmbedding(false);
         return false;
       }
 
-      const hasEmbedding = data?.facial_embedding && 
-        Array.isArray(data.facial_embedding) && 
-        data.facial_embedding.length > 0;
+      const hasEmbedding = profile?.facial_embedding && 
+        Array.isArray(profile.facial_embedding) && 
+        profile.facial_embedding.length > 0;
       
+      console.log('📊 Has stored embedding:', hasEmbedding);
       setHasStoredEmbedding(hasEmbedding);
       return hasEmbedding;
     } catch (err) {
       console.error('Error checking stored embedding:', err);
+      setHasStoredEmbedding(false);
       return false;
     }
   }, [userId]);
@@ -230,7 +231,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     return (A + B) / (2.0 * C);
   };
 
-  // Detect blink using EAR
+  // Detect blink using EAR with improved thresholds and logging
   const detectBlink = useCallback((landmarks: faceapi.FaceLandmarks68) => {
     const leftEye = landmarks.getLeftEye();
     const rightEye = landmarks.getRightEye();
@@ -241,19 +242,28 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     eyeRatioHistory.current.push(avgEAR);
     
-    // Keep last 10 frames
-    if (eyeRatioHistory.current.length > 10) {
+    // Log every 10 frames for debugging
+    if (eyeRatioHistory.current.length % 10 === 0) {
+      console.log('👁️ EAR values:', { leftEAR: leftEAR.toFixed(3), rightEAR: rightEAR.toFixed(3), avgEAR: avgEAR.toFixed(3) });
+    }
+    
+    // Keep last 15 frames for better detection
+    if (eyeRatioHistory.current.length > 15) {
       eyeRatioHistory.current.shift();
     }
 
     // Detect blink: EAR drops below threshold then rises back
+    // More lenient thresholds for better detection
     if (eyeRatioHistory.current.length >= 5) {
       const recent = eyeRatioHistory.current.slice(-5);
       const min = Math.min(...recent);
       const max = Math.max(...recent);
+      const current = recent[recent.length - 1];
       
       // Blink detected if there's significant variation (eyes closed then opened)
-      if (min < 0.2 && max > 0.25 && recent[recent.length - 1] > 0.22) {
+      // Lowered thresholds for easier detection
+      if (min < 0.25 && max > 0.28 && current > 0.25) {
+        console.log('✅ BLINK DETECTED!', { min: min.toFixed(3), max: max.toFixed(3), current: current.toFixed(3) });
         blinkCount.current += 1;
         eyeRatioHistory.current = []; // Reset after blink
         return true;
@@ -267,6 +277,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const startDetection = useCallback(async () => {
     if (!videoRef.current || !modelsLoaded) return;
 
+    console.log('🚀 Starting face detection...');
     setStatus('detecting');
     setInstruction('Buscando tu rostro...');
     setBlinkDetected(false);
@@ -275,7 +286,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     let livenessConfirmed = false;
     let detectionAttempts = 0;
-    const maxDetectionAttempts = 150; // ~5 seconds at 30fps
+    const maxDetectionAttempts = 300; // ~10 seconds at 30fps
+    let faceDetectedCount = 0;
 
     const detect = async () => {
       if (!videoRef.current || status === 'success' || status === 'failed') return;
@@ -285,14 +297,19 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       try {
         const detection = await faceapi
           .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({
-            inputSize: 416,
-            scoreThreshold: 0.5,
+            inputSize: 320, // Slightly smaller for faster detection
+            scoreThreshold: 0.4, // Lower threshold for better detection
           }))
           .withFaceLandmarks()
           .withFaceDescriptor();
 
         if (detection) {
+          faceDetectedCount++;
           setFaceDetected(true);
+          
+          if (faceDetectedCount === 1) {
+            console.log('👤 Face detected!', detection.detection.score.toFixed(2));
+          }
 
           // Draw face detection on canvas
           if (canvasRef.current) {
@@ -309,9 +326,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Liveness check - detect blink
           if (!livenessConfirmed) {
             setStatus('liveness-check');
-            setInstruction('¡Rostro detectado! Parpadea para verificar que eres real');
+            setInstruction('¡Rostro detectado! Parpadea lentamente para verificar');
             
             if (detectBlink(detection.landmarks)) {
+              console.log('🎉 Liveness confirmed via blink!');
               setBlinkDetected(true);
               livenessConfirmed = true;
               
@@ -327,8 +345,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           }
         }
 
+        // Log progress every 50 frames
+        if (detectionAttempts % 50 === 0) {
+          console.log(`⏱️ Detection attempt ${detectionAttempts}/${maxDetectionAttempts}, faces detected: ${faceDetectedCount}`);
+        }
+
         if (detectionAttempts >= maxDetectionAttempts && !livenessConfirmed) {
-          setError('No se detectó parpadeo. Intenta de nuevo mirando la cámara y parpadeando.');
+          console.log('❌ Timeout - no blink detected after max attempts');
+          setError('No se detectó parpadeo. Intenta de nuevo mirando la cámara y parpadeando lentamente.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
           return;
@@ -344,9 +368,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     detect();
   }, [modelsLoaded, status, detectBlink]);
 
-  // Process embedding - compare or register
+  // Process embedding - compare or register using RPC to bypass RLS
   const processEmbedding = async (descriptor: Float32Array) => {
     const embedding = Array.from(descriptor);
+    console.log('🔐 Processing embedding, has stored:', hasStoredEmbedding);
 
     if (hasStoredEmbedding) {
       // Compare with stored embedding
@@ -354,30 +379,29 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       setInstruction('Comparando con tu rostro registrado...');
 
       try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('facial_embedding')
-          .eq('id', userId)
-          .single();
+        // Use RPC to get profile with embedding
+        const { data: profile, error } = await supabase.rpc('get_my_profile');
 
-        if (error || !data?.facial_embedding) {
+        if (error || !profile?.facial_embedding) {
+          console.error('Error getting facial embedding:', error);
           setError('Error al obtener datos faciales. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
           return;
         }
 
-        const storedEmbedding = data.facial_embedding as number[];
+        const storedEmbedding = profile.facial_embedding as number[];
         
         // Calculate Euclidean distance
         const distance = Math.sqrt(
           embedding.reduce((sum, val, i) => sum + Math.pow(val - storedEmbedding[i], 2), 0)
         );
 
-        console.log('Face match distance:', distance);
+        console.log('📏 Face match distance:', distance.toFixed(4), '(threshold:', MATCH_THRESHOLD, ')');
 
         if (distance < MATCH_THRESHOLD) {
           // Match successful
+          console.log('✅ Face match successful!');
           setStatus('success');
           setInstruction('¡Identidad verificada!');
           stopCamera();
@@ -385,14 +409,21 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Log successful access with location
           await logAccessWithLocation(true, locationData || {});
           
-          // Update last facial verification timestamp
-          await supabase
+          // Update last facial verification timestamp using direct update
+          const { error: updateError } = await supabase
             .from('user_profiles')
             .update({ last_facial_verification: new Date().toISOString() })
             .eq('id', userId);
+          
+          if (updateError) {
+            console.error('Error updating verification timestamp:', updateError);
+          } else {
+            console.log('📝 Verification timestamp saved!');
+          }
 
           setTimeout(onSuccess, 1500);
         } else {
+          console.log('❌ Face match failed - distance too high');
           setError(`Rostro no coincide (distancia: ${distance.toFixed(2)}). Intenta de nuevo.`);
           setAttempts(prev => prev + 1);
           setStatus('failed');
@@ -405,13 +436,17 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       }
     } else {
       // First time - register facial embedding
+      console.log('📝 Registering new facial embedding...');
       setStatus('registering');
       setInstruction('Registrando tu rostro por primera vez...');
 
       try {
         const { error } = await supabase
           .from('user_profiles')
-          .update({ facial_embedding: embedding })
+          .update({ 
+            facial_embedding: embedding,
+            last_facial_verification: new Date().toISOString()
+          })
           .eq('id', userId);
 
         if (error) {
@@ -422,18 +457,13 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           return;
         }
 
+        console.log('✅ Facial embedding registered successfully!');
         setStatus('success');
         setInstruction('¡Rostro registrado exitosamente!');
         stopCamera();
 
         // Log successful access with location
         await logAccessWithLocation(true, locationData || {});
-        
-        // Update last facial verification timestamp
-        await supabase
-          .from('user_profiles')
-          .update({ last_facial_verification: new Date().toISOString() })
-          .eq('id', userId);
 
         setTimeout(onSuccess, 1500);
       } catch (err) {
