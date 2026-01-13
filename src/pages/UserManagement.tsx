@@ -15,7 +15,9 @@ import {
   CheckCircle,
   XCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Edit,
+  Building2
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { SpaceBackground } from '@/components/SpaceBackground';
@@ -60,6 +62,9 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { UserEditDialog } from '@/components/UserEditDialog';
+import { getFullAccessEmails } from '@/config/allowedEmails';
+import { companies, getCompanyById } from '@/data/companies';
 
 const AVAILABLE_ROLES = [
   { value: 'superadmin', label: 'Super Admin', icon: ShieldAlert, color: 'text-red-500' },
@@ -70,7 +75,7 @@ const AVAILABLE_ROLES = [
 export const UserManagement = () => {
   const navigate = useNavigate();
   const { profile, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
-  const { users, isLoading, error, fetchUsers, addRole, removeRole, deleteUser, getAccessLogsByUser } = useUserManagement();
+  const { users, isLoading, error, fetchUsers, addRole, removeRole, deleteUser, getAccessLogsByUser, updateUserWithFullAccess } = useUserManagement();
   
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
@@ -79,6 +84,26 @@ export const UserManagement = () => {
   const [logsLoading, setLogsLoading] = useState(false);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserWithDetails | null>(null);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [editingUser, setEditingUser] = useState<UserWithDetails | null>(null);
+
+  const handleSaveUser = async (
+    userId: string,
+    updates: {
+      full_name: string;
+      role: string;
+      company_id: string;
+      department: string;
+      has_full_access: boolean;
+    }
+  ) => {
+    const result = await updateUserWithFullAccess(userId, updates);
+    if (result.success) {
+      toast.success('Usuario actualizado correctamente');
+    } else {
+      toast.error(result.error || 'Error al actualizar usuario');
+    }
+    return result;
+  };
 
   const handleViewAccessLogs = async (user: UserWithDetails) => {
     setSelectedUser(user);
@@ -298,7 +323,7 @@ export const UserManagement = () => {
                       <TableHead className="w-8"></TableHead>
                       <TableHead>Usuario</TableHead>
                       <TableHead>Empresa</TableHead>
-                      <TableHead>Roles</TableHead>
+                      <TableHead>Cargo / Acceso</TableHead>
                       <TableHead>Último Acceso</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -328,16 +353,23 @@ export const UserManagement = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {user.company_id || '-'}
-                            </span>
+                            {user.company_id ? (
+                              <div className="flex items-center gap-2">
+                                <span>{getCompanyById(user.company_id)?.icon || '🏢'}</span>
+                                <span className="text-sm">{getCompanyById(user.company_id)?.name || user.company_id}</span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Sin asignar</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {user.roles.length > 0 ? (
-                                user.roles.map((r) => getRoleBadge(r.role))
-                              ) : (
-                                <span className="text-sm text-muted-foreground">Sin roles</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm font-medium">{user.role || 'Sin cargo'}</span>
+                              {user.has_full_access && (
+                                <Badge variant="outline" className="text-primary border-primary w-fit text-xs">
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Acceso Completo
+                                </Badge>
                               )}
                             </div>
                           </TableCell>
@@ -410,6 +442,15 @@ export const UserManagement = () => {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                               
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setEditingUser(user)}
+                                title="Editar usuario"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -574,6 +615,15 @@ export const UserManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit User Dialog */}
+      <UserEditDialog
+        user={editingUser}
+        open={!!editingUser}
+        onOpenChange={(open) => !open && setEditingUser(null)}
+        onSave={handleSaveUser}
+        fullAccessEmails={getFullAccessEmails()}
+      />
     </div>
   );
 };

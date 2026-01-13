@@ -7,8 +7,10 @@ export interface UserProfile {
   email: string | null;
   role: string | null;
   company_id: string | null;
+  department: string | null;
   avatar_url: string | null;
   created_at: string | null;
+  has_full_access: boolean;
 }
 
 export interface UserRole {
@@ -126,12 +128,47 @@ export function useUserManagement() {
 
   const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
     try {
+      // Remove has_full_access from updates if it exists - it's stored separately
+      const { has_full_access, ...profileUpdates } = updates as any;
+      
       const { error } = await supabase
         .from('user_profiles')
-        .update(updates)
+        .update(profileUpdates)
         .eq('id', userId);
 
       if (error) throw error;
+      await fetchUsers();
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating user:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar usuario' };
+    }
+  };
+
+  const updateUserWithFullAccess = async (
+    userId: string,
+    updates: {
+      full_name: string;
+      role: string;
+      company_id: string;
+      department: string;
+      has_full_access: boolean;
+    }
+  ) => {
+    try {
+      const { has_full_access, ...profileUpdates } = updates;
+      
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({
+          ...profileUpdates,
+          has_full_access,
+        })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -188,6 +225,7 @@ export function useUserManagement() {
     addRole,
     removeRole,
     updateUserProfile,
+    updateUserWithFullAccess,
     deleteUser,
     getAccessLogsByUser,
   };

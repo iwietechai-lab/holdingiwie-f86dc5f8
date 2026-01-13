@@ -8,6 +8,8 @@ interface UserProfile {
   role: string;
   company_id: string;
   department: string;
+  has_full_access: boolean;
+  avatar_url?: string;
 }
 
 interface AuthState {
