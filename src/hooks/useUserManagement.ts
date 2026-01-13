@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 
 export interface UserProfile {
   id: string;
@@ -47,30 +48,87 @@ export function useUserManagement() {
     setError(null);
 
     try {
-      // Fetch user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Get current user to verify superadmin status
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
 
-      if (profilesError) throw profilesError;
+      // Check if current user is superadmin using RPC (avoids RLS recursion)
+      const { data: isSuperadmin } = await supabase.rpc('has_role', {
+        _user_id: currentUser.id,
+        _role: 'superadmin'
+      });
 
-      // Fetch user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
+      // Also check by UUID for hardcoded superadmin
+      const isHardcodedSuperadmin = currentUser.id === SUPERADMIN_USER_ID;
+      
+      if (!isSuperadmin && !isHardcodedSuperadmin) {
+        throw new Error('No tienes permisos para ver usuarios');
+      }
 
-      // Fetch access logs (last 100 per user)
-      const { data: accessLogs, error: logsError } = await supabase
+      // Try to fetch using RPC function first (if it exists)
+      // This bypasses RLS for superadmin
+      let profiles: any[] = [];
+      let roles: any[] = [];
+      let accessLogs: any[] = [];
+
+      // Try RPC call for profiles (security definer)
+      const { data: rpcProfiles, error: rpcProfilesError } = await supabase.rpc('get_all_user_profiles');
+      
+      if (rpcProfilesError) {
+        console.log('RPC get_all_user_profiles not available, using direct query');
+        // Fallback to direct query - will work if user has RLS permissions
+        const { data: directProfiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
+        profiles = directProfiles || [];
+      } else {
+        profiles = rpcProfiles || [];
+      }
+
+      // Try RPC call for roles (security definer)
+      const { data: rpcRoles, error: rpcRolesError } = await supabase.rpc('get_all_user_roles');
+      
+      if (rpcRolesError) {
+        console.log('RPC get_all_user_roles not available, using direct query');
+        // Fallback - this may fail with RLS recursion
+        const { data: directRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('*');
+        
+        if (rolesError) {
+          console.warn('Could not fetch roles:', rolesError);
+          // Don't throw - continue with empty roles
+        } else {
+          roles = directRoles || [];
+        }
+      } else {
+        roles = rpcRoles || [];
+      }
+
+      // Fetch access logs (usually has simpler RLS)
+      const { data: logsData, error: logsError } = await supabase
         .from('access_logs')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(500);
+      
+      if (!logsError) {
+        accessLogs = logsData || [];
+      }
 
       // Combine data
-      const usersWithDetails: UserWithDetails[] = (profiles || []).map((profile) => {
-        const userRoles = (roles || []).filter((r) => r.user_id === profile.id);
-        const userLogs = (accessLogs || []).filter((l) => l.user_id === profile.id);
+      const usersWithDetails: UserWithDetails[] = profiles.map((profile) => {
+        const userRoles = roles.filter((r) => r.user_id === profile.id);
+        const userLogs = accessLogs.filter((l) => l.user_id === profile.id);
         const lastAccess = userLogs.length > 0 ? userLogs[0].timestamp : null;
 
         return {
