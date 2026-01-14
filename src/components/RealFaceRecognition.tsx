@@ -242,17 +242,31 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
-  // Stop camera
+  // Stop camera - ensures complete cleanup
   const stopCamera = useCallback(() => {
-    console.log('📹 Stopping camera...');
+    console.log('📹 Stopping camera and cleaning up...');
+    
+    // Cancel animation frame
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
+    
+    // Stop all media tracks
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        console.log('📹 Stopping track:', track.kind, track.label);
+        track.stop();
+      });
       streamRef.current = null;
     }
+    
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    console.log('✅ Camera cleanup complete');
   }, []);
 
   // Calculate cosine similarity
@@ -712,8 +726,21 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       }
     };
     init();
-    return () => stopCamera();
+    
+    // Cleanup on unmount - ensure camera is always stopped
+    return () => {
+      console.log('🧹 Component unmounting, stopping camera...');
+      stopCamera();
+    };
   }, [loadModels, checkStoredEmbedding, startCamera, stopCamera, getLocation]);
+
+  // Stop camera when status changes to success or failed
+  useEffect(() => {
+    if (status === 'success' || status === 'failed') {
+      console.log('📹 Status changed to', status, '- ensuring camera is stopped');
+      stopCamera();
+    }
+  }, [status, stopCamera]);
 
   // Start detection when ready
   useEffect(() => {
