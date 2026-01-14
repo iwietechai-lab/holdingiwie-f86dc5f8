@@ -11,12 +11,14 @@ import {
   Filter,
   Crown,
   Briefcase,
-  Eye
+  Eye,
+  Plus
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { SuperadminUserEditDialog } from '@/components/SuperadminUserEditDialog';
+import { CreateCompanyDialog } from '@/components/CreateCompanyDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +63,7 @@ export default function SuperadminDashboard() {
     updateUserProfile,
     updateUserRole,
     updateDashboardVisibility,
+    createCompany,
   } = useSuperadmin();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -68,6 +71,7 @@ export default function SuperadminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
 
   // Filter users
   const filteredUsers = users.filter(user => {
@@ -113,6 +117,16 @@ export default function SuperadminDashboard() {
       toast.success('Visibilidad actualizada correctamente');
     } else {
       toast.error(result.error || 'Error al actualizar visibilidad');
+    }
+    return result;
+  };
+
+  const handleCreateCompany = async (company: { id: string; name: string; icon?: string; color?: string; description?: string }) => {
+    const result = await createCompany(company);
+    if (result.success) {
+      toast.success('Empresa creada correctamente');
+    } else {
+      toast.error(result.error || 'Error al crear empresa');
     }
     return result;
   };
@@ -216,7 +230,7 @@ export default function SuperadminDashboard() {
           </header>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card className="bg-card/50 backdrop-blur-sm border-border">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -236,6 +250,21 @@ export default function SuperadminDashboard() {
                   <div>
                     <p className="text-2xl font-bold text-foreground">{companies.length}</p>
                     <p className="text-xs text-muted-foreground">Empresas</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card 
+              className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 cursor-pointer transition-colors"
+              onClick={() => setShowCreateCompany(true)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Plus className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Nueva Empresa</p>
+                    <p className="text-xs text-muted-foreground">Añadir empresa</p>
                   </div>
                 </div>
               </CardContent>
@@ -477,6 +506,13 @@ export default function SuperadminDashboard() {
         onSaveProfile={handleSaveProfile}
         onSaveRole={handleSaveRole}
         onSaveVisibility={handleSaveVisibility}
+      />
+
+      {/* Create Company Dialog */}
+      <CreateCompanyDialog
+        open={showCreateCompany}
+        onOpenChange={setShowCreateCompany}
+        onSave={handleCreateCompany}
       />
     </div>
   );

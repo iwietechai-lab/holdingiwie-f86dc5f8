@@ -28,6 +28,8 @@ interface UseSuperadminReturn {
   updateUserRole: (userId: string, newRole: AppRole) => Promise<{ success: boolean; error?: string }>;
   updateDashboardVisibility: (userId: string, visibility: DashboardVisibility) => Promise<{ success: boolean; error?: string }>;
   removeUserRole: (userId: string, role: AppRole) => Promise<{ success: boolean; error?: string }>;
+  createCompany: (company: Omit<DbCompany, 'created_at'>) => Promise<{ success: boolean; error?: string }>;
+  createDepartment: (department: Omit<DbDepartment, 'id' | 'created_at'>) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useSuperadmin(): UseSuperadminReturn {
@@ -98,7 +100,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       }
 
       // Combine data
-      const usersWithDetails: SuperadminUser[] = (profiles || []).map((profile) => {
+      const usersWithDetails: SuperadminUser[] = (profiles || []).map((profile: any) => {
         const userRoles = (roles || [])
           .filter((r: any) => r.user_id === profile.id)
           .map((r: any) => ({
@@ -112,11 +114,11 @@ export function useSuperadmin(): UseSuperadminReturn {
           id: profile.id,
           full_name: profile.full_name,
           email: profile.email,
-          avatar_url: null,
+          avatar_url: profile.avatar_url || null,
           company_id: profile.company_id,
-          department_id: null,
-          position: null,
-          dashboard_visibility: DEFAULT_DASHBOARD_VISIBILITY,
+          department_id: profile.department_id || null,
+          position: profile.position || null,
+          dashboard_visibility: profile.dashboard_visibility || DEFAULT_DASHBOARD_VISIBILITY,
           created_at: profile.created_at,
           updated_at: profile.updated_at,
           roles: userRoles,
@@ -135,13 +137,39 @@ export function useSuperadmin(): UseSuperadminReturn {
   }, [isSuperadmin]);
 
   const fetchCompanies = useCallback(async () => {
-    // Companies table may not exist yet - silently handle
-    setCompanies([]);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching companies:', error);
+        return;
+      }
+      
+      setCompanies(data || []);
+    } catch (err) {
+      console.error('Error in fetchCompanies:', err);
+    }
   }, []);
 
   const fetchDepartments = useCallback(async () => {
-    // Departments table may not exist yet - silently handle
-    setDepartments([]);
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching departments:', error);
+        return;
+      }
+      
+      setDepartments(data || []);
+    } catch (err) {
+      console.error('Error in fetchDepartments:', err);
+    }
   }, []);
 
   const getDepartmentsByCompany = useCallback((companyId: string): DbDepartment[] => {
@@ -162,6 +190,9 @@ export function useSuperadmin(): UseSuperadminReturn {
         .update({
           full_name: updates.full_name,
           company_id: updates.company_id,
+          department_id: updates.department_id,
+          position: updates.position,
+          avatar_url: updates.avatar_url,
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId);
@@ -254,10 +285,23 @@ export function useSuperadmin(): UseSuperadminReturn {
       return { success: false, error: 'No autorizado' };
     }
 
-    // Dashboard visibility not in current schema - log only
-    console.log('Dashboard visibility update requested:', userId, visibility);
-    return { success: true };
-  }, [isSuperadmin]);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          dashboard_visibility: JSON.parse(JSON.stringify(visibility)),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+      await fetchUsers();
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating dashboard visibility:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar visibilidad' };
+    }
+  }, [isSuperadmin, fetchUsers]);
 
   const removeUserRole = useCallback(async (
     userId: string,
@@ -293,6 +337,58 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
   }, [isSuperadmin, fetchUsers]);
 
+  const createCompany = useCallback(async (
+    company: Omit<DbCompany, 'created_at'>
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .insert({
+          id: company.id,
+          name: company.name,
+          icon: company.icon,
+          color: company.color,
+          description: company.description,
+        });
+
+      if (error) throw error;
+      await fetchCompanies();
+      return { success: true };
+    } catch (err) {
+      console.error('Error creating company:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Error al crear empresa' };
+    }
+  }, [isSuperadmin, fetchCompanies]);
+
+  const createDepartment = useCallback(async (
+    department: Omit<DbDepartment, 'id' | 'created_at'>
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('departments')
+        .insert({
+          name: department.name,
+          company_id: department.company_id,
+          description: department.description,
+        });
+
+      if (error) throw error;
+      await fetchDepartments();
+      return { success: true };
+    } catch (err) {
+      console.error('Error creating department:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Error al crear departamento' };
+    }
+  }, [isSuperadmin, fetchDepartments]);
+
   // Initial data fetch when superadmin is confirmed
   useEffect(() => {
     if (isSuperadmin) {
@@ -318,5 +414,7 @@ export function useSuperadmin(): UseSuperadminReturn {
     updateUserRole,
     updateDashboardVisibility,
     removeUserRole,
+    createCompany,
+    createDepartment,
   };
 }
