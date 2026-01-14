@@ -7,7 +7,7 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
-import { triggerTourFromVerification } from '@/hooks/useTour';
+import { triggerTourFromVerification } from '@/components/tour';
 
 // Global function to stop all active camera streams
 const stopAllCameraStreams = () => {
