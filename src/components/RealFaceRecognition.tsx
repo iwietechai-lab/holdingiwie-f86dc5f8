@@ -855,7 +855,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
         video.srcObject = null;
         video.pause();
+        try {
+          video.load(); // Force video element to release resources
+        } catch (e) {
+          // Ignore
+        }
       });
+      
+      console.log('✅ RealFaceRecognition: All camera cleanup complete on unmount');
     };
   }, []); // Empty dependencies - only run on mount/unmount
 
