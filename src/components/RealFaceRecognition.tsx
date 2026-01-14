@@ -598,23 +598,26 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     const scaleX = dims.width / videoRef.current.videoWidth;
     const scaleY = dims.height / videoRef.current.videoHeight;
     
-    // Draw all landmarks
-    const drawPoints = (points: faceapi.Point[], color: string) => {
+    // Draw all landmarks with larger points
+    const drawPoints = (points: faceapi.Point[], color: string, size: number = 4) => {
       ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 6;
       points.forEach(point => {
         ctx.beginPath();
-        ctx.arc(point.x * scaleX, point.y * scaleY, 2, 0, 2 * Math.PI);
+        ctx.arc(point.x * scaleX, point.y * scaleY, size, 0, 2 * Math.PI);
         ctx.fill();
       });
+      ctx.shadowBlur = 0;
     };
 
-    drawPoints(landmarks.getLeftEye(), '#00ff00');
-    drawPoints(landmarks.getRightEye(), '#00ff00');
-    drawPoints(landmarks.getNose(), '#0088ff');
-    drawPoints(landmarks.getMouth(), '#ff4444');
-    drawPoints(landmarks.getLeftEyeBrow(), '#ffff00');
-    drawPoints(landmarks.getRightEyeBrow(), '#ffff00');
-    drawPoints(landmarks.getJawOutline(), '#ffffff');
+    drawPoints(landmarks.getLeftEye(), '#00ff00', 5);
+    drawPoints(landmarks.getRightEye(), '#00ff00', 5);
+    drawPoints(landmarks.getNose(), '#0088ff', 5);
+    drawPoints(landmarks.getMouth(), '#ff4444', 5);
+    drawPoints(landmarks.getLeftEyeBrow(), '#ffff00', 4);
+    drawPoints(landmarks.getRightEyeBrow(), '#ffff00', 4);
+    drawPoints(landmarks.getJawOutline(), '#ffffff', 3);
   }, []);
 
   // Main detection loop
@@ -893,13 +896,50 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
                 style={{ width: `${status === 'liveness-check' ? Math.max(5, livenessProgress) : 100}%` }}
               />
             </div>
+            
+            {/* Animated movement instruction - PROMINENT */}
             {status === 'liveness-check' && currentChallenge && (
-              <p className="text-xs text-muted-foreground mt-1 text-center">
-                {currentChallenge === 'blink' && 'Parpadea lentamente'}
-                {currentChallenge === 'turn-left' && 'Gira hacia tu izquierda'}
-                {currentChallenge === 'turn-right' && 'Gira hacia tu derecha'}
-                {currentChallenge === 'nod' && 'Asiente con la cabeza'}
-              </p>
+              <div className="mt-4 p-4 rounded-xl bg-yellow-500/10 border-2 border-yellow-500/50 animate-pulse">
+                <div className="flex items-center justify-center gap-3 text-yellow-400">
+                  {currentChallenge === 'turn-left' && (
+                    <>
+                      <span className="text-4xl animate-bounce">👈</span>
+                      <div className="text-center">
+                        <p className="text-lg font-bold">GIRA A LA IZQUIERDA</p>
+                        <p className="text-sm opacity-80">Mueve tu cabeza hacia tu izquierda</p>
+                      </div>
+                    </>
+                  )}
+                  {currentChallenge === 'turn-right' && (
+                    <>
+                      <div className="text-center">
+                        <p className="text-lg font-bold">GIRA A LA DERECHA</p>
+                        <p className="text-sm opacity-80">Mueve tu cabeza hacia tu derecha</p>
+                      </div>
+                      <span className="text-4xl animate-bounce">👉</span>
+                    </>
+                  )}
+                  {currentChallenge === 'blink' && (
+                    <>
+                      <span className="text-4xl">👁️</span>
+                      <div className="text-center">
+                        <p className="text-lg font-bold">PARPADEA</p>
+                        <p className="text-sm opacity-80">Cierra y abre los ojos lentamente</p>
+                      </div>
+                      <span className="text-4xl">👁️</span>
+                    </>
+                  )}
+                  {currentChallenge === 'nod' && (
+                    <>
+                      <span className="text-4xl animate-bounce">👆👇</span>
+                      <div className="text-center">
+                        <p className="text-lg font-bold">ASIENTE</p>
+                        <p className="text-sm opacity-80">Mueve tu cabeza de arriba a abajo</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
