@@ -9,7 +9,6 @@ import {
   SuperadminUserProfile,
   DbUserRole,
   DashboardVisibility,
-  SUPERADMIN_USER_ID,
   DEFAULT_DASHBOARD_VISIBILITY
 } from '@/types/superadmin';
 
@@ -41,7 +40,7 @@ export function useSuperadmin(): UseSuperadminReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if current user is superadmin by UUID
+  // Check if current user is superadmin using SECURITY DEFINER function
   useEffect(() => {
     const checkSuperadmin = async () => {
       if (authLoading) return;
@@ -52,8 +51,22 @@ export function useSuperadmin(): UseSuperadminReturn {
         return;
       }
 
-      // Only the designated superadmin user can have superadmin role
-      setIsSuperadmin(user.id === SUPERADMIN_USER_ID);
+      try {
+        // Use the SECURITY DEFINER function to check superadmin status
+        const { data, error: rpcError } = await supabase.rpc('is_superadmin');
+        
+        if (rpcError) {
+          console.error('Error checking superadmin status:', rpcError);
+          setIsSuperadmin(false);
+        } else {
+          console.log('Superadmin check result:', data);
+          setIsSuperadmin(data === true);
+        }
+      } catch (err) {
+        console.error('Error in superadmin check:', err);
+        setIsSuperadmin(false);
+      }
+      
       setIsCheckingRole(false);
     };
 
@@ -67,7 +80,7 @@ export function useSuperadmin(): UseSuperadminReturn {
     setError(null);
 
     try {
-      // Fetch user profiles
+      // Fetch user profiles - superadmin can see all due to RLS policy
       const { data: profiles, error: profilesError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -75,8 +88,26 @@ export function useSuperadmin(): UseSuperadminReturn {
 
       if (profilesError) throw profilesError;
 
-      // Combine data - simplified without companies/departments tables
+      // Fetch user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+
+      if (rolesError) {
+        console.warn('Error fetching roles:', rolesError);
+      }
+
+      // Combine data
       const usersWithDetails: SuperadminUser[] = (profiles || []).map((profile) => {
+        const userRoles = (roles || [])
+          .filter((r: any) => r.user_id === profile.id)
+          .map((r: any) => ({
+            id: r.id,
+            user_id: r.user_id,
+            role: r.role as AppRole,
+            created_at: r.created_at,
+          }));
+
         return {
           id: profile.id,
           full_name: profile.full_name,
@@ -88,7 +119,7 @@ export function useSuperadmin(): UseSuperadminReturn {
           dashboard_visibility: DEFAULT_DASHBOARD_VISIBILITY,
           created_at: profile.created_at,
           updated_at: profile.updated_at,
-          roles: [],
+          roles: userRoles,
           company: null,
           department: null,
         };
@@ -152,13 +183,29 @@ export function useSuperadmin(): UseSuperadminReturn {
       return { success: false, error: 'No autorizado' };
     }
 
-    // Prevent assigning superadmin to anyone except the designated user
-    if (newRole === 'superadmin' && userId !== SUPERADMIN_USER_ID) {
-      return { success: false, error: 'Solo el usuario designado puede ser superadmin' };
-    }
-
     try {
-      // Update role in user_profiles
+      // Remove existing roles for this user (except superadmin if they're not the target)
+      const { error: deleteError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .neq('role', 'superadmin');
+
+      if (deleteError) throw deleteError;
+
+      // Add new role - cast to valid DB role type
+      const validDbRoles = ['superadmin', 'admin', 'manager', 'employee', 'user'] as const;
+      const dbRole = validDbRoles.includes(newRole as any) ? newRole : 'user';
+      
+      if (dbRole !== 'superadmin') {
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: dbRole as 'admin' | 'employee' | 'manager' | 'superadmin' | 'user' });
+
+        if (insertError) throw insertError;
+      }
+
+      // Also update role in user_profiles for compatibility
       const { error } = await supabase
         .from('user_profiles')
         .update({ role: newRole })
@@ -194,19 +241,25 @@ export function useSuperadmin(): UseSuperadminReturn {
       return { success: false, error: 'No autorizado' };
     }
 
-    // Prevent removing superadmin from designated user
-    if (role === 'superadmin' && userId === SUPERADMIN_USER_ID) {
-      return { success: false, error: 'No se puede quitar superadmin al usuario designado' };
-    }
-
     try {
-      // Clear role in user_profiles
+      // Cast role to valid DB type
+      const validDbRoles = ['superadmin', 'admin', 'manager', 'employee', 'user'] as const;
+      const dbRole = validDbRoles.includes(role as any) ? role : 'user';
+      
       const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('role', dbRole as 'admin' | 'employee' | 'manager' | 'superadmin' | 'user');
+
+      if (error) throw error;
+      
+      // Update user_profiles role to 'user' if removing their role
+      await supabase
         .from('user_profiles')
         .update({ role: 'user' })
         .eq('id', userId);
 
-      if (error) throw error;
       await fetchUsers();
       return { success: true };
     } catch (err) {
