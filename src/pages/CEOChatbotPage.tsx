@@ -10,6 +10,7 @@ import {
   User,
   Calendar,
   Ticket,
+  CalendarDays,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -17,27 +18,47 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useChatbot } from '@/hooks/useChatbot';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTickets } from '@/hooks/useTickets';
+import { useCeoAvailability } from '@/hooks/useCeoAvailability';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format, getDay, addDays, startOfDay, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import mauricioAvatar from '@/assets/faces/mauricio.jpg';
 
+const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
 export default function CEOChatbotPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, profile } = useSupabaseAuth();
+  const { user, isAuthenticated, isLoading: authLoading, profile } = useSupabaseAuth();
   const { chatbot, messages, isLoading, isSending, sendMessage, clearConversation } = useChatbot();
   const { createMeeting } = useMeetings();
   const { createTicket } = useTickets();
+  const { availability, createMeetingRequest } = useCeoAvailability();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Meeting scheduling state
+  const [showMeetingDialog, setShowMeetingDialog] = useState(false);
+  const [pendingMeeting, setPendingMeeting] = useState<{
+    title: string;
+    description: string;
+    duration_minutes: number;
+    day_of_week?: number;
+    preferred_time?: string;
+  } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string>('');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -57,21 +78,35 @@ export default function CEOChatbotPage() {
     }
   }, [messages]);
 
+  // Get available days (days of week that have availability)
+  const availableDayNumbers = [...new Set(
+    availability.filter(a => a.is_active).map(a => a.day_of_week)
+  )];
+
+  // Get available time slots for a selected date
+  const getTimeSlotsForDate = (date: Date) => {
+    const dayOfWeek = getDay(date);
+    return availability.filter(a => a.day_of_week === dayOfWeek && a.is_active);
+  };
+
+  // Check if a date is available
+  const isDateAvailable = (date: Date) => {
+    const dayOfWeek = getDay(date);
+    const today = startOfDay(new Date());
+    return date >= today && availableDayNumbers.includes(dayOfWeek);
+  };
+
   const handleAction = async (metadata: any) => {
-    if (metadata.action === 'create_meeting') {
-      const result = await createMeeting({
+    if (metadata.action === 'request_meeting') {
+      // Open the calendar dialog to select date
+      setPendingMeeting({
         title: metadata.title,
         description: metadata.description,
-        scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        duration_minutes: metadata.duration_minutes || 60,
-        status: 'scheduled',
-        attendees: [],
-        company_id: profile?.company_id || '',
-        created_by: '',
+        duration_minutes: metadata.duration_minutes || 30,
+        day_of_week: metadata.day_of_week,
+        preferred_time: metadata.preferred_time,
       });
-      if (result.success) {
-        toast.success('Reunión creada exitosamente');
-      }
+      setShowMeetingDialog(true);
     } else if (metadata.action === 'create_ticket') {
       const result = await createTicket({
         title: metadata.title,
@@ -86,6 +121,40 @@ export default function CEOChatbotPage() {
       if (result.success) {
         toast.success('Ticket creado exitosamente');
       }
+    }
+  };
+
+  const handleConfirmMeeting = async () => {
+    if (!selectedDate || !selectedTime || !pendingMeeting || !user) {
+      toast.error('Por favor selecciona una fecha y horario');
+      return;
+    }
+
+    // Find a CEO user to send the request to
+    const ceoUserId = availability[0]?.user_id;
+    if (!ceoUserId) {
+      toast.error('No se encontró el CEO para enviar la solicitud');
+      return;
+    }
+
+    const result = await createMeetingRequest({
+      host_id: ceoUserId,
+      requester_id: user.id,
+      requested_date: format(selectedDate, 'yyyy-MM-dd'),
+      requested_time: selectedTime,
+      duration_minutes: pendingMeeting.duration_minutes,
+      message: `${pendingMeeting.title}: ${pendingMeeting.description}`,
+      status: 'pending',
+    });
+
+    if (result.success) {
+      toast.success('Solicitud de reunión enviada. El CEO la revisará pronto.');
+      setShowMeetingDialog(false);
+      setPendingMeeting(null);
+      setSelectedDate(undefined);
+      setSelectedTime('');
+    } else {
+      toast.error(result.error || 'Error al enviar la solicitud');
     }
   };
 
@@ -270,6 +339,102 @@ export default function CEOChatbotPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Meeting Scheduling Dialog */}
+        <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-primary" />
+                Agendar Reunión con el CEO
+              </DialogTitle>
+              <DialogDescription>
+                {pendingMeeting?.title}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">
+                  Selecciona una fecha disponible
+                </Label>
+                <div className="flex justify-center">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={(date) => !isDateAvailable(date)}
+                    className="rounded-md border pointer-events-auto"
+                    locale={es}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Días disponibles: {availableDayNumbers.map(d => DAY_NAMES[d]).join(', ')}
+                </p>
+              </div>
+
+              {selectedDate && (
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">
+                    Selecciona un horario
+                  </Label>
+                  <Select value={selectedTime} onValueChange={setSelectedTime}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Elige un horario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getTimeSlotsForDate(selectedDate).map((slot) => (
+                        <SelectItem 
+                          key={slot.id} 
+                          value={slot.start_time.slice(0, 5)}
+                        >
+                          {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {selectedDate && selectedTime && (
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm">
+                    <strong>Reunión:</strong> {pendingMeeting?.title}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Fecha:</strong> {format(selectedDate, "EEEE d 'de' MMMM, yyyy", { locale: es })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Hora:</strong> {selectedTime}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Duración:</strong> {pendingMeeting?.duration_minutes} minutos
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowMeetingDialog(false);
+                    setPendingMeeting(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-primary to-secondary"
+                  onClick={handleConfirmMeeting}
+                  disabled={!selectedDate || !selectedTime}
+                >
+                  Enviar Solicitud
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
