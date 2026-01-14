@@ -12,17 +12,20 @@ import {
   Crown,
   Briefcase,
   Eye,
-  Plus
+  Plus,
+  Brain
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { SuperadminUserEditDialog } from '@/components/SuperadminUserEditDialog';
 import { CreateCompanyDialog } from '@/components/CreateCompanyDialog';
+import { ChatbotKnowledgeManager } from '@/components/ChatbotKnowledgeManager';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -229,73 +232,92 @@ export default function SuperadminDashboard() {
             </Button>
           </header>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{users.length}</p>
-                    <p className="text-xs text-muted-foreground">Usuarios Totales</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Building2 className="w-8 h-8 text-blue-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{companies.length}</p>
-                    <p className="text-xs text-muted-foreground">Empresas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card 
-              className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 cursor-pointer transition-colors"
-              onClick={() => setShowCreateCompany(true)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Plus className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Nueva Empresa</p>
-                    <p className="text-xs text-muted-foreground">Añadir empresa</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Briefcase className="w-8 h-8 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{departments.length}</p>
-                    <p className="text-xs text-muted-foreground">Departamentos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Crown className="w-8 h-8 text-yellow-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {users.filter(u => u.roles.some(r => ['superadmin', 'ceo', 'gerente_area'].includes(r.role))).length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Líderes</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Tabs for different sections */}
+          <Tabs defaultValue="users" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Usuarios
+              </TabsTrigger>
+              <TabsTrigger value="companies" className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Empresas
+              </TabsTrigger>
+              <TabsTrigger value="chatbot" className="flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                Knowledge Base
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Users Tab */}
+            <TabsContent value="users" className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-8 h-8 text-primary" />
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{users.length}</p>
+                        <p className="text-xs text-muted-foreground">Usuarios Totales</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Building2 className="w-8 h-8 text-blue-500" />
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{companies.length}</p>
+                        <p className="text-xs text-muted-foreground">Empresas</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card 
+                  className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 cursor-pointer transition-colors"
+                  onClick={() => setShowCreateCompany(true)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Plus className="w-8 h-8 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Nueva Empresa</p>
+                        <p className="text-xs text-muted-foreground">Añadir empresa</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Briefcase className="w-8 h-8 text-green-500" />
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{departments.length}</p>
+                        <p className="text-xs text-muted-foreground">Departamentos</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Crown className="w-8 h-8 text-yellow-500" />
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">
+                          {users.filter(u => u.roles.some(r => ['superadmin', 'ceo', 'gerente_area'].includes(r.role))).length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Líderes</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
           {/* Filters */}
           <Card className="bg-card/50 backdrop-blur-sm border-border">
@@ -485,6 +507,46 @@ export default function SuperadminDashboard() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            {/* Companies Tab */}
+            <TabsContent value="companies" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {companies.map((company) => (
+                  <Card key={company.id} className="bg-card/50 backdrop-blur-sm border-border">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{company.icon || '🏢'}</span>
+                        <div>
+                          <p className="font-medium text-foreground">{company.name}</p>
+                          <p className="text-sm text-muted-foreground">{company.description}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {users.filter(u => u.company_id === company.id).length} usuarios
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Card 
+                  className="bg-card/30 border-dashed border-2 hover:border-primary/50 cursor-pointer transition-colors"
+                  onClick={() => setShowCreateCompany(true)}
+                >
+                  <CardContent className="p-4 flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <Plus className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground">Agregar Empresa</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Chatbot Knowledge Base Tab */}
+            <TabsContent value="chatbot">
+              <ChatbotKnowledgeManager />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
