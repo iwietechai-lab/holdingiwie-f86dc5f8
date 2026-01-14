@@ -993,13 +993,20 @@ export type Database = {
       }
       tasks: {
         Row: {
+          actual_end_date: string | null
           area: string
           assigned_to: Json
+          collaborating_companies: Json | null
           company_id: string
           created_at: string | null
           created_by: string
+          description: string | null
           development_notes: string | null
+          early_completion_reason: string | null
+          end_date: string | null
+          estimated_hours: number | null
           execution_time: unknown
+          extension_reason: string | null
           final_results: string | null
           id: string
           improvement_proposals: string | null
@@ -1007,19 +1014,27 @@ export type Database = {
           partial_results: string | null
           priority: Database["public"]["Enums"]["approval_priority"]
           problems: string | null
+          start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           team_members: Json | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          actual_end_date?: string | null
           area: string
           assigned_to?: Json
+          collaborating_companies?: Json | null
           company_id: string
           created_at?: string | null
           created_by: string
+          description?: string | null
           development_notes?: string | null
+          early_completion_reason?: string | null
+          end_date?: string | null
+          estimated_hours?: number | null
           execution_time?: unknown
+          extension_reason?: string | null
           final_results?: string | null
           id?: string
           improvement_proposals?: string | null
@@ -1027,19 +1042,27 @@ export type Database = {
           partial_results?: string | null
           priority?: Database["public"]["Enums"]["approval_priority"]
           problems?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           team_members?: Json | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          actual_end_date?: string | null
           area?: string
           assigned_to?: Json
+          collaborating_companies?: Json | null
           company_id?: string
           created_at?: string | null
           created_by?: string
+          description?: string | null
           development_notes?: string | null
+          early_completion_reason?: string | null
+          end_date?: string | null
+          estimated_hours?: number | null
           execution_time?: unknown
+          extension_reason?: string | null
           final_results?: string | null
           id?: string
           improvement_proposals?: string | null
@@ -1047,6 +1070,7 @@ export type Database = {
           partial_results?: string | null
           priority?: Database["public"]["Enums"]["approval_priority"]
           problems?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           team_members?: Json | null
           title?: string
