@@ -9,9 +9,11 @@ import {
   Zap,
   PieChart,
   Activity,
-  LogOut
+  LogOut,
+  Menu
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileNav } from '@/components/MobileNav';
 import { KPICard } from '@/components/KPICard';
 import { CEOChatbot } from '@/components/CEOChatbot';
 import { SpaceBackground } from '@/components/SpaceBackground';
@@ -122,18 +124,33 @@ export const Dashboard = () => {
   const displayRole = profile?.role || 'Usuario';
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       <SpaceBackground />
       
-      <Sidebar 
-        selectedCompany={selectedCompany} 
-        onSelectCompany={setSelectedCompany} 
-      />
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <Sidebar 
+          selectedCompany={selectedCompany} 
+          onSelectCompany={setSelectedCompany} 
+        />
+      </div>
+
+      {/* Mobile Header */}
+      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between p-3 border-b border-border bg-background/95 backdrop-blur-sm">
+        <MobileNav
+          selectedCompany={selectedCompany}
+          onSelectCompany={setSelectedCompany}
+        />
+        <h1 className="text-lg font-bold text-foreground neon-text">IWIE Holding</h1>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="w-4 h-4" />
+        </Button>
+      </header>
 
       <main className="flex-1 overflow-auto">
-        <div className="p-8 space-y-8">
-          {/* Header */}
-          <header className="flex items-center justify-between">
+        <div className="p-4 md:p-6 lg:p-8 space-y-6 lg:space-y-8">
+          {/* Header - Desktop only */}
+          <header className="hidden lg:flex items-center justify-between">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold text-foreground">
                 {selectedCompanyData ? (
@@ -171,8 +188,18 @@ export const Dashboard = () => {
             </Button>
           </header>
 
+          {/* Mobile Title */}
+          <div className="lg:hidden">
+            <h1 className="text-xl font-bold text-foreground">
+              {selectedCompanyData ? selectedCompanyData.name : 'Dashboard Global'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Bienvenido, <span className="text-primary font-semibold">{displayName}</span>
+            </p>
+          </div>
+
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             <KPICard
               title="Ingresos Totales"
               value="$2.4M"
@@ -204,17 +231,17 @@ export const Dashboard = () => {
           </div>
 
           {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
             {/* Revenue Chart */}
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Activity className="w-5 h-5 text-primary" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-foreground text-sm md:text-base">
+                  <Activity className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                   Ingresos Mensuales
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+              <CardContent className="p-2 md:p-6 pt-0">
+                <div className="h-[200px] md:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={revenueData}>
                       <defs>
@@ -255,14 +282,14 @@ export const Dashboard = () => {
 
             {/* Tasks Chart */}
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Target className="w-5 h-5 text-secondary" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-foreground text-sm md:text-base">
+                  <Target className="w-4 h-4 md:w-5 md:h-5 text-secondary" />
                   Estado de Tareas
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+              <CardContent className="p-2 md:p-6 pt-0">
+                <div className="h-[200px] md:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={tasksData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 25%, 20%)" />
@@ -300,11 +327,11 @@ export const Dashboard = () => {
           {/* Companies Overview - clicking shows dev modal */}
           {!selectedCompany && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <PieChart className="w-5 h-5 text-accent" />
+              <h2 className="text-base md:text-xl font-semibold text-foreground flex items-center gap-2">
+                <PieChart className="w-4 h-4 md:w-5 md:h-5 text-accent" />
                 Resumen por Empresa
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
                 {companies.map((company, index) => (
                   <Card 
                     key={company.id}
@@ -342,40 +369,40 @@ export const Dashboard = () => {
           )}
 
           {/* Quick stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-card/30 backdrop-blur-sm border-border p-4">
-              <div className="flex items-center gap-3">
-                <Zap className="w-8 h-8 text-yellow-400" />
-                <div>
-                  <p className="text-2xl font-bold text-foreground">156</p>
-                  <p className="text-xs text-muted-foreground">Proyectos activos</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Zap className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold text-foreground">156</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Proyectos activos</p>
                 </div>
               </div>
             </Card>
-            <Card className="bg-card/30 backdrop-blur-sm border-border p-4">
-              <div className="flex items-center gap-3">
-                <Target className="w-8 h-8 text-green-400" />
-                <div>
-                  <p className="text-2xl font-bold text-foreground">94%</p>
-                  <p className="text-xs text-muted-foreground">Objetivos cumplidos</p>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Target className="w-6 h-6 md:w-8 md:h-8 text-green-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold text-foreground">94%</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Objetivos cumplidos</p>
                 </div>
               </div>
             </Card>
-            <Card className="bg-card/30 backdrop-blur-sm border-border p-4">
-              <div className="flex items-center gap-3">
-                <Users className="w-8 h-8 text-blue-400" />
-                <div>
-                  <p className="text-2xl font-bold text-foreground">10</p>
-                  <p className="text-xs text-muted-foreground">Empresas</p>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Users className="w-6 h-6 md:w-8 md:h-8 text-blue-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold text-foreground">10</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Empresas</p>
                 </div>
               </div>
             </Card>
-            <Card className="bg-card/30 backdrop-blur-sm border-border p-4">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="w-8 h-8 text-purple-400" />
-                <div>
-                  <p className="text-2xl font-bold text-foreground">+27%</p>
-                  <p className="text-xs text-muted-foreground">Crecimiento anual</p>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-purple-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold text-foreground">+27%</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Crecimiento anual</p>
                 </div>
               </div>
             </Card>
