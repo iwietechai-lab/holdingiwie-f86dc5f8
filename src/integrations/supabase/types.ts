@@ -206,24 +206,33 @@ export type Database = {
       }
       ceo_knowledge_access: {
         Row: {
+          access_level: Database["public"]["Enums"]["knowledge_access_level"]
+          allowed_categories: string[] | null
           company_id: string
           granted_at: string | null
           granted_by: string | null
           id: string
+          notes: string | null
           user_id: string
         }
         Insert: {
+          access_level?: Database["public"]["Enums"]["knowledge_access_level"]
+          allowed_categories?: string[] | null
           company_id: string
           granted_at?: string | null
           granted_by?: string | null
           id?: string
+          notes?: string | null
           user_id: string
         }
         Update: {
+          access_level?: Database["public"]["Enums"]["knowledge_access_level"]
+          allowed_categories?: string[] | null
           company_id?: string
           granted_at?: string | null
           granted_by?: string | null
           id?: string
+          notes?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1211,6 +1220,12 @@ export type Database = {
         | "group_company"
         | "group_multi_company"
         | "global"
+      knowledge_access_level:
+        | "global_holding"
+        | "empresa"
+        | "proyecto"
+        | "desarrollo"
+        | "confidencial"
       meeting_request_status:
         | "pendiente"
         | "aprobada"
@@ -1353,6 +1368,13 @@ export const Constants = {
         "group_company",
         "group_multi_company",
         "global",
+      ],
+      knowledge_access_level: [
+        "global_holding",
+        "empresa",
+        "proyecto",
+        "desarrollo",
+        "confidencial",
       ],
       meeting_request_status: [
         "pendiente",
