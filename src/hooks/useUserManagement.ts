@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { DashboardVisibility } from '@/types/superadmin';
 
 export interface UserProfile {
   id: string;
@@ -41,6 +42,8 @@ export function useUserManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [canManageUsers, setCanManageUsers] = useState(false);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   // Check superadmin status first
   const checkSuperadminStatus = useCallback(async (): Promise<boolean> => {
@@ -59,6 +62,33 @@ export function useUserManagement() {
     }
   }, []);
 
+  // Check if user has gestionar_usuarios permission
+  const checkUserManagementPermission = useCallback(async (): Promise<{ canManage: boolean; companyId: string | null }> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { canManage: false, companyId: null };
+
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id, dashboard_visibility')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) return { canManage: false, companyId: null };
+
+      const visibility = profile.dashboard_visibility as unknown as DashboardVisibility | null;
+      const hasPermission = visibility?.gestionar_usuarios === true;
+      
+      return {
+        canManage: hasPermission, 
+        companyId: profile.company_id 
+      };
+    } catch (err) {
+      console.error('Error checking management permission:', err);
+      return { canManage: false, companyId: null };
+    }
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -68,15 +98,28 @@ export function useUserManagement() {
       const superadminStatus = await checkSuperadminStatus();
       setIsSuperadmin(superadminStatus);
       
-      if (!superadminStatus) {
+      // Check user management permission for non-superadmins
+      const { canManage, companyId } = await checkUserManagementPermission();
+      setCanManageUsers(canManage);
+      setUserCompanyId(companyId);
+
+      // User must be either superadmin or have gestionar_usuarios permission
+      if (!superadminStatus && !canManage) {
         throw new Error('No tienes permisos para ver usuarios');
       }
 
-      // Fetch profiles - RLS will allow superadmin to see all
-      const { data: profiles, error: profilesError } = await supabase
+      // Build query - filter by company if not superadmin
+      let query = supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Non-superadmins can only see users from their company
+      if (!superadminStatus && canManage && companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data: profiles, error: profilesError } = await query;
       
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
@@ -90,13 +133,22 @@ export function useUserManagement() {
       
       const userRoles = rolesError ? [] : (rolesData || []);
 
-      // Fetch access logs - RLS will allow superadmin to see all
-      const { data: logsData, error: logsError } = await supabase
+      // Fetch access logs - RLS will handle permissions
+      let logsQuery = supabase
         .from('access_logs')
         .select('*')
         .order('timestampt', { ascending: false })
         .limit(500);
-      
+
+      // Filter logs by company users if not superadmin
+      if (!superadminStatus && canManage && companyId && profiles) {
+        const userIds = profiles.map(p => p.id);
+        if (userIds.length > 0) {
+          logsQuery = logsQuery.in('user_id', userIds);
+        }
+      }
+
+      const { data: logsData, error: logsError } = await logsQuery;
       const accessLogs = logsError ? [] : (logsData || []);
 
       // Combine data
@@ -135,15 +187,16 @@ export function useUserManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [checkSuperadminStatus]);
+  }, [checkSuperadminStatus, checkUserManagementPermission]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
   const addRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    // Only superadmin can add roles
     if (!isSuperadmin) {
-      return { success: false, error: 'No autorizado' };
+      return { success: false, error: 'Solo superadmin puede modificar roles' };
     }
 
     try {
@@ -170,8 +223,9 @@ export function useUserManagement() {
   };
 
   const removeRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    // Only superadmin can remove roles
     if (!isSuperadmin) {
-      return { success: false, error: 'No autorizado' };
+      return { success: false, error: 'Solo superadmin puede modificar roles' };
     }
 
     try {
@@ -198,8 +252,17 @@ export function useUserManagement() {
   };
 
   const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
-    if (!isSuperadmin) {
+    // Either superadmin or manager with gestionar_usuarios can update profiles in their company
+    if (!isSuperadmin && !canManageUsers) {
       return { success: false, error: 'No autorizado' };
+    }
+
+    // Non-superadmins can only update users from their company
+    if (!isSuperadmin && canManageUsers) {
+      const targetUser = users.find(u => u.id === userId);
+      if (targetUser?.company_id !== userCompanyId) {
+        return { success: false, error: 'Solo puedes editar usuarios de tu empresa' };
+      }
     }
 
     try {
@@ -226,10 +289,24 @@ export function useUserManagement() {
       full_name: string;
       role: string;
       company_id: string;
+      department?: string;
     }
   ) => {
-    if (!isSuperadmin) {
+    // Either superadmin or manager with gestionar_usuarios can update
+    if (!isSuperadmin && !canManageUsers) {
       return { success: false, error: 'No autorizado' };
+    }
+
+    // Non-superadmins can only update users from their company
+    if (!isSuperadmin && canManageUsers) {
+      const targetUser = users.find(u => u.id === userId);
+      if (targetUser?.company_id !== userCompanyId) {
+        return { success: false, error: 'Solo puedes editar usuarios de tu empresa' };
+      }
+      // Non-superadmins cannot change the company_id
+      if (updates.company_id !== userCompanyId) {
+        return { success: false, error: 'No puedes cambiar la empresa del usuario' };
+      }
     }
 
     try {
@@ -253,8 +330,9 @@ export function useUserManagement() {
   };
 
   const deleteUser = async (userId: string) => {
+    // Only superadmin can delete users
     if (!isSuperadmin) {
-      return { success: false, error: 'No autorizado' };
+      return { success: false, error: 'Solo superadmin puede eliminar usuarios' };
     }
 
     try {
@@ -275,6 +353,14 @@ export function useUserManagement() {
 
   const getAccessLogsByUser = async (userId: string) => {
     try {
+      // Non-superadmins can only view logs for users in their company
+      if (!isSuperadmin && canManageUsers) {
+        const targetUser = users.find(u => u.id === userId);
+        if (targetUser?.company_id !== userCompanyId) {
+          return { success: false, error: 'No autorizado', data: [] };
+        }
+      }
+
       const { data, error } = await supabase
         .from('access_logs')
         .select('*')
@@ -295,6 +381,8 @@ export function useUserManagement() {
     isLoading,
     error,
     isSuperadmin,
+    canManageUsers,
+    userCompanyId,
     fetchUsers,
     addRole,
     removeRole,
