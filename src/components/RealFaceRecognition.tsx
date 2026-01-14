@@ -337,19 +337,26 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     const nose = landmarks.getNose();
     const noseCenter = nose[3]; // Tip of nose
     
+    // Get jaw width as reference for adaptive threshold
+    const jaw = landmarks.getJawOutline();
+    const jawWidth = Math.abs(jaw[0].x - jaw[16].x);
+    
+    // Adaptive threshold based on face size (10% of jaw width = small movement)
+    const ADAPTIVE_THRESHOLD = Math.max(8, jawWidth * 0.08);
+    
     // Store nose positions for movement detection
     nosePositionsRef.current.push({ x: noseCenter.x, y: noseCenter.y });
-    if (nosePositionsRef.current.length > 30) {
+    if (nosePositionsRef.current.length > 60) {
       nosePositionsRef.current.shift();
     }
 
-    // Set initial position if not set
-    if (!initialNosePositionRef.current && nosePositionsRef.current.length >= 5) {
+    // Set initial position after stabilization (use first 3 frames for quicker start)
+    if (!initialNosePositionRef.current && nosePositionsRef.current.length >= 3) {
       initialNosePositionRef.current = {
-        x: nosePositionsRef.current.slice(0, 5).reduce((sum, p) => sum + p.x, 0) / 5,
-        y: nosePositionsRef.current.slice(0, 5).reduce((sum, p) => sum + p.y, 0) / 5
+        x: nosePositionsRef.current.slice(0, 3).reduce((sum, p) => sum + p.x, 0) / 3,
+        y: nosePositionsRef.current.slice(0, 3).reduce((sum, p) => sum + p.y, 0) / 3
       };
-      console.log('📍 Initial nose position set:', initialNosePositionRef.current);
+      console.log('📍 Initial nose position set:', initialNosePositionRef.current, 'Adaptive threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
     }
 
     if (!initialNosePositionRef.current) return false;
@@ -363,57 +370,70 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     const deltaX = currentX - initialX;
     const deltaY = currentY - initialY;
     
-    // Movement threshold (adjust based on video resolution)
-    const MOVEMENT_THRESHOLD = 20; // Reduced for easier detection
+    // Also track maximum displacement for more robust detection
+    const allDeltasX = nosePositionsRef.current.map(p => p.x - initialX);
+    const allDeltasY = nosePositionsRef.current.map(p => p.y - initialY);
+    const maxDeltaX = Math.max(...allDeltasX);
+    const minDeltaX = Math.min(...allDeltasX);
+    const maxDeltaY = Math.max(...allDeltasY);
+    const minDeltaY = Math.min(...allDeltasY);
+
+    let detected = false;
+    let progress = 0;
 
     switch (challenge) {
       case 'turn-left':
         // Nose moves RIGHT in mirrored video when turning left
-        const progressLeft = Math.min(100, Math.max(0, (deltaX / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progressLeft);
-        if (deltaX > MOVEMENT_THRESHOLD) {
-          console.log('✅ LIVENESS: Turn left detected! DeltaX:', deltaX.toFixed(2));
-          return true;
+        // Check both current position and max displacement
+        const effectiveDeltaLeft = Math.max(deltaX, maxDeltaX);
+        progress = Math.min(100, Math.max(0, (effectiveDeltaLeft / ADAPTIVE_THRESHOLD) * 100));
+        setLivenessProgress(progress);
+        if (effectiveDeltaLeft > ADAPTIVE_THRESHOLD) {
+          console.log('✅ LIVENESS: Turn left detected! DeltaX:', effectiveDeltaLeft.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          detected = true;
         }
         break;
 
       case 'turn-right':
         // Nose moves LEFT in mirrored video when turning right
-        const progressRight = Math.min(100, Math.max(0, (Math.abs(deltaX) / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progressRight);
-        if (deltaX < -MOVEMENT_THRESHOLD) {
-          console.log('✅ LIVENESS: Turn right detected! DeltaX:', deltaX.toFixed(2));
-          return true;
+        const effectiveDeltaRight = Math.min(deltaX, minDeltaX);
+        progress = Math.min(100, Math.max(0, (Math.abs(effectiveDeltaRight) / ADAPTIVE_THRESHOLD) * 100));
+        setLivenessProgress(progress);
+        if (effectiveDeltaRight < -ADAPTIVE_THRESHOLD) {
+          console.log('✅ LIVENESS: Turn right detected! DeltaX:', effectiveDeltaRight.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          detected = true;
         }
         break;
 
       case 'nod-up':
         // Head moves up (nose goes up in video, Y decreases)
-        const progressUp = Math.min(100, Math.max(0, (Math.abs(deltaY) / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progressUp);
-        if (deltaY < -MOVEMENT_THRESHOLD) {
-          console.log('✅ LIVENESS: Nod up detected! DeltaY:', deltaY.toFixed(2));
-          return true;
+        const effectiveDeltaUp = Math.min(deltaY, minDeltaY);
+        progress = Math.min(100, Math.max(0, (Math.abs(effectiveDeltaUp) / ADAPTIVE_THRESHOLD) * 100));
+        setLivenessProgress(progress);
+        if (effectiveDeltaUp < -ADAPTIVE_THRESHOLD) {
+          console.log('✅ LIVENESS: Nod up detected! DeltaY:', effectiveDeltaUp.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          detected = true;
         }
         break;
 
       case 'nod-down':
         // Head moves down (nose goes down in video, Y increases)
-        const progressDown = Math.min(100, Math.max(0, (deltaY / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progressDown);
-        if (deltaY > MOVEMENT_THRESHOLD) {
-          console.log('✅ LIVENESS: Nod down detected! DeltaY:', deltaY.toFixed(2));
-          return true;
+        const effectiveDeltaDown = Math.max(deltaY, maxDeltaY);
+        progress = Math.min(100, Math.max(0, (effectiveDeltaDown / ADAPTIVE_THRESHOLD) * 100));
+        setLivenessProgress(progress);
+        if (effectiveDeltaDown > ADAPTIVE_THRESHOLD) {
+          console.log('✅ LIVENESS: Nod down detected! DeltaY:', effectiveDeltaDown.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          detected = true;
         }
         break;
     }
 
-    // Log progress periodically
-    if (nosePositionsRef.current.length % 15 === 0) {
-      console.log(`🔍 Liveness check - Challenge: ${challenge}, DeltaX: ${deltaX.toFixed(2)}, DeltaY: ${deltaY.toFixed(2)}`);
+    // Log progress every 10 frames for debugging
+    if (nosePositionsRef.current.length % 10 === 0) {
+      console.log(`🔍 Liveness: ${challenge} | Current: dX=${deltaX.toFixed(1)}, dY=${deltaY.toFixed(1)} | Max: dX=[${minDeltaX.toFixed(1)},${maxDeltaX.toFixed(1)}], dY=[${minDeltaY.toFixed(1)},${maxDeltaY.toFixed(1)}] | Threshold: ${ADAPTIVE_THRESHOLD.toFixed(1)} | Progress: ${progress.toFixed(0)}%`);
     }
 
-    return false;
+    return detected;
   }, []);
 
   // Process embedding
