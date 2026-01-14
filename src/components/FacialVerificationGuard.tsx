@@ -8,10 +8,11 @@ import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
 
-// Global function to stop all active camera streams
-const stopAllCameraStreams = () => {
+// Global function to stop all active camera streams - more aggressive approach
+const stopAllCameraStreams = async () => {
   console.log('🛑 FacialVerificationGuard: Stopping all camera streams globally...');
-  // Get all video elements and stop their streams
+  
+  // Method 1: Stop all video elements
   const videos = document.querySelectorAll('video');
   videos.forEach(video => {
     const stream = video.srcObject as MediaStream | null;
@@ -24,7 +25,21 @@ const stopAllCameraStreams = () => {
     }
     video.srcObject = null;
     video.pause();
+    try {
+      video.load(); // Force release
+    } catch (e) {
+      // Ignore
+    }
   });
+  
+  // Method 2: Try to enumerate and stop all devices (more aggressive)
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    console.log('🛑 Found', videoDevices.length, 'video input devices');
+  } catch (e) {
+    console.warn('Could not enumerate devices:', e);
+  }
 };
 
 interface FacialVerificationGuardProps {
@@ -77,25 +92,33 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     console.log('🎉 FacialVerificationGuard: Face success callback triggered');
     
     // Stop camera globally FIRST before anything else
-    stopAllCameraStreams();
+    await stopAllCameraStreams();
     
     // Wait a moment for camera hardware to release
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Stop again just in case
-    stopAllCameraStreams();
+    await stopAllCameraStreams();
     
     // Update verification record
     await recordVerification();
     
-    // Wait for camera to fully stop before hiding component
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Final cleanup
-    stopAllCameraStreams();
-    
-    console.log('✅ FacialVerificationGuard: All cleanup done, hiding face recognition');
+    // Hide the component FIRST to trigger unmount
     setShowFaceRecognition(false);
+    
+    // Wait for component to unmount
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Final cleanup after unmount
+    await stopAllCameraStreams();
+    
+    // Additional delayed cleanup
+    setTimeout(() => {
+      stopAllCameraStreams();
+      console.log('✅ FacialVerificationGuard: Final delayed cleanup complete');
+    }, 500);
+    
+    console.log('✅ FacialVerificationGuard: All cleanup done');
   }, [recordVerification]);
 
   const handleCancel = async () => {
