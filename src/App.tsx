@@ -10,6 +10,10 @@ import GestorDocumentos from "./pages/GestorDocumentos";
 import AdminFaceSetup from "./pages/AdminFaceSetup";
 import UserManagement from "./pages/UserManagement";
 import SuperadminDashboard from "./pages/SuperadminDashboard";
+import OrganizationStructure from "./pages/OrganizationStructure";
+import CEOChatbotPage from "./pages/CEOChatbotPage";
+import MeetingsPage from "./pages/MeetingsPage";
+import TicketsPage from "./pages/TicketsPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 
@@ -37,8 +41,20 @@ const App = () => (
           <Route path="/chatbot" element={
             <ProtectedRoute><Chatbot /></ProtectedRoute>
           } />
+          <Route path="/ceo-chatbot" element={
+            <ProtectedRoute><CEOChatbotPage /></ProtectedRoute>
+          } />
           <Route path="/gestor-documentos" element={
             <ProtectedRoute><GestorDocumentos /></ProtectedRoute>
+          } />
+          <Route path="/organizacion" element={
+            <ProtectedRoute><OrganizationStructure /></ProtectedRoute>
+          } />
+          <Route path="/reuniones" element={
+            <ProtectedRoute><MeetingsPage /></ProtectedRoute>
+          } />
+          <Route path="/tickets" element={
+            <ProtectedRoute><TicketsPage /></ProtectedRoute>
           } />
           <Route path="/admin/face-setup" element={
             <ProtectedRoute><AdminFaceSetup /></ProtectedRoute>
