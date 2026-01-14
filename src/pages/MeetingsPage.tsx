@@ -157,74 +157,87 @@ export default function MeetingsPage() {
               </p>
             </div>
 
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-primary to-secondary">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nueva Reunión
+            <div className="flex items-center gap-3">
+              <a
+                href="https://calendar.app.google/iouQyVL54CS5tvK56"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" className="border-primary/50 hover:bg-primary/10">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Agendar en Google Calendar
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Reunión</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Título *</Label>
-                    <Input
-                      value={newMeeting.title}
-                      onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })}
-                      placeholder="Título de la reunión"
-                    />
-                  </div>
-                  <div>
-                    <Label>Descripción</Label>
-                    <Textarea
-                      value={newMeeting.description}
-                      onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })}
-                      placeholder="Descripción de la reunión"
-                    />
-                  </div>
-                  <div>
-                    <Label>Fecha y Hora *</Label>
-                    <Input
-                      type="datetime-local"
-                      value={newMeeting.scheduled_at}
-                      onChange={(e) => setNewMeeting({ ...newMeeting, scheduled_at: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Duración (min)</Label>
-                      <Input
-                        type="number"
-                        value={newMeeting.duration_minutes}
-                        onChange={(e) => setNewMeeting({ ...newMeeting, duration_minutes: parseInt(e.target.value) })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Ubicación</Label>
-                      <Input
-                        value={newMeeting.location}
-                        onChange={(e) => setNewMeeting({ ...newMeeting, location: e.target.value })}
-                        placeholder="Sala o ubicación"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>URL de la reunión</Label>
-                    <Input
-                      value={newMeeting.meeting_url}
-                      onChange={(e) => setNewMeeting({ ...newMeeting, meeting_url: e.target.value })}
-                      placeholder="https://meet.google.com/..."
-                    />
-                  </div>
-                  <Button onClick={handleCreateMeeting} className="w-full">
-                    Crear Reunión
+              </a>
+
+              <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-to-r from-primary to-secondary">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nueva Reunión
                   </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Crear Nueva Reunión</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Título *</Label>
+                      <Input
+                        value={newMeeting.title}
+                        onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })}
+                        placeholder="Título de la reunión"
+                      />
+                    </div>
+                    <div>
+                      <Label>Descripción</Label>
+                      <Textarea
+                        value={newMeeting.description}
+                        onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })}
+                        placeholder="Descripción de la reunión"
+                      />
+                    </div>
+                    <div>
+                      <Label>Fecha y Hora *</Label>
+                      <Input
+                        type="datetime-local"
+                        value={newMeeting.scheduled_at}
+                        onChange={(e) => setNewMeeting({ ...newMeeting, scheduled_at: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Duración (min)</Label>
+                        <Input
+                          type="number"
+                          value={newMeeting.duration_minutes}
+                          onChange={(e) => setNewMeeting({ ...newMeeting, duration_minutes: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Ubicación</Label>
+                        <Input
+                          value={newMeeting.location}
+                          onChange={(e) => setNewMeeting({ ...newMeeting, location: e.target.value })}
+                          placeholder="Sala o ubicación"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>URL de la reunión</Label>
+                      <Input
+                        value={newMeeting.meeting_url}
+                        onChange={(e) => setNewMeeting({ ...newMeeting, meeting_url: e.target.value })}
+                        placeholder="https://meet.google.com/..."
+                      />
+                    </div>
+                    <Button onClick={handleCreateMeeting} className="w-full">
+                      Crear Reunión
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </header>
 
           {/* Stats */}
