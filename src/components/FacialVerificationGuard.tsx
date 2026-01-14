@@ -40,10 +40,10 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   }, [authLoading, verificationLoading, isAuthenticated, isVerified]);
 
   const handleFaceSuccess = async () => {
-    const success = await recordVerification();
-    if (success) {
-      setShowFaceRecognition(false);
-    }
+    // RealFaceRecognition already saved the embedding and marked session as verified
+    // Just update local state and hide the modal
+    await recordVerification();
+    setShowFaceRecognition(false);
   };
 
   const handleCancel = async () => {

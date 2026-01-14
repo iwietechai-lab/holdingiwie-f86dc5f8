@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import * as faceapi from 'face-api.js';
 import { supabase } from '@/lib/supabase';
 
+// Session verification key (must match useFacialVerification hook)
+const SESSION_VERIFIED_KEY = 'facial_verification_done';
+const markSessionVerified = () => {
+  try {
+    sessionStorage.setItem(SESSION_VERIFIED_KEY, 'true');
+  } catch {
+    console.warn('Could not save to sessionStorage');
+  }
+};
+
 interface LocationData {
   latitude?: number;
   longitude?: number;
@@ -440,6 +450,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             console.log('✅ Timestamp actualizado via RPC:', new Date().toISOString());
           }
 
+          // Mark session as verified in sessionStorage
+          markSessionVerified();
+          
           setTimeout(onSuccess, 1500);
         } else {
           console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
@@ -490,6 +503,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
         stopCamera();
+
+        // Mark session as verified in sessionStorage
+        markSessionVerified();
 
         await logAccessWithLocation(true, locationData || {});
         setTimeout(onSuccess, 1500);
