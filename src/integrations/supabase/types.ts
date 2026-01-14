@@ -50,6 +50,126 @@ export type Database = {
         }
         Relationships: []
       }
+      areas: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          gerencia_id: string | null
+          id: string
+          name: string
+          order_index: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "areas_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          chatbot_id: string | null
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          chatbot_id?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          chatbot_id?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbots: {
+        Row: {
+          avatar_url: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          knowledge_base: Json | null
+          name: string
+          system_prompt: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          knowledge_base?: Json | null
+          name: string
+          system_prompt?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          knowledge_base?: Json | null
+          name?: string
+          system_prompt?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           color: string | null
@@ -109,6 +229,66 @@ export type Database = {
           },
         ]
       }
+      document_approvals: {
+        Row: {
+          approved_at: string | null
+          approver_id: string
+          comments: string | null
+          created_at: string | null
+          document_id: string
+          id: string
+          priority: Database["public"]["Enums"]["approval_priority"] | null
+          requested_by: string
+          status: Database["public"]["Enums"]["approval_status"] | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id: string
+          comments?: string | null
+          created_at?: string | null
+          document_id: string
+          id?: string
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          requested_by: string
+          status?: Database["public"]["Enums"]["approval_status"] | null
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string
+          comments?: string | null
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          requested_by?: string
+          status?: Database["public"]["Enums"]["approval_status"] | null
+        }
+        Relationships: []
+      }
+      document_shares: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          id: string
+          shared_by: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          shared_by: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          shared_by?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       documentos: {
         Row: {
           area_id: string
@@ -157,8 +337,337 @@ export type Database = {
         }
         Relationships: []
       }
+      gerencias: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          order_index: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gerencias_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetings: {
+        Row: {
+          attendees: Json | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          location: string | null
+          meeting_url: string | null
+          notes: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["meeting_status"] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          attendees?: Json | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          location?: string | null
+          meeting_url?: string | null
+          notes?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["meeting_status"] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          attendees?: Json | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          location?: string | null
+          meeting_url?: string | null
+          notes?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["meeting_status"] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          company_id: string | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          is_read: boolean | null
+          meeting_id: string | null
+          message: string
+          priority: Database["public"]["Enums"]["approval_priority"] | null
+          ticket_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          is_read?: boolean | null
+          meeting_id?: string | null
+          message: string
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          ticket_id?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          is_read?: boolean | null
+          meeting_id?: string | null
+          message?: string
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          ticket_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      positions: {
+        Row: {
+          area_id: string | null
+          created_at: string | null
+          description: string | null
+          gerencia_id: string | null
+          id: string
+          level: string | null
+          name: string
+          order_index: number | null
+        }
+        Insert: {
+          area_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          level?: string | null
+          name: string
+          order_index?: number | null
+        }
+        Update: {
+          area_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          level?: string | null
+          name?: string
+          order_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "positions_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_gerencias: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          gerencia_id: string | null
+          id: string
+          name: string
+          order_index: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          gerencia_id?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_gerencias_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          ticket_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          ticket_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          ticket_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tickets: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          points: number | null
+          priority: Database["public"]["Enums"]["approval_priority"] | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"] | null
+          tags: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          points?: number | null
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          tags?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          points?: number | null
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          tags?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
+          area_id: string | null
+          can_upload_documents: boolean | null
           company_id: string | null
           created_at: string | null
           dashboard_visibility: Json | null
@@ -166,12 +675,17 @@ export type Database = {
           email: string | null
           facial_embedding: Json | null
           full_name: string | null
+          gerencia_id: string | null
           id: string
           last_facial_verification: string | null
+          position_id: string | null
           role: string | null
+          sub_gerencia_id: string | null
           updated_at: string | null
         }
         Insert: {
+          area_id?: string | null
+          can_upload_documents?: boolean | null
           company_id?: string | null
           created_at?: string | null
           dashboard_visibility?: Json | null
@@ -179,12 +693,17 @@ export type Database = {
           email?: string | null
           facial_embedding?: Json | null
           full_name?: string | null
+          gerencia_id?: string | null
           id: string
           last_facial_verification?: string | null
+          position_id?: string | null
           role?: string | null
+          sub_gerencia_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          area_id?: string | null
+          can_upload_documents?: boolean | null
           company_id?: string | null
           created_at?: string | null
           dashboard_visibility?: Json | null
@@ -192,17 +711,48 @@ export type Database = {
           email?: string | null
           facial_embedding?: Json | null
           full_name?: string | null
+          gerencia_id?: string | null
           id?: string
           last_facial_verification?: string | null
+          position_id?: string | null
           role?: string | null
+          sub_gerencia_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "user_profiles_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_profiles_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_sub_gerencia_id_fkey"
+            columns: ["sub_gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "sub_gerencias"
             referencedColumns: ["id"]
           },
         ]
@@ -233,6 +783,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_notification: {
+        Args: {
+          p_action_url?: string
+          p_company_id: string
+          p_document_id?: string
+          p_meeting_id?: string
+          p_message: string
+          p_priority?: Database["public"]["Enums"]["approval_priority"]
+          p_ticket_id?: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_user_facial_embedding: {
         Args: { target_user_id: string }
         Returns: {
@@ -262,9 +827,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      seed_company_org_structure: {
+        Args: { p_company_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "superadmin" | "admin" | "manager" | "employee" | "user"
+      approval_priority: "baja" | "media" | "alta" | "urgente"
+      approval_status: "pending" | "approved" | "rejected"
+      meeting_status: "scheduled" | "confirmed" | "cancelled" | "completed"
+      ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -393,6 +966,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["superadmin", "admin", "manager", "employee", "user"],
+      approval_priority: ["baja", "media", "alta", "urgente"],
+      approval_status: ["pending", "approved", "rejected"],
+      meeting_status: ["scheduled", "confirmed", "cancelled", "completed"],
+      ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
   },
 } as const
