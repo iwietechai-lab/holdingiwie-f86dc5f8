@@ -208,38 +208,148 @@ export const TourOverlay = () => {
           />
         </svg>
 
-        {/* Animated highlight border around target */}
+        {/* Animated highlight border around target with pulsating effect */}
         {targetRect && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute pointer-events-none"
-            style={{
-              left: targetRect.left - 12,
-              top: targetRect.top - 12,
-              width: targetRect.width + 24,
-              height: targetRect.height + 24,
-            }}
-          >
-            <div className="w-full h-full rounded-xl border-2 border-primary shadow-[0_0_30px_rgba(var(--primary),0.6)]">
-              <Sparkles className="absolute -top-3 -left-3 w-6 h-6 text-primary animate-pulse" />
-              <Sparkles className="absolute -top-3 -right-3 w-6 h-6 text-accent animate-pulse" style={{ animationDelay: '0.2s' }} />
-              <Sparkles className="absolute -bottom-3 -left-3 w-6 h-6 text-accent animate-pulse" style={{ animationDelay: '0.4s' }} />
-              <Sparkles className="absolute -bottom-3 -right-3 w-6 h-6 text-primary animate-pulse" style={{ animationDelay: '0.6s' }} />
-            </div>
+          <>
+            {/* Outer pulsating ring */}
             <motion.div
-              className="absolute inset-0 rounded-xl border-2 border-primary/50"
+              className="absolute pointer-events-none"
+              style={{
+                left: targetRect.left - 20,
+                top: targetRect.top - 20,
+                width: targetRect.width + 40,
+                height: targetRect.height + 40,
+              }}
               animate={{
-                scale: [1, 1.05, 1],
-                opacity: [0.5, 0.2, 0.5]
+                scale: [1, 1.1, 1],
+                opacity: [0.3, 0.6, 0.3]
               }}
               transition={{
-                duration: 1.5,
+                duration: 1.2,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
-            />
-          </motion.div>
+            >
+              <div className="w-full h-full rounded-2xl border-4 border-primary/60 bg-primary/10" />
+            </motion.div>
+
+            {/* Middle pulsating ring */}
+            <motion.div
+              className="absolute pointer-events-none"
+              style={{
+                left: targetRect.left - 16,
+                top: targetRect.top - 16,
+                width: targetRect.width + 32,
+                height: targetRect.height + 32,
+              }}
+              animate={{
+                scale: [1, 1.05, 1],
+                opacity: [0.5, 0.8, 0.5]
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.2
+              }}
+            >
+              <div className="w-full h-full rounded-xl border-2 border-accent/80" />
+            </motion.div>
+
+            {/* Main highlight border */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="absolute pointer-events-none"
+              style={{
+                left: targetRect.left - 12,
+                top: targetRect.top - 12,
+                width: targetRect.width + 24,
+                height: targetRect.height + 24,
+              }}
+            >
+              <motion.div 
+                className="w-full h-full rounded-xl border-4 border-primary shadow-[0_0_40px_rgba(var(--primary),0.8),0_0_80px_rgba(var(--primary),0.4)]"
+                animate={{
+                  boxShadow: [
+                    '0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.3)',
+                    '0 0 40px rgba(168, 85, 247, 0.9), 0 0 80px rgba(168, 85, 247, 0.5)',
+                    '0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.3)'
+                  ]
+                }}
+                transition={{
+                  duration: 1,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+              {/* Animated corner sparkles */}
+              <motion.div
+                className="absolute -top-4 -left-4"
+                animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <Sparkles className="w-8 h-8 text-primary" />
+              </motion.div>
+              <motion.div
+                className="absolute -top-4 -right-4"
+                animate={{ rotate: -360, scale: [1, 1.3, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 0.5 }}
+              >
+                <Sparkles className="w-8 h-8 text-accent" />
+              </motion.div>
+              <motion.div
+                className="absolute -bottom-4 -left-4"
+                animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 1 }}
+              >
+                <Sparkles className="w-8 h-8 text-accent" />
+              </motion.div>
+              <motion.div
+                className="absolute -bottom-4 -right-4"
+                animate={{ rotate: -360, scale: [1, 1.3, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 1.5 }}
+              >
+                <Sparkles className="w-8 h-8 text-primary" />
+              </motion.div>
+            </motion.div>
+
+            {/* Arrow pointing to the element */}
+            <motion.div
+              className="absolute z-30 pointer-events-none"
+              style={{
+                left: targetRect.left + targetRect.width / 2 - 20,
+                top: targetRect.top - 50,
+              }}
+              animate={{
+                y: [0, -10, 0],
+                opacity: [0.8, 1, 0.8]
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              <div className="w-10 h-10 flex items-center justify-center">
+                <motion.svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 40 40"
+                  className="text-primary drop-shadow-lg"
+                >
+                  <path
+                    d="M20 35 L20 15 M10 25 L20 35 L30 25"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </motion.svg>
+              </div>
+            </motion.div>
+          </>
         )}
 
         {/* Flying Avatar */}
