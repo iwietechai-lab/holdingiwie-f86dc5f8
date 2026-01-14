@@ -109,6 +109,54 @@ export type Database = {
           },
         ]
       }
+      documentos: {
+        Row: {
+          area_id: string
+          created_at: string | null
+          empresa_id: string
+          file_path: string
+          file_size: number
+          id: string
+          is_development: boolean | null
+          mime_type: string
+          nombre: string
+          tipo: string
+          updated_at: string | null
+          user_id: string | null
+          version: number | null
+        }
+        Insert: {
+          area_id: string
+          created_at?: string | null
+          empresa_id: string
+          file_path: string
+          file_size: number
+          id?: string
+          is_development?: boolean | null
+          mime_type: string
+          nombre: string
+          tipo: string
+          updated_at?: string | null
+          user_id?: string | null
+          version?: number | null
+        }
+        Update: {
+          area_id?: string
+          created_at?: string | null
+          empresa_id?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          is_development?: boolean | null
+          mime_type?: string
+          nombre?: string
+          tipo?: string
+          updated_at?: string | null
+          user_id?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           company_id: string | null
