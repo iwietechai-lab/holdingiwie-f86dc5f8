@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -17,9 +17,11 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
-  Building2
+  Building2,
+  LogOut
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileNav } from '@/components/MobileNav';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useUserManagement, UserWithDetails, AccessLog } from '@/hooks/useUserManagement';
@@ -192,18 +194,33 @@ export const UserManagement = () => {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       <SpaceBackground />
       
-      <Sidebar 
-        selectedCompany={selectedCompany} 
-        onSelectCompany={setSelectedCompany} 
-      />
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <Sidebar 
+          selectedCompany={selectedCompany} 
+          onSelectCompany={setSelectedCompany} 
+        />
+      </div>
+
+      {/* Mobile Header */}
+      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between p-3 border-b border-border bg-background/95 backdrop-blur-sm">
+        <MobileNav
+          selectedCompany={selectedCompany}
+          onSelectCompany={setSelectedCompany}
+        />
+        <h1 className="text-lg font-bold text-foreground">Usuarios</h1>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>
+          <LogOut className="w-4 h-4" />
+        </Button>
+      </header>
 
       <main className="flex-1 overflow-auto">
-        <div className="p-8 space-y-6">
-          {/* Header */}
-          <header className="flex items-center justify-between">
+        <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+          {/* Header - Desktop */}
+          <header className="hidden lg:flex items-center justify-between">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <Button
@@ -233,57 +250,75 @@ export const UserManagement = () => {
             </Button>
           </header>
 
+          {/* Mobile Header Content */}
+          <div className="lg:hidden flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <UserCog className="w-5 h-5 text-primary" />
+                Gestión de Usuarios
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchUsers()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{users.length}</p>
-                    <p className="text-xs text-muted-foreground">Usuarios Totales</p>
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <Users className="w-6 h-6 md:w-8 md:h-8 text-primary shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xl md:text-2xl font-bold text-foreground">{users.length}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Usuarios Totales</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ShieldAlert className="w-8 h-8 text-red-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <ShieldAlert className="w-6 h-6 md:w-8 md:h-8 text-red-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xl md:text-2xl font-bold text-foreground">
                       {users.filter(u => u.roles.some(r => r.role === 'superadmin')).length}
                     </p>
-                    <p className="text-xs text-muted-foreground">Super Admins</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Super Admins</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-8 h-8 text-yellow-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <ShieldCheck className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xl md:text-2xl font-bold text-foreground">
                       {users.filter(u => u.roles.some(r => r.role === 'manager')).length}
                     </p>
-                    <p className="text-xs text-muted-foreground">Managers</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Managers</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="bg-card/50 backdrop-blur-sm border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-8 h-8 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <Clock className="w-6 h-6 md:w-8 md:h-8 text-green-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xl md:text-2xl font-bold text-foreground">
                       {users.filter(u => u.lastAccess && new Date(u.lastAccess) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}
                     </p>
-                    <p className="text-xs text-muted-foreground">Activos (24h)</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Activos (24h)</p>
                   </div>
                 </div>
               </CardContent>
@@ -301,13 +336,13 @@ export const UserManagement = () => {
 
           {/* Users Table */}
           <Card className="bg-card/50 backdrop-blur-sm border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 Lista de Usuarios
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-2 md:p-6 md:pt-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -317,198 +352,259 @@ export const UserManagement = () => {
                   No hay usuarios registrados
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>Usuario</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Cargo / Acceso</TableHead>
-                      <TableHead>Último Acceso</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Mobile Cards View */}
+                  <div className="md:hidden space-y-3">
                     {users.map((user) => (
-                      <>
-                        <TableRow key={user.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => toggleUserExpand(user.id)}
-                            >
-                              {expandedUsers.has(user.id) ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium text-foreground">{user.full_name || 'Sin nombre'}</p>
-                              <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {user.company_id ? (
-                              <div className="flex items-center gap-2">
-                                <span>{getCompanyById(user.company_id)?.icon || '🏢'}</span>
-                                <span className="text-sm">{getCompanyById(user.company_id)?.name || user.company_id}</span>
+                      <Card key={user.id} className="bg-card/30 border-border">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground truncate">{user.full_name || 'Sin nombre'}</p>
+                              <p className="text-xs text-muted-foreground truncate">{user.email || 'Sin email'}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                {user.company_id && (
+                                  <span className="text-sm">
+                                    {getCompanyById(user.company_id)?.icon || '🏢'}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground">{user.role || 'Sin cargo'}</span>
                               </div>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">Sin asignar</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-sm font-medium">{user.role || 'Sin cargo'}</span>
                               {user.has_full_access && (
-                                <Badge variant="outline" className="text-primary border-primary w-fit text-xs">
-                                  <Eye className="w-3 h-3 mr-1" />
+                                <Badge variant="outline" className="text-primary border-primary text-[10px] mt-2">
+                                  <Eye className="w-2 h-2 mr-1" />
                                   Acceso Completo
                                 </Badge>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            {user.lastAccess ? (
-                              <span className="text-sm">
-                                {format(new Date(user.lastAccess), "dd MMM yyyy, HH:mm", { locale: es })}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">Nunca</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8"
                                 onClick={() => handleViewAccessLogs(user)}
-                                title="Ver logs de acceso"
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" title="Gestionar roles">
-                                    <Shield className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="bg-popover">
-                                  <div className="px-2 py-1.5 text-sm font-semibold">Agregar Rol</div>
-                                  {AVAILABLE_ROLES.map((role) => {
-                                    const hasRole = user.roles.some(r => r.role === role.value);
-                                    const Icon = role.icon;
-                                    return (
-                                      <DropdownMenuItem
-                                        key={role.value}
-                                        onClick={() => !hasRole && handleAddRole(user.id, role.value)}
-                                        disabled={hasRole}
-                                        className="cursor-pointer"
-                                      >
-                                        <Icon className={`w-4 h-4 mr-2 ${role.color}`} />
-                                        {role.label}
-                                        {hasRole && <CheckCircle className="w-4 h-4 ml-auto text-green-500" />}
-                                      </DropdownMenuItem>
-                                    );
-                                  })}
-                                  
-                                  {user.roles.length > 0 && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <div className="px-2 py-1.5 text-sm font-semibold text-destructive">Eliminar Rol</div>
-                                      {user.roles.map((userRole) => {
-                                        const roleConfig = AVAILABLE_ROLES.find(r => r.value === userRole.role);
-                                        if (!roleConfig) return null;
-                                        const Icon = roleConfig.icon;
-                                        return (
-                                          <DropdownMenuItem
-                                            key={userRole.id}
-                                            onClick={() => handleRemoveRole(user.id, userRole.role)}
-                                            className="cursor-pointer text-destructive"
-                                          >
-                                            <Icon className="w-4 h-4 mr-2" />
-                                            Quitar {roleConfig.label}
-                                          </DropdownMenuItem>
-                                        );
-                                      })}
-                                    </>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                              
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8"
                                 onClick={() => setEditingUser(user)}
-                                title="Editar usuario"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8 text-destructive"
                                 onClick={() => setDeleteConfirmUser(user)}
-                                title="Eliminar usuario"
-                                className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
-                          </TableCell>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-8"></TableHead>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Empresa</TableHead>
+                          <TableHead>Cargo / Acceso</TableHead>
+                          <TableHead>Último Acceso</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
-                        
-                        {/* Expanded details row */}
-                        {expandedUsers.has(user.id) && (
-                          <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/30 p-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <React.Fragment key={user.id}>
+                            <TableRow className="hover:bg-muted/50">
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => toggleUserExpand(user.id)}
+                                >
+                                  {expandedUsers.has(user.id) ? (
+                                    <ChevronUp className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell>
                                 <div>
-                                  <h4 className="font-medium mb-2">Información del Usuario</h4>
-                                  <div className="space-y-1 text-sm">
-                                    <p><span className="text-muted-foreground">ID:</span> {user.id}</p>
-                                    <p><span className="text-muted-foreground">Rol en App:</span> {user.role || 'No definido'}</p>
-                                    <p><span className="text-muted-foreground">Creado:</span> {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : 'N/A'}</p>
-                                  </div>
+                                  <p className="font-medium text-foreground">{user.full_name || 'Sin nombre'}</p>
+                                  <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
                                 </div>
-                                <div>
-                                  <h4 className="font-medium mb-2">Últimos Accesos ({user.accessLogs.length})</h4>
-                                  <div className="space-y-1 text-sm max-h-32 overflow-y-auto">
-                                    {user.accessLogs.slice(0, 5).map((log) => (
-                                      <div key={log.id} className="flex items-center gap-2">
-                                        {log.success ? (
-                                          <CheckCircle className="w-3 h-3 text-green-500" />
-                                        ) : (
-                                          <XCircle className="w-3 h-3 text-red-500" />
-                                        )}
-                                        <span>{log.timestampt ? format(new Date(log.timestampt), "dd/MM HH:mm", { locale: es }) : 'N/A'}</span>
-                                        {log.city && (
-                                          <span className="text-muted-foreground flex items-center gap-1">
-                                            <MapPin className="w-3 h-3" />
-                                            {log.city}
-                                          </span>
+                              </TableCell>
+                              <TableCell>
+                                {user.company_id ? (
+                                  <div className="flex items-center gap-2">
+                                    <span>{getCompanyById(user.company_id)?.icon || '🏢'}</span>
+                                    <span className="text-sm">{getCompanyById(user.company_id)?.name || user.company_id}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Sin asignar</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-sm font-medium">{user.role || 'Sin cargo'}</span>
+                                  {user.has_full_access && (
+                                    <Badge variant="outline" className="text-primary border-primary w-fit text-xs">
+                                      <Eye className="w-3 h-3 mr-1" />
+                                      Acceso Completo
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {user.lastAccess ? (
+                                  <span className="text-sm">
+                                    {format(new Date(user.lastAccess), "dd MMM yyyy, HH:mm", { locale: es })}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Nunca</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewAccessLogs(user)}
+                                    title="Ver logs de acceso"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                  
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" title="Gestionar roles">
+                                        <Shield className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-popover">
+                                      <div className="px-2 py-1.5 text-sm font-semibold">Agregar Rol</div>
+                                      {AVAILABLE_ROLES.map((role) => {
+                                        const hasRole = user.roles.some(r => r.role === role.value);
+                                        const Icon = role.icon;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={role.value}
+                                            onClick={() => !hasRole && handleAddRole(user.id, role.value)}
+                                            disabled={hasRole}
+                                            className="cursor-pointer"
+                                          >
+                                            <Icon className={`w-4 h-4 mr-2 ${role.color}`} />
+                                            {role.label}
+                                            {hasRole && <CheckCircle className="w-4 h-4 ml-auto text-green-500" />}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
+                                      
+                                      {user.roles.length > 0 && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <div className="px-2 py-1.5 text-sm font-semibold text-destructive">Eliminar Rol</div>
+                                          {user.roles.map((userRole) => {
+                                            const roleConfig = AVAILABLE_ROLES.find(r => r.value === userRole.role);
+                                            if (!roleConfig) return null;
+                                            const Icon = roleConfig.icon;
+                                            return (
+                                              <DropdownMenuItem
+                                                key={userRole.id}
+                                                onClick={() => handleRemoveRole(user.id, userRole.role)}
+                                                className="cursor-pointer text-destructive"
+                                              >
+                                                <Icon className="w-4 h-4 mr-2" />
+                                                Quitar {roleConfig.label}
+                                              </DropdownMenuItem>
+                                            );
+                                          })}
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                  
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setEditingUser(user)}
+                                    title="Editar usuario"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeleteConfirmUser(user)}
+                                    title="Eliminar usuario"
+                                    className="text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            
+                            {/* Expanded details row */}
+                            {expandedUsers.has(user.id) && (
+                              <TableRow>
+                                <TableCell colSpan={6} className="bg-muted/30 p-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <h4 className="font-medium mb-2">Información del Usuario</h4>
+                                      <div className="space-y-1 text-sm">
+                                        <p><span className="text-muted-foreground">ID:</span> {user.id}</p>
+                                        <p><span className="text-muted-foreground">Rol en App:</span> {user.role || 'No definido'}</p>
+                                        <p><span className="text-muted-foreground">Creado:</span> {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : 'N/A'}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-medium mb-2">Últimos Accesos ({user.accessLogs.length})</h4>
+                                      <div className="space-y-1 text-sm max-h-32 overflow-y-auto">
+                                        {user.accessLogs.slice(0, 5).map((log) => (
+                                          <div key={log.id} className="flex items-center gap-2">
+                                            {log.success ? (
+                                              <CheckCircle className="w-3 h-3 text-green-500" />
+                                            ) : (
+                                              <XCircle className="w-3 h-3 text-red-500" />
+                                            )}
+                                            <span>{log.timestampt ? format(new Date(log.timestampt), "dd/MM HH:mm", { locale: es }) : 'N/A'}</span>
+                                            {log.city && (
+                                              <span className="text-muted-foreground flex items-center gap-1">
+                                                <MapPin className="w-3 h-3" />
+                                                {log.city}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {user.accessLogs.length === 0 && (
+                                          <p className="text-muted-foreground">Sin registros de acceso</p>
                                         )}
                                       </div>
-                                    ))}
-                                    {user.accessLogs.length === 0 && (
-                                      <p className="text-muted-foreground">Sin registros de acceso</p>
-                                    )}
+                                    </div>
                                   </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    ))}
-                  </TableBody>
-                </Table>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
