@@ -12,6 +12,7 @@ import UserManagement from "./pages/UserManagement";
 import SuperadminDashboard from "./pages/SuperadminDashboard";
 import OrganizationStructure from "./pages/OrganizationStructure";
 import CEOChatbotPage from "./pages/CEOChatbotPage";
+import CEOKnowledgeManager from "./pages/CEOKnowledgeManager";
 import MeetingsPage from "./pages/MeetingsPage";
 import VideoCallPage from "./pages/VideoCallPage";
 import TicketsPage from "./pages/TicketsPage";
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
           <Route path="/ceo-chatbot" element={<ProtectedRoute><CEOChatbotPage /></ProtectedRoute>} />
+          <Route path="/ceo-knowledge" element={<ProtectedRoute><CEOKnowledgeManager /></ProtectedRoute>} />
           <Route path="/gestor-documentos" element={<ProtectedRoute><GestorDocumentos /></ProtectedRoute>} />
           <Route path="/organizacion" element={<ProtectedRoute><OrganizationStructure /></ProtectedRoute>} />
           <Route path="/reuniones" element={<ProtectedRoute><MeetingsPage /></ProtectedRoute>} />
