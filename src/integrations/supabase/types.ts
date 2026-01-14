@@ -1274,6 +1274,98 @@ export type Database = {
           },
         ]
       }
+      user_creation_requests: {
+        Row: {
+          access_permissions: Json | null
+          area_id: string | null
+          company_id: string
+          created_at: string | null
+          department_id: string | null
+          email: string
+          full_name: string
+          gerencia_id: string | null
+          id: string
+          justification: string | null
+          position_id: string | null
+          proposed_role: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_permissions?: Json | null
+          area_id?: string | null
+          company_id: string
+          created_at?: string | null
+          department_id?: string | null
+          email: string
+          full_name: string
+          gerencia_id?: string | null
+          id?: string
+          justification?: string | null
+          position_id?: string | null
+          proposed_role: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_permissions?: Json | null
+          area_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          department_id?: string | null
+          email?: string
+          full_name?: string
+          gerencia_id?: string | null
+          id?: string
+          justification?: string | null
+          position_id?: string | null
+          proposed_role?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_creation_requests_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_creation_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_creation_requests_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_creation_requests_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           area_id: string | null
