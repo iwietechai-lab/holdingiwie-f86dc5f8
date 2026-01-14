@@ -242,31 +242,43 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
-  // Stop camera - ensures complete cleanup
+  // Stop camera - ensures complete cleanup with forced track termination
   const stopCamera = useCallback(() => {
     console.log('📹 Stopping camera and cleaning up...');
     
-    // Cancel animation frame
+    // Cancel animation frame first
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     
-    // Stop all media tracks
+    // Stop all media tracks from streamRef
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        console.log('📹 Stopping track:', track.kind, track.label);
+      const tracks = streamRef.current.getTracks();
+      console.log('📹 Found', tracks.length, 'tracks to stop');
+      tracks.forEach(track => {
+        console.log('📹 Stopping track:', track.kind, track.label, 'readyState:', track.readyState);
         track.stop();
+        track.enabled = false;
       });
       streamRef.current = null;
     }
     
-    // Clear video source
-    if (videoRef.current) {
+    // Also stop tracks directly from video element (belt and suspenders approach)
+    if (videoRef.current && videoRef.current.srcObject) {
+      const mediaStream = videoRef.current.srcObject as MediaStream;
+      if (mediaStream && mediaStream.getTracks) {
+        mediaStream.getTracks().forEach(track => {
+          console.log('📹 Stopping video element track:', track.kind, track.label);
+          track.stop();
+          track.enabled = false;
+        });
+      }
       videoRef.current.srcObject = null;
+      videoRef.current.load(); // Force video element to release resources
     }
     
-    console.log('✅ Camera cleanup complete');
+    console.log('✅ Camera cleanup complete - all tracks stopped');
   }, []);
 
   // Calculate cosine similarity
@@ -447,6 +459,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setStatus('success');
           statusRef.current = 'success';
           setInstruction('¡Verificación completada!');
+          
+          // IMMEDIATELY stop camera before anything else
+          console.log('📹 Stopping camera IMMEDIATELY after success');
           stopCamera();
           
           await logAccessWithLocation(true, locationData || {});
@@ -467,7 +482,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Mark session as verified in sessionStorage
           markSessionVerified();
           
-          setTimeout(onSuccess, 1500);
+          // Ensure camera is fully stopped before calling onSuccess
+          setTimeout(() => {
+            stopCamera(); // Call again just in case
+            onSuccess();
+          }, 1500);
         } else {
           console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
           setError(`Rostro no coincide (similitud: ${(similarity * 100).toFixed(1)}%). Intenta de nuevo.`);
@@ -516,13 +535,21 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setStatus('success');
         statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
+        
+        // IMMEDIATELY stop camera before anything else
+        console.log('📹 Stopping camera IMMEDIATELY after registration success');
         stopCamera();
 
         // Mark session as verified in sessionStorage
         markSessionVerified();
 
         await logAccessWithLocation(true, locationData || {});
-        setTimeout(onSuccess, 1500);
+        
+        // Ensure camera is fully stopped before calling onSuccess
+        setTimeout(() => {
+          stopCamera(); // Call again just in case
+          onSuccess();
+        }, 1500);
       } catch (err) {
         console.error('❌ Registration error:', err);
         setError('Error al registrar rostro. Intenta de nuevo.');
