@@ -336,7 +336,7 @@ export const Dashboard = () => {
                   <Card 
                     key={company.id}
                     className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group"
-                    onClick={() => setShowDevelopmentModal(true)}
+                    onClick={() => setSelectedCompany(company.id)}
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     <CardContent className="p-4">
