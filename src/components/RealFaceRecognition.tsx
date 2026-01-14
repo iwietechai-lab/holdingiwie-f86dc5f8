@@ -790,21 +790,21 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-4 p-6 max-w-lg w-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="flex flex-col items-center gap-3 sm:gap-4 p-4 sm:p-6 max-w-lg w-full my-auto">
         {/* Header */}
         <div className="text-center space-y-1">
-          <h2 className="text-2xl font-bold text-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">
             {hasStoredEmbedding === false ? 'Registro Facial' : 'Verificación Facial'}
           </h2>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-xs sm:text-sm">
             Prueba de vida requerida para seguridad
           </p>
         </div>
 
         {/* Video container */}
         <div className="relative">
-          <div className={`relative w-72 h-72 rounded-full overflow-hidden border-4 transition-all duration-300 ${getStatusColor()}`}>
+          <div className={`relative w-56 h-56 sm:w-72 sm:h-72 rounded-full overflow-hidden border-4 transition-all duration-300 ${getStatusColor()}`}>
             <video
               ref={videoRef}
               autoPlay
@@ -819,26 +819,26 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             
             {status === 'loading-models' && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-primary animate-spin" />
               </div>
             )}
             
             {status === 'success' && (
               <div className="absolute inset-0 flex items-center justify-center bg-green-500/30">
-                <CheckCircle className="w-20 h-20 text-green-400" />
+                <CheckCircle className="w-16 h-16 sm:w-20 sm:h-20 text-green-400" />
               </div>
             )}
             
             {status === 'failed' && attempts >= MAX_ATTEMPTS && (
               <div className="absolute inset-0 flex items-center justify-center bg-red-500/30">
-                <XCircle className="w-20 h-20 text-red-400" />
+                <XCircle className="w-16 h-16 sm:w-20 sm:h-20 text-red-400" />
               </div>
             )}
           </div>
 
           {/* Face indicator */}
           {(status === 'detecting' || status === 'liveness-check') && (
-            <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+            <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1 ${
               faceDetected ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
             }`}>
               <User className="w-3 h-3" />
@@ -847,7 +847,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           )}
 
           {/* Location */}
-          <div className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+          <div className={`absolute -bottom-8 sm:-bottom-10 left-1/2 -translate-x-1/2 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1 ${
             locationData ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
           }`}>
             <MapPin className="w-3 h-3" />
@@ -857,19 +857,19 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
         {/* Liveness progress bar - show during liveness check OR detecting with face */}
         {(status === 'liveness-check' || (status === 'detecting' && faceDetected)) && (
-          <div className="w-72 mt-6">
+          <div className="w-56 sm:w-72 mt-4 sm:mt-6">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <MoveHorizontal className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm text-yellow-400 font-medium">
+                <span className="text-xs sm:text-sm text-yellow-400 font-medium">
                   {status === 'liveness-check' ? 'Prueba de vida' : 'Detectando rostro...'}
                 </span>
               </div>
-              <span className="text-sm font-bold text-yellow-400">
+              <span className="text-xs sm:text-sm font-bold text-yellow-400">
                 {status === 'liveness-check' ? `${Math.round(livenessProgress)}%` : '✓'}
               </span>
             </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden border border-yellow-500/30">
+            <div className="h-2 sm:h-3 bg-muted rounded-full overflow-hidden border border-yellow-500/30">
               <div 
                 className="h-full bg-gradient-to-r from-yellow-500 to-green-500 transition-all duration-200 ease-out"
                 style={{ width: `${status === 'liveness-check' ? Math.max(5, livenessProgress) : 100}%` }}
@@ -878,41 +878,41 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             
             {/* Animated movement instruction - PROMINENT */}
             {status === 'liveness-check' && currentChallenge && (
-              <div className="mt-4 p-4 rounded-xl bg-yellow-500/10 border-2 border-yellow-500/50 animate-pulse">
-                <div className="flex items-center justify-center gap-3 text-yellow-400">
+              <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-xl bg-yellow-500/10 border-2 border-yellow-500/50 animate-pulse">
+                <div className="flex items-center justify-center gap-2 sm:gap-3 text-yellow-400">
                   {currentChallenge === 'turn-left' && (
                     <>
-                      <span className="text-4xl animate-bounce">👈</span>
+                      <span className="text-2xl sm:text-4xl animate-bounce">👈</span>
                       <div className="text-center">
-                        <p className="text-lg font-bold">GIRA A LA IZQUIERDA</p>
-                        <p className="text-sm opacity-80">Mueve tu cabeza hacia tu izquierda</p>
+                        <p className="text-sm sm:text-lg font-bold">GIRA A LA IZQUIERDA</p>
+                        <p className="text-xs sm:text-sm opacity-80">Mueve tu cabeza hacia tu izquierda</p>
                       </div>
                     </>
                   )}
                   {currentChallenge === 'turn-right' && (
                     <>
                       <div className="text-center">
-                        <p className="text-lg font-bold">GIRA A LA DERECHA</p>
-                        <p className="text-sm opacity-80">Mueve tu cabeza hacia tu derecha</p>
+                        <p className="text-sm sm:text-lg font-bold">GIRA A LA DERECHA</p>
+                        <p className="text-xs sm:text-sm opacity-80">Mueve tu cabeza hacia tu derecha</p>
                       </div>
-                      <span className="text-4xl animate-bounce">👉</span>
+                      <span className="text-2xl sm:text-4xl animate-bounce">👉</span>
                     </>
                   )}
                   {currentChallenge === 'nod-up' && (
                     <>
-                      <span className="text-4xl animate-bounce">👆</span>
+                      <span className="text-2xl sm:text-4xl animate-bounce">👆</span>
                       <div className="text-center">
-                        <p className="text-lg font-bold">MIRA HACIA ARRIBA</p>
-                        <p className="text-sm opacity-80">Levanta la cabeza hacia arriba</p>
+                        <p className="text-sm sm:text-lg font-bold">MIRA HACIA ARRIBA</p>
+                        <p className="text-xs sm:text-sm opacity-80">Levanta la cabeza hacia arriba</p>
                       </div>
                     </>
                   )}
                   {currentChallenge === 'nod-down' && (
                     <>
-                      <span className="text-4xl animate-bounce">👇</span>
+                      <span className="text-2xl sm:text-4xl animate-bounce">👇</span>
                       <div className="text-center">
-                        <p className="text-lg font-bold">MIRA HACIA ABAJO</p>
-                        <p className="text-sm opacity-80">Baja la cabeza hacia abajo</p>
+                        <p className="text-sm sm:text-lg font-bold">MIRA HACIA ABAJO</p>
+                        <p className="text-xs sm:text-sm opacity-80">Baja la cabeza hacia abajo</p>
                       </div>
                     </>
                   )}
