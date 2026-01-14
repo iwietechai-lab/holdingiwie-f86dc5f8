@@ -11,7 +11,12 @@ import {
   ChevronRight,
   Rocket,
   FolderOpen,
-  ShieldAlert
+  ShieldAlert,
+  Bot,
+  Calendar,
+  Ticket,
+  Network,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -21,6 +26,7 @@ import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import { VerificationStatusBadge } from '@/components/FacialVerificationGuard';
+import { NotificationsPopover } from '@/components/NotificationsPopover';
 
 interface SidebarProps {
   selectedCompany: string | null;
@@ -51,8 +57,12 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
     { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
-    { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
+    { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
+    { icon: Bot, label: 'Chatbot CEO', action: 'navigate', path: '/ceo-chatbot' },
+    { icon: Calendar, label: 'Reuniones', action: 'navigate', path: '/reuniones' },
+    { icon: Ticket, label: 'Tickets', action: 'navigate', path: '/tickets' },
+    { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
     // Only show superadmin panel to the superadmin user
     ...(isSuperadmin ? [{ 
@@ -78,7 +88,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
               <Rocket className="w-6 h-6 text-primary" />
             </div>
             {!isCollapsed && (
-              <div className="overflow-hidden">
+              <div className="overflow-hidden flex-1">
                 <h1 className="font-bold text-lg text-sidebar-foreground neon-text truncate">
                   IWIE Holding
                 </h1>
@@ -87,6 +97,8 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
                 </p>
               </div>
             )}
+            {/* Notifications button */}
+            <NotificationsPopover />
           </div>
         </div>
 

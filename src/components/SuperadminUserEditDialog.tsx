@@ -6,7 +6,9 @@ import {
   Shield, 
   Eye,
   EyeOff,
-  Check
+  Check,
+  Network,
+  Upload
 } from 'lucide-react';
 import {
   Dialog,
@@ -27,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   SuperadminUser, 
@@ -38,6 +41,8 @@ import {
   DEFAULT_DASHBOARD_VISIBILITY,
   SUPERADMIN_USER_ID
 } from '@/types/superadmin';
+import { useOrganization } from '@/hooks/useOrganization';
+import { supabase } from '@/lib/supabase';
 
 const VISIBILITY_LABELS: Record<keyof DashboardVisibility, string> = {
   ver_perfiles: 'Ver Perfiles de Usuarios',
@@ -60,6 +65,11 @@ interface SuperadminUserEditDialogProps {
     full_name: string | null;
     company_id: string | null;
     department_id: string | null;
+    gerencia_id?: string | null;
+    sub_gerencia_id?: string | null;
+    area_id?: string | null;
+    position_id?: string | null;
+    can_upload_documents?: boolean;
   }) => Promise<{ success: boolean; error?: string }>;
   onSaveRole: (userId: string, role: AppRole) => Promise<{ success: boolean; error?: string }>;
   onSaveVisibility: (userId: string, visibility: DashboardVisibility) => Promise<{ success: boolean; error?: string }>;
@@ -78,10 +88,26 @@ export function SuperadminUserEditDialog({
   const [fullName, setFullName] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
+  const [gerenciaId, setGerenciaId] = useState('');
+  const [subGerenciaId, setSubGerenciaId] = useState('');
+  const [areaId, setAreaId] = useState('');
+  const [positionId, setPositionId] = useState('');
+  const [canUploadDocuments, setCanUploadDocuments] = useState(false);
   const [selectedRole, setSelectedRole] = useState<AppRole>('colaborador');
   const [visibility, setVisibility] = useState<DashboardVisibility>(DEFAULT_DASHBOARD_VISIBILITY);
   const [isSaving, setIsSaving] = useState(false);
   const [departments, setDepartments] = useState<DbDepartment[]>([]);
+
+  const { 
+    gerencias, 
+    subGerencias, 
+    areas, 
+    positions, 
+    fetchByCompany,
+    getSubGerenciasByGerencia,
+    getAreasByGerencia,
+    getPositionsByGerencia
+  } = useOrganization();
 
   useEffect(() => {
     if (user) {
@@ -89,6 +115,15 @@ export function SuperadminUserEditDialog({
       setCompanyId(user.company_id || '');
       setDepartmentId(user.department_id || '');
       setVisibility(user.dashboard_visibility || DEFAULT_DASHBOARD_VISIBILITY);
+      setCanUploadDocuments((user as any).can_upload_documents || false);
+      
+      // Load organization data
+      if (user.company_id) {
+        fetchByCompany(user.company_id);
+      }
+      
+      // Load existing org structure assignments
+      loadUserOrgData(user.id);
       
       // Set current role (use first role if exists)
       if (user.roles.length > 0) {
@@ -97,65 +132,69 @@ export function SuperadminUserEditDialog({
         setSelectedRole('colaborador');
       }
     }
-  }, [user]);
+  }, [user, fetchByCompany]);
+
+  const loadUserOrgData = async (userId: string) => {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('gerencia_id, sub_gerencia_id, area_id, position_id, can_upload_documents')
+      .eq('id', userId)
+      .single();
+    
+    if (data) {
+      setGerenciaId(data.gerencia_id || '');
+      setSubGerenciaId(data.sub_gerencia_id || '');
+      setAreaId(data.area_id || '');
+      setPositionId(data.position_id || '');
+      setCanUploadDocuments(data.can_upload_documents || false);
+    }
+  };
 
   // Update departments when company changes
   useEffect(() => {
     if (companyId) {
       const depts = getDepartmentsByCompany(companyId);
       setDepartments(depts);
+      fetchByCompany(companyId);
       // Reset department if not in new company
       if (!depts.some(d => d.id === departmentId)) {
         setDepartmentId('');
       }
+      // Reset org structure
+      setGerenciaId('');
+      setSubGerenciaId('');
+      setAreaId('');
+      setPositionId('');
     } else {
       setDepartments([]);
       setDepartmentId('');
     }
-  }, [companyId, getDepartmentsByCompany, departmentId]);
+  }, [companyId, getDepartmentsByCompany, fetchByCompany]);
 
-  const handleSaveProfile = async () => {
-    if (!user) return;
-
-    setIsSaving(true);
-    const result = await onSaveProfile(user.id, {
-      full_name: fullName || null,
-      company_id: companyId || null,
-      department_id: departmentId || null,
-    });
-
-    setIsSaving(false);
-    return result;
-  };
-
-  const handleSaveRole = async () => {
-    if (!user) return;
-
-    setIsSaving(true);
-    const result = await onSaveRole(user.id, selectedRole);
-    setIsSaving(false);
-    return result;
-  };
-
-  const handleSaveVisibility = async () => {
-    if (!user) return;
-
-    setIsSaving(true);
-    const result = await onSaveVisibility(user.id, visibility);
-    setIsSaving(false);
-    return result;
-  };
+  // Reset sub-gerencia when gerencia changes
+  useEffect(() => {
+    if (!gerenciaId) {
+      setSubGerenciaId('');
+      setAreaId('');
+      setPositionId('');
+    }
+  }, [gerenciaId]);
 
   const handleSaveAll = async () => {
     if (!user) return;
 
     setIsSaving(true);
     
-    // Save profile
+    // Save profile with org structure
     const profileResult = await onSaveProfile(user.id, {
       full_name: fullName || null,
       company_id: companyId || null,
       department_id: departmentId || null,
+      gerencia_id: gerenciaId || null,
+      sub_gerencia_id: subGerenciaId || null,
+      area_id: areaId || null,
+      position_id: positionId || null,
+      can_upload_documents: canUploadDocuments,
     });
 
     if (!profileResult.success) {
@@ -195,6 +234,10 @@ export function SuperadminUserEditDialog({
     return true;
   });
 
+  const filteredSubGerencias = gerenciaId ? getSubGerenciasByGerencia(gerenciaId) : [];
+  const filteredAreas = gerenciaId ? getAreasByGerencia(gerenciaId) : [];
+  const filteredPositions = gerenciaId ? getPositionsByGerencia(gerenciaId) : [];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -204,14 +247,15 @@ export function SuperadminUserEditDialog({
             Editar Usuario - {user?.full_name || user?.email}
           </DialogTitle>
           <DialogDescription>
-            Gestiona perfil, rol, empresa, área y permisos del dashboard
+            Gestiona perfil, rol, empresa, estructura organizacional y permisos
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Perfil</TabsTrigger>
             <TabsTrigger value="role">Rol y Empresa</TabsTrigger>
+            <TabsTrigger value="organization">Organización</TabsTrigger>
             <TabsTrigger value="visibility">Visibilidad</TabsTrigger>
           </TabsList>
 
@@ -229,6 +273,22 @@ export function SuperadminUserEditDialog({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Ingresa el nombre completo"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Puede subir documentos
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Permite al usuario subir documentos al gestor
+                </p>
+              </div>
+              <Switch
+                checked={canUploadDocuments}
+                onCheckedChange={setCanUploadDocuments}
               />
             </div>
           </TabsContent>
@@ -299,7 +359,7 @@ export function SuperadminUserEditDialog({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Briefcase className="w-4 h-4" />
-                Área / Departamento
+                Departamento
               </Label>
               <Select 
                 value={departmentId || "_none"} 
@@ -311,8 +371,8 @@ export function SuperadminUserEditDialog({
                     !companyId 
                       ? "Selecciona primero una empresa" 
                       : departments.length === 0 
-                        ? "No hay áreas para esta empresa"
-                        : "Selecciona un área"
+                        ? "No hay departamentos para esta empresa"
+                        : "Selecciona un departamento"
                   } />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
@@ -325,6 +385,126 @@ export function SuperadminUserEditDialog({
                 </SelectContent>
               </Select>
             </div>
+          </TabsContent>
+
+          {/* Organization Tab */}
+          <TabsContent value="organization" className="space-y-4 py-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              <Network className="w-4 h-4 inline mr-2" />
+              Asigna la posición del usuario en la estructura organizacional
+            </div>
+
+            {!companyId && (
+              <p className="text-sm text-yellow-500 bg-yellow-500/10 p-3 rounded-lg">
+                Selecciona primero una empresa en la pestaña "Rol y Empresa"
+              </p>
+            )}
+
+            {companyId && (
+              <>
+                {/* Gerencia */}
+                <div className="space-y-2">
+                  <Label>Gerencia</Label>
+                  <Select value={gerenciaId || "_none"} onValueChange={(v) => setGerenciaId(v === "_none" ? "" : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una gerencia" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-60">
+                      <SelectItem value="_none">Sin asignar</SelectItem>
+                      {gerencias.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sub-Gerencia */}
+                <div className="space-y-2">
+                  <Label>Sub-Gerencia (Cargo Gerencial)</Label>
+                  <Select 
+                    value={subGerenciaId || "_none"} 
+                    onValueChange={(v) => setSubGerenciaId(v === "_none" ? "" : v)}
+                    disabled={!gerenciaId || filteredSubGerencias.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        !gerenciaId 
+                          ? "Selecciona primero una gerencia" 
+                          : filteredSubGerencias.length === 0 
+                            ? "No hay sub-gerencias"
+                            : "Selecciona una sub-gerencia"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-60">
+                      <SelectItem value="_none">Sin asignar</SelectItem>
+                      {filteredSubGerencias.map((sg) => (
+                        <SelectItem key={sg.id} value={sg.id}>
+                          {sg.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Área */}
+                <div className="space-y-2">
+                  <Label>Área</Label>
+                  <Select 
+                    value={areaId || "_none"} 
+                    onValueChange={(v) => setAreaId(v === "_none" ? "" : v)}
+                    disabled={!gerenciaId || filteredAreas.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        !gerenciaId 
+                          ? "Selecciona primero una gerencia" 
+                          : filteredAreas.length === 0 
+                            ? "No hay áreas"
+                            : "Selecciona un área"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-60">
+                      <SelectItem value="_none">Sin asignar</SelectItem>
+                      {filteredAreas.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Posición */}
+                <div className="space-y-2">
+                  <Label>Posición / Cargo</Label>
+                  <Select 
+                    value={positionId || "_none"} 
+                    onValueChange={(v) => setPositionId(v === "_none" ? "" : v)}
+                    disabled={!gerenciaId || filteredPositions.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        !gerenciaId 
+                          ? "Selecciona primero una gerencia" 
+                          : filteredPositions.length === 0 
+                            ? "No hay posiciones"
+                            : "Selecciona una posición"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-60">
+                      <SelectItem value="_none">Sin asignar</SelectItem>
+                      {filteredPositions.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </TabsContent>
 
           {/* Visibility Tab */}
