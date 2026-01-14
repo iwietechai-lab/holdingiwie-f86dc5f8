@@ -6,9 +6,17 @@ export interface Task {
   id: string;
   company_id: string;
   title: string;
+  description: string | null;
   area: string;
   priority: 'baja' | 'media' | 'alta' | 'urgente';
   execution_time: string | null;
+  estimated_hours: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  actual_end_date: string | null;
+  early_completion_reason: string | null;
+  extension_reason: string | null;
+  collaborating_companies: string[];
   assigned_to: string[];
   team_members: string[];
   partial_results: string | null;
@@ -35,11 +43,15 @@ export interface TaskComment {
 export interface CreateTaskInput {
   company_id: string;
   title: string;
+  description?: string;
   area: string;
   priority: 'baja' | 'media' | 'alta' | 'urgente';
-  execution_time?: string;
+  estimated_hours?: number;
+  start_date?: string;
+  end_date?: string;
   assigned_to: string[];
   team_members?: string[];
+  collaborating_companies?: string[];
 }
 
 export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
@@ -66,9 +78,17 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
         id: task.id,
         company_id: task.company_id,
         title: task.title,
+        description: task.description,
         area: task.area,
         priority: task.priority as Task['priority'],
         execution_time: task.execution_time ? String(task.execution_time) : null,
+        estimated_hours: task.estimated_hours ? Number(task.estimated_hours) : null,
+        start_date: task.start_date,
+        end_date: task.end_date,
+        actual_end_date: task.actual_end_date,
+        early_completion_reason: task.early_completion_reason,
+        extension_reason: task.extension_reason,
+        collaborating_companies: Array.isArray(task.collaborating_companies) ? (task.collaborating_companies as string[]) : [],
         assigned_to: Array.isArray(task.assigned_to) ? (task.assigned_to as string[]) : [],
         team_members: Array.isArray(task.team_members) ? (task.team_members as string[]) : [],
         partial_results: task.partial_results,
@@ -99,9 +119,17 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
       const { data, error } = await supabase
         .from('tasks')
         .insert({
-          ...input,
+          company_id: input.company_id,
+          title: input.title,
+          description: input.description || null,
+          area: input.area,
+          priority: input.priority,
+          estimated_hours: input.estimated_hours || null,
+          start_date: input.start_date || null,
+          end_date: input.end_date || null,
           assigned_to: input.assigned_to,
           team_members: input.team_members || [],
+          collaborating_companies: input.collaborating_companies || [],
           created_by: user.id,
         })
         .select()
