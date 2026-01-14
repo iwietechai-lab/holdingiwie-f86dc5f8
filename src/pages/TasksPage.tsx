@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 export default function TasksPage() {
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [companies, setCompanies] = useState<{ id: string; name: string; icon: string }[]>([]);
@@ -25,9 +26,13 @@ export default function TasksPage() {
   const [filterAlert, setFilterAlert] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'eisenhower'>('list');
 
+  // Determine if user can see all tasks (holding or superadmin)
+  const canSeeAllTasks = isSuperadmin || isHolding;
+  
   const { tasks, isLoading, createTask, updateTask, deleteTask, addComment, getTaskComments, refetch } = useTasks(
     selectedCompany || userCompanyId,
-    isSuperadmin
+    isSuperadmin,
+    isHolding
   );
 
   useEffect(() => {
@@ -49,13 +54,19 @@ export default function TasksPage() {
       if (profile) {
         setUserCompanyId(profile.company_id);
         setUserRole(profile.role);
-        if (!isSA) {
+        
+        // Check if user is from holding company
+        const userIsHolding = profile.company_id === 'iwie-holding';
+        setIsHolding(userIsHolding);
+        
+        // Only set initial selected company if not holding and not superadmin
+        if (!isSA && !userIsHolding) {
           setSelectedCompany(profile.company_id);
         }
       }
 
-      // Fetch companies for superadmin
-      if (isSA) {
+      // Fetch companies for holding and superadmin users
+      if (isSA || profile?.company_id === 'iwie-holding') {
         const { data: companiesData } = await supabase
           .from('companies')
           .select('id, name, icon');
@@ -115,7 +126,7 @@ export default function TasksPage() {
               📋 Gestor de Tareas
             </h1>
             <p className="text-slate-400">
-              {isSuperadmin ? 'Dashboard global de tareas' : 'Tareas de tu empresa'}
+              {canSeeAllTasks ? 'Dashboard global de tareas' : 'Tareas de tu empresa'}
             </p>
           </div>
 
@@ -164,7 +175,7 @@ export default function TasksPage() {
             />
           </div>
 
-          {isSuperadmin && (
+          {canSeeAllTasks && (
             <Select value={selectedCompany || 'all'} onValueChange={v => setSelectedCompany(v === 'all' ? null : v)}>
               <SelectTrigger className="w-48 bg-slate-900 border-slate-600 text-white">
                 <SelectValue placeholder="Empresa" />

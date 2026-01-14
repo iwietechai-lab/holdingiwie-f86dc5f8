@@ -62,7 +62,7 @@ export interface CreateTaskInput {
   collaborating_companies?: string[];
 }
 
-export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
+export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHolding?: boolean) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -72,9 +72,9 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
     try {
       let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
       
-      // For holding company or superadmin with no filter, show all
-      const isHolding = companyId === 'iwie-holding';
-      if (companyId && !isHolding && !isSuperadmin) {
+      // Only holding and superadmins can see all tasks
+      // Other companies only see their own tasks
+      if (!isSuperadmin && !isHolding && companyId) {
         query = query.eq('company_id', companyId);
       }
       
@@ -321,7 +321,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [companyId, isSuperadmin]);
+  }, [companyId, isSuperadmin, isHolding]);
 
   return {
     tasks,
