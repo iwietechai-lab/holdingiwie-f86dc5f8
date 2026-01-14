@@ -112,6 +112,251 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_categories: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          order_index: number | null
+          parent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_items: {
+        Row: {
+          category_id: string | null
+          checklist_checked: boolean | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          notes: string | null
+          part_number: string | null
+          price_clp: number | null
+          price_rmb: number | null
+          quantity: number | null
+          stock_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          checklist_checked?: boolean | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          notes?: string | null
+          part_number?: string | null
+          price_clp?: number | null
+          price_rmb?: number | null
+          quantity?: number | null
+          stock_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          checklist_checked?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          notes?: string | null
+          part_number?: string | null
+          price_clp?: number | null
+          price_rmb?: number | null
+          quantity?: number | null
+          stock_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_quote_items: {
+        Row: {
+          created_at: string | null
+          custom_description: string | null
+          custom_name: string | null
+          id: string
+          item_id: string | null
+          quantity: number | null
+          quote_id: string
+          total_price: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          custom_description?: string | null
+          custom_name?: string | null
+          id?: string
+          item_id?: string | null
+          quantity?: number | null
+          quote_id: string
+          total_price?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          custom_description?: string | null
+          custom_name?: string | null
+          id?: string
+          item_id?: string | null
+          quantity?: number | null
+          quote_id?: string
+          total_price?: number | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_quote_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "budget_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "budget_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_quotes: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          quote_number: string
+          rmb_to_clp_rate: number | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          tax_percentage: number | null
+          total: number | null
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quote_number: string
+          rmb_to_clp_rate?: number | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percentage?: number | null
+          total?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quote_number?: string
+          rmb_to_clp_rate?: number | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percentage?: number | null
+          total?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_quotes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ceo_availability: {
         Row: {
           created_at: string
@@ -1191,15 +1436,18 @@ export type Database = {
       tasks: {
         Row: {
           actual_end_date: string | null
+          alert_status: string | null
           area: string
           assigned_to: Json
           collaborating_companies: Json | null
           company_id: string
           created_at: string | null
           created_by: string
+          days_planned: number | null
           description: string | null
           development_notes: string | null
           early_completion_reason: string | null
+          eisenhower_priority: string | null
           end_date: string | null
           estimated_hours: number | null
           execution_time: unknown
@@ -1211,6 +1459,7 @@ export type Database = {
           partial_results: string | null
           priority: Database["public"]["Enums"]["approval_priority"]
           problems: string | null
+          responsible_name: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           team_members: Json | null
@@ -1219,15 +1468,18 @@ export type Database = {
         }
         Insert: {
           actual_end_date?: string | null
+          alert_status?: string | null
           area: string
           assigned_to?: Json
           collaborating_companies?: Json | null
           company_id: string
           created_at?: string | null
           created_by: string
+          days_planned?: number | null
           description?: string | null
           development_notes?: string | null
           early_completion_reason?: string | null
+          eisenhower_priority?: string | null
           end_date?: string | null
           estimated_hours?: number | null
           execution_time?: unknown
@@ -1239,6 +1491,7 @@ export type Database = {
           partial_results?: string | null
           priority?: Database["public"]["Enums"]["approval_priority"]
           problems?: string | null
+          responsible_name?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           team_members?: Json | null
@@ -1247,15 +1500,18 @@ export type Database = {
         }
         Update: {
           actual_end_date?: string | null
+          alert_status?: string | null
           area?: string
           assigned_to?: Json
           collaborating_companies?: Json | null
           company_id?: string
           created_at?: string | null
           created_by?: string
+          days_planned?: number | null
           description?: string | null
           development_notes?: string | null
           early_completion_reason?: string | null
+          eisenhower_priority?: string | null
           end_date?: string | null
           estimated_hours?: number | null
           execution_time?: unknown
@@ -1267,6 +1523,7 @@ export type Database = {
           partial_results?: string | null
           priority?: Database["public"]["Enums"]["approval_priority"]
           problems?: string | null
+          responsible_name?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
           team_members?: Json | null
