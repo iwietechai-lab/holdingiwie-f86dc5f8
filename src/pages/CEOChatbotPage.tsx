@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useCEOChatbot } from '@/hooks/useCEOChatbot';
 import { useMeetings } from '@/hooks/useMeetings';
@@ -241,97 +242,103 @@ export default function CEOChatbotPage() {
           </header>
 
           {/* Chat Area */}
-          <Card className="flex-1 bg-card/50 backdrop-blur-sm border-border flex flex-col overflow-hidden">
-            <CardContent className="flex-1 flex flex-col p-0">
-              <ScrollArea className="flex-1 p-4">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <MessageSquare className="w-16 h-16 mb-4 opacity-50" />
-                    <p className="text-lg font-medium">¡Hola! Soy el asistente del CEO</p>
-                    <p className="text-sm mt-2 text-center max-w-md">
-                      Puedo ayudarte con consultas sobre la empresa, crear solicitudes de reunión
-                      y generar tickets de trabajo.
-                    </p>
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setInputMessage('Quiero programar una reunión')}
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Crear reunión
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setInputMessage('Necesito crear un ticket')}
-                      >
-                        <Ticket className="w-4 h-4 mr-2" />
-                        Crear ticket
-                      </Button>
+          <Card className="flex-1 bg-card/50 backdrop-blur-sm border-border flex flex-col min-h-0">
+            <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
+              <ScrollArea className="flex-1 h-full">
+                <div className="p-4">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex gap-3 ${
-                          message.role === 'user' ? 'justify-end' : 'justify-start'
-                        }`}
-                      >
-                        {message.role === 'assistant' && (
-                          <Avatar className="w-8 h-8">
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <MessageSquare className="w-16 h-16 mb-4 opacity-50" />
+                      <p className="text-lg font-medium">¡Hola! Soy el asistente del CEO</p>
+                      <p className="text-sm mt-2 text-center max-w-md">
+                        Puedo ayudarte con consultas sobre la empresa, crear solicitudes de reunión
+                        y generar tickets de trabajo.
+                      </p>
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInputMessage('Quiero programar una reunión')}
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Crear reunión
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInputMessage('Necesito crear un ticket')}
+                        >
+                          <Ticket className="w-4 h-4 mr-2" />
+                          Crear ticket
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex gap-3 ${
+                            message.role === 'user' ? 'justify-end' : 'justify-start'
+                          }`}
+                        >
+                          {message.role === 'assistant' && (
+                            <Avatar className="w-8 h-8 shrink-0">
+                              <AvatarImage src={mauricioAvatar} alt="CEO" />
+                              <AvatarFallback>
+                                <Bot className="w-4 h-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div
+                            className={`max-w-[70%] rounded-lg p-3 ${
+                              message.role === 'user'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-foreground'
+                            }`}
+                          >
+                            {message.role === 'assistant' ? (
+                              <MarkdownRenderer content={message.content} />
+                            ) : (
+                              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                            )}
+                            <span className="text-xs opacity-60 mt-2 block">
+                              {formatDistanceToNow(new Date(message.created_at), {
+                                addSuffix: true,
+                                locale: es,
+                              })}
+                            </span>
+                          </div>
+                          {message.role === 'user' && (
+                            <Avatar className="w-8 h-8 shrink-0">
+                              <AvatarFallback>
+                                <User className="w-4 h-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      ))}
+                      {isSending && (
+                        <div className="flex gap-3">
+                          <Avatar className="w-8 h-8 shrink-0">
                             <AvatarImage src={mauricioAvatar} alt="CEO" />
                             <AvatarFallback>
                               <Bot className="w-4 h-4" />
                             </AvatarFallback>
                           </Avatar>
-                        )}
-                        <div
-                          className={`max-w-[70%] rounded-lg p-3 ${
-                            message.role === 'user'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-foreground'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          <span className="text-xs opacity-60 mt-1 block">
-                            {formatDistanceToNow(new Date(message.created_at), {
-                              addSuffix: true,
-                              locale: es,
-                            })}
-                          </span>
+                          <div className="bg-muted rounded-lg p-3">
+                            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                          </div>
                         </div>
-                        {message.role === 'user' && (
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback>
-                              <User className="w-4 h-4" />
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                      </div>
-                    ))}
-                    {isSending && (
-                      <div className="flex gap-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={mauricioAvatar} alt="CEO" />
-                          <AvatarFallback>
-                            <Bot className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="bg-muted rounded-lg p-3">
-                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                        </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
 
               {/* Input Area */}
