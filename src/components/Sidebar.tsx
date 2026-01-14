@@ -189,8 +189,8 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
               const isSelected = selectedCompany === company.id;
               
               const handleCompanyClick = () => {
-                // Show dev modal instead of selecting company
-                handleDevClick(`${company.name}`);
+                // Enable company selection for authorized users
+                onSelectCompany(company.id);
               };
               
               const button = (
