@@ -84,7 +84,20 @@ export const UserManagement = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
-  const { users, isLoading, error, fetchUsers, addRole, removeRole, deleteUser, getAccessLogsByUser, updateUserWithFullAccess } = useUserManagement();
+  const { 
+    users, 
+    isLoading, 
+    error, 
+    fetchUsers, 
+    addRole, 
+    removeRole, 
+    deleteUser, 
+    getAccessLogsByUser, 
+    updateUserWithFullAccess,
+    isSuperadmin,
+    canManageUsers,
+    userCompanyId,
+  } = useUserManagement();
   
   // Get company filter from URL
   const companyFilterId = searchParams.get('empresa');
@@ -107,14 +120,20 @@ export const UserManagement = () => {
   const canCreateRequests = useMemo(() => {
     if (!profile) return false;
     const allowedRoles = ['gerente_area', 'lider_area', 'jefe_area', 'superadmin', 'ceo'];
-    return allowedRoles.includes(profile.role || '') || profile.id === 'e5251256-2f23-4613-8f07-22b149fbad72';
-  }, [profile]);
+    return allowedRoles.includes(profile.role || '') || isSuperadmin || canManageUsers;
+  }, [profile, isSuperadmin, canManageUsers]);
   
-  // Check if current user is CEO/superadmin
-  const isCEO = useMemo(() => {
-    if (!profile) return false;
-    return profile.id === 'e5251256-2f23-4613-8f07-22b149fbad72' || profile.role === 'ceo';
-  }, [profile]);
+  // Get company name for non-superadmin managers
+  const managedCompany = useMemo(() => {
+    if (isSuperadmin) return null;
+    if (canManageUsers && userCompanyId) {
+      return getCompanyById(userCompanyId);
+    }
+    return null;
+  }, [isSuperadmin, canManageUsers, userCompanyId]);
+
+  // Check if current user is CEO/superadmin (can approve/reject requests)
+  const isCEO = isSuperadmin;
 
   // Update selected company when URL param changes
   useEffect(() => {
