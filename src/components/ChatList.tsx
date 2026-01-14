@@ -125,12 +125,13 @@ export function ChatList({ onSelectChat, onCreateChat, selectedChatId }: ChatLis
                         }
                       </p>
                     </div>
-                    {(isSuperadmin || chat.created_by === user?.id) && (
+                    {isSuperadmin && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="opacity-0 group-hover:opacity-100 hover:opacity-100 text-destructive"
                         onClick={(e) => handleDelete(e, chat.id)}
+                        title="Solo el CEO puede eliminar chats"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
