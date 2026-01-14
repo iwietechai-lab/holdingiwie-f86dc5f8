@@ -13,13 +13,13 @@ import SuperadminDashboard from "./pages/SuperadminDashboard";
 import OrganizationStructure from "./pages/OrganizationStructure";
 import CEOChatbotPage from "./pages/CEOChatbotPage";
 import MeetingsPage from "./pages/MeetingsPage";
+import VideoCallPage from "./pages/VideoCallPage";
 import TicketsPage from "./pages/TicketsPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 
 const queryClient = new QueryClient();
 
-// Wrapper component for protected routes that require facial verification
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => (
   <FacialVerificationGuard>{children}</FacialVerificationGuard>
 );
@@ -34,39 +34,18 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           
-          {/* Protected routes - require facial verification */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute><Dashboard /></ProtectedRoute>
-          } />
-          <Route path="/chatbot" element={
-            <ProtectedRoute><Chatbot /></ProtectedRoute>
-          } />
-          <Route path="/ceo-chatbot" element={
-            <ProtectedRoute><CEOChatbotPage /></ProtectedRoute>
-          } />
-          <Route path="/gestor-documentos" element={
-            <ProtectedRoute><GestorDocumentos /></ProtectedRoute>
-          } />
-          <Route path="/organizacion" element={
-            <ProtectedRoute><OrganizationStructure /></ProtectedRoute>
-          } />
-          <Route path="/reuniones" element={
-            <ProtectedRoute><MeetingsPage /></ProtectedRoute>
-          } />
-          <Route path="/tickets" element={
-            <ProtectedRoute><TicketsPage /></ProtectedRoute>
-          } />
-          <Route path="/admin/face-setup" element={
-            <ProtectedRoute><AdminFaceSetup /></ProtectedRoute>
-          } />
-          <Route path="/usuarios" element={
-            <ProtectedRoute><UserManagement /></ProtectedRoute>
-          } />
-          <Route path="/superadmin" element={
-            <ProtectedRoute><SuperadminDashboard /></ProtectedRoute>
-          } />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
+          <Route path="/ceo-chatbot" element={<ProtectedRoute><CEOChatbotPage /></ProtectedRoute>} />
+          <Route path="/gestor-documentos" element={<ProtectedRoute><GestorDocumentos /></ProtectedRoute>} />
+          <Route path="/organizacion" element={<ProtectedRoute><OrganizationStructure /></ProtectedRoute>} />
+          <Route path="/reuniones" element={<ProtectedRoute><MeetingsPage /></ProtectedRoute>} />
+          <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
+          <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
+          <Route path="/admin/face-setup" element={<ProtectedRoute><AdminFaceSetup /></ProtectedRoute>} />
+          <Route path="/usuarios" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+          <Route path="/superadmin" element={<ProtectedRoute><SuperadminDashboard /></ProtectedRoute>} />
           
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
