@@ -286,8 +286,11 @@ export const useSupabaseAuth = () => {
     });
   }, []);
 
+  const isSuperadmin = authState.user?.id === SUPERADMIN_USER_ID;
+
   return {
     ...authState,
+    isSuperadmin,
     login,
     signUp,
     logout,
