@@ -242,6 +242,28 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
+  // Global cleanup: stop ALL video elements and their streams
+  const stopAllCameraStreamsGlobally = useCallback(() => {
+    console.log('🛑 Stopping ALL camera streams globally...');
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+      const stream = video.srcObject as MediaStream | null;
+      if (stream && stream.getTracks) {
+        stream.getTracks().forEach(track => {
+          console.log('🛑 Global cleanup: stopping track:', track.kind, track.label);
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch (e) {
+            console.warn('Error stopping track:', e);
+          }
+        });
+      }
+      video.srcObject = null;
+      video.pause();
+    });
+  }, []);
+
   // Stop camera - ensures complete cleanup with forced track termination
   const stopCamera = useCallback(() => {
     console.log('📹 FORCE stopping camera and cleaning up...');
@@ -291,16 +313,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       }
     }
     
-    // As a last resort, try to stop all active media tracks in the page
-    try {
-      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-        // This doesn't stop existing streams, but we've done what we can
-        console.log('✅ Camera cleanup complete - all tracks should be stopped');
-      }
-    } catch (e) {
-      console.warn('MediaDevices check error:', e);
-    }
-  }, []);
+    // As a last resort, stop all active video elements globally
+    stopAllCameraStreamsGlobally();
+    
+    console.log('✅ Camera cleanup complete - all tracks should be stopped');
+  }, [stopAllCameraStreamsGlobally]);
 
   // Calculate cosine similarity
   const cosineSimilarity = (a: number[], b: number[]): number => {
@@ -821,6 +838,24 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         videoRef.current.srcObject = null;
         videoRef.current.pause();
       }
+      
+      // Global cleanup: stop ALL video elements as last resort
+      const videos = document.querySelectorAll('video');
+      videos.forEach(video => {
+        const stream = video.srcObject as MediaStream | null;
+        if (stream && stream.getTracks) {
+          stream.getTracks().forEach(track => {
+            try {
+              track.stop();
+              track.enabled = false;
+            } catch (e) {
+              // Ignore
+            }
+          });
+        }
+        video.srcObject = null;
+        video.pause();
+      });
     };
   }, []); // Empty dependencies - only run on mount/unmount
 
