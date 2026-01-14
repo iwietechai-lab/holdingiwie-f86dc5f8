@@ -6,10 +6,21 @@ import { SpaceBackground } from '@/components/SpaceBackground';
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
   showBackground?: boolean;
+  selectedCompany?: string | null;
+  onSelectCompany?: (companyId: string | null) => void;
 }
 
-export const ResponsiveLayout = ({ children, showBackground = true }: ResponsiveLayoutProps) => {
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+export const ResponsiveLayout = ({ 
+  children, 
+  showBackground = true,
+  selectedCompany: externalSelectedCompany,
+  onSelectCompany: externalOnSelectCompany 
+}: ResponsiveLayoutProps) => {
+  const [internalSelectedCompany, setInternalSelectedCompany] = useState<string | null>(null);
+  
+  // Use external state if provided, otherwise use internal
+  const selectedCompany = externalSelectedCompany !== undefined ? externalSelectedCompany : internalSelectedCompany;
+  const setSelectedCompany = externalOnSelectCompany || setInternalSelectedCompany;
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">

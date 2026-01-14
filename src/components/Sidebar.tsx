@@ -17,7 +17,8 @@ import {
   Ticket,
   Network,
   Bell,
-  MessageSquare
+  MessageSquare,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -57,6 +58,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
+    { icon: ClipboardList, label: 'Tareas', action: 'navigate', path: '/tareas' },
     { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },

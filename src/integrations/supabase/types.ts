@@ -918,6 +918,150 @@ export type Database = {
           },
         ]
       }
+      task_comments: {
+        Row: {
+          comment_type: string | null
+          content: string
+          created_at: string | null
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          comment_type?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          comment_type?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_history: {
+        Row: {
+          changed_at: string | null
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_history_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          area: string
+          assigned_to: Json
+          company_id: string
+          created_at: string | null
+          created_by: string
+          development_notes: string | null
+          execution_time: unknown
+          final_results: string | null
+          id: string
+          improvement_proposals: string | null
+          new_ideas: string | null
+          partial_results: string | null
+          priority: Database["public"]["Enums"]["approval_priority"]
+          problems: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          team_members: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          area: string
+          assigned_to?: Json
+          company_id: string
+          created_at?: string | null
+          created_by: string
+          development_notes?: string | null
+          execution_time?: unknown
+          final_results?: string | null
+          id?: string
+          improvement_proposals?: string | null
+          new_ideas?: string | null
+          partial_results?: string | null
+          priority?: Database["public"]["Enums"]["approval_priority"]
+          problems?: string | null
+          status?: Database["public"]["Enums"]["task_status"] | null
+          team_members?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          area?: string
+          assigned_to?: Json
+          company_id?: string
+          created_at?: string | null
+          created_by?: string
+          development_notes?: string | null
+          execution_time?: unknown
+          final_results?: string | null
+          id?: string
+          improvement_proposals?: string | null
+          new_ideas?: string | null
+          partial_results?: string | null
+          priority?: Database["public"]["Enums"]["approval_priority"]
+          problems?: string | null
+          status?: Database["public"]["Enums"]["task_status"] | null
+          team_members?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_comments: {
         Row: {
           content: string
@@ -1232,6 +1376,7 @@ export type Database = {
         | "rechazada"
         | "completada"
       meeting_status: "scheduled" | "confirmed" | "cancelled" | "completed"
+      task_status: "pendiente" | "en_progreso" | "completada" | "bloqueada"
       ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
     CompositeTypes: {
@@ -1383,6 +1528,7 @@ export const Constants = {
         "completada",
       ],
       meeting_status: ["scheduled", "confirmed", "cancelled", "completed"],
+      task_status: ["pendiente", "en_progreso", "completada", "bloqueada"],
       ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
   },
