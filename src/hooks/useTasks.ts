@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export type EisenhowerPriority = 'urgente_importante' | 'no_urgente_importante' | 'urgente_no_importante' | 'no_urgente_no_importante';
+export type AlertStatus = 'al_dia' | 'por_vencer' | 'vencida';
+
 export interface Task {
   id: string;
   company_id: string;
@@ -29,6 +32,11 @@ export interface Task {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // New fields for enhanced tasks
+  eisenhower_priority: EisenhowerPriority | null;
+  alert_status: AlertStatus | null;
+  responsible_name: string | null;
+  days_planned: number | null;
 }
 
 export interface TaskComment {
@@ -101,6 +109,11 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean) => {
         created_by: task.created_by,
         created_at: task.created_at,
         updated_at: task.updated_at,
+        // New enhanced fields
+        eisenhower_priority: (task as any).eisenhower_priority as EisenhowerPriority | null,
+        alert_status: (task as any).alert_status as AlertStatus | null,
+        responsible_name: (task as any).responsible_name as string | null,
+        days_planned: (task as any).days_planned as number | null,
       }));
       
       setTasks(mappedTasks);

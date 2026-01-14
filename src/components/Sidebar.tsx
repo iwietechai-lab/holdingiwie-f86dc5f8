@@ -42,6 +42,8 @@ interface SidebarProps {
   onSelectCompany: (companyId: string | null) => void;
 }
 
+import { Package } from 'lucide-react';
+
 // Submenu items for each company
 const companyMenuItems = [
   { icon: TrendingUp, label: 'Dashboard', path: '/empresa', queryParam: true },
@@ -50,6 +52,7 @@ const companyMenuItems = [
   { icon: FolderOpen, label: 'Documentos', path: '/gestor-documentos', queryParam: true },
   { icon: MessageSquare, label: 'Chat Interno', path: '/mensajeria', queryParam: true },
   { icon: ClipboardList, label: 'Tareas', path: '/tareas', queryParam: true },
+  { icon: Package, label: 'Presupuestos', path: '/presupuestos', queryParam: true },
   { icon: Ticket, label: 'Tickets', path: '/tickets', queryParam: true },
   { icon: Bot, label: 'Chatbot Empresa', path: '/chatbot-empresa', queryParam: true },
   { icon: Calendar, label: 'Reuniones', path: '/reuniones', queryParam: true },
