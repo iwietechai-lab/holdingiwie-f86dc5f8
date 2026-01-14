@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TourAvatar } from './TourAvatar';
-import { useTour, TourStep } from '@/hooks/useTour';
+import { useTourContext } from './TourProvider';
 import { useTourSounds } from '@/hooks/useTourSounds';
 
 export const TourOverlay = () => {
@@ -15,7 +15,7 @@ export const TourOverlay = () => {
     nextStep,
     prevStep,
     skipTour
-  } = useTour();
+  } = useTourContext();
   
   const { playSound, toggleSounds } = useTourSounds();
   const [soundsOn, setSoundsOn] = useState(true);
@@ -28,7 +28,6 @@ export const TourOverlay = () => {
   // Calculate avatar position based on target element
   const calculateAvatarPosition = (rect: DOMRect | null, position?: string) => {
     if (!rect || position === 'center') {
-      // Center of screen for welcome/complete steps
       return {
         x: window.innerWidth / 2 - 40,
         y: window.innerHeight / 2 - 100
@@ -78,10 +77,8 @@ export const TourOverlay = () => {
           const rect = element.getBoundingClientRect();
           setTargetRect(rect);
           
-          // Scroll element into view
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           
-          // Calculate new avatar position
           const newPos = calculateAvatarPosition(rect, currentStep.position);
           setAvatarPosition(newPos);
         } else {
@@ -93,7 +90,6 @@ export const TourOverlay = () => {
         setAvatarPosition(calculateAvatarPosition(null, 'center'));
       }
 
-      // Avatar arrives after flying
       const flyTimer = setTimeout(() => {
         setIsAvatarFlying(false);
       }, 600);
@@ -107,7 +103,6 @@ export const TourOverlay = () => {
     if (isActive && currentStep && currentStep.id !== lastStepRef.current) {
       lastStepRef.current = currentStep.id;
       if (currentStep.soundEffect && soundsOn) {
-        // Delay sound slightly for better timing with animation
         setTimeout(() => {
           playSound(currentStep.soundEffect!);
         }, 300);
@@ -121,10 +116,6 @@ export const TourOverlay = () => {
   };
 
   const getTooltipPosition = (): React.CSSProperties => {
-    const tooltipWidth = 360;
-    const tooltipHeight = 180;
-    const padding = 20;
-
     if (!targetRect || currentStep?.position === 'center') {
       return {
         top: '50%',
@@ -133,9 +124,9 @@ export const TourOverlay = () => {
       };
     }
 
-    // Position tooltip relative to avatar
-    const avatarX = avatarPosition.x + 40; // center of avatar
-    const avatarY = avatarPosition.y + 80; // bottom of avatar
+    const avatarX = avatarPosition.x + 40;
+    const avatarY = avatarPosition.y + 80;
+    const padding = 20;
 
     switch (currentStep?.position) {
       case 'top':
@@ -171,6 +162,8 @@ export const TourOverlay = () => {
     }
   };
 
+  console.log('TourOverlay render - isActive:', isActive, 'currentStep:', currentStep?.id);
+
   if (!isActive || !currentStep) return null;
 
   return (
@@ -199,7 +192,6 @@ export const TourOverlay = () => {
                 />
               )}
             </mask>
-            {/* Glow effect */}
             <filter id="glow">
               <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
               <feMerge>
@@ -230,13 +222,11 @@ export const TourOverlay = () => {
             }}
           >
             <div className="w-full h-full rounded-xl border-2 border-primary shadow-[0_0_30px_rgba(var(--primary),0.6)]">
-              {/* Animated corner sparkles */}
               <Sparkles className="absolute -top-3 -left-3 w-6 h-6 text-primary animate-pulse" />
               <Sparkles className="absolute -top-3 -right-3 w-6 h-6 text-accent animate-pulse" style={{ animationDelay: '0.2s' }} />
               <Sparkles className="absolute -bottom-3 -left-3 w-6 h-6 text-accent animate-pulse" style={{ animationDelay: '0.4s' }} />
               <Sparkles className="absolute -bottom-3 -right-3 w-6 h-6 text-primary animate-pulse" style={{ animationDelay: '0.6s' }} />
             </div>
-            {/* Pulsing ring */}
             <motion.div
               className="absolute inset-0 rounded-xl border-2 border-primary/50"
               animate={{
@@ -270,7 +260,6 @@ export const TourOverlay = () => {
             duration: 0.8
           }}
         >
-          {/* Trail effect when flying */}
           {isAvatarFlying && (
             <>
               {[...Array(5)].map((_, i) => (
@@ -304,7 +293,7 @@ export const TourOverlay = () => {
           />
         </motion.div>
 
-        {/* Tooltip - appears after avatar lands */}
+        {/* Tooltip */}
         <AnimatePresence>
           {!isAvatarFlying && (
             <motion.div

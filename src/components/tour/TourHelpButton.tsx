@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, Play, RotateCcw, BookOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTour, tourConfigs } from '@/hooks/useTour';
+import { useTourContext, tourConfigs } from './TourProvider';
 import { TourAvatar } from './TourAvatar';
 
 export const TourHelpButton = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { startTour, hasTourForCurrentPage, resetTours } = useTour();
+  const { startTour, hasTourForCurrentPage, resetTours } = useTourContext();
 
   const availableTours = Object.entries(tourConfigs).map(([key, steps]) => ({
     key,
@@ -16,17 +16,18 @@ export const TourHelpButton = () => {
   }));
 
   const handleStartCurrentTour = () => {
-    console.log('Button clicked - starting tour');
+    console.log('TourHelpButton - Button clicked, starting tour');
     setIsOpen(false);
-    // Small delay to ensure panel closes first
-    setTimeout(() => {
-      startTour();
-    }, 200);
+    startTour();
+  };
+
+  const handleResetTours = () => {
+    console.log('TourHelpButton - Resetting all tours');
+    resetTours();
+    setIsOpen(false);
   };
 
   const handleStartSpecificTour = (tourKey: string) => {
-    // Navigate to that page first, then start tour
-    // For now, just close the menu
     setIsOpen(false);
   };
 
@@ -99,7 +100,7 @@ export const TourHelpButton = () => {
 
               <Button
                 variant="outline"
-                onClick={resetTours}
+                onClick={handleResetTours}
                 className="w-full gap-2"
               >
                 <RotateCcw className="w-4 h-4" />
