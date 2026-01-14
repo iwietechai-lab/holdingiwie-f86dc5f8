@@ -1,13 +1,31 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, Play, RotateCcw, BookOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTourContext, tourConfigs } from './TourProvider';
 import { TourAvatar } from './TourAvatar';
 
+// Mapeo de tourKey a ruta de navegación
+const tourRouteMap: Record<string, string> = {
+  dashboard: '/dashboard',
+  empresa: '/empresa',
+  tareas: '/tareas',
+  'gestor-documentos': '/gestor-documentos',
+  presupuestos: '/presupuestos',
+  chatbot: '/chatbot',
+  reuniones: '/reuniones',
+  tickets: '/tickets'
+};
+
+// Key para almacenar el tour pendiente en sessionStorage
+const PENDING_TOUR_KEY = 'iwie_pending_tour';
+
 export const TourHelpButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { startTour, hasTourForCurrentPage, resetTours } = useTourContext();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const availableTours = Object.entries(tourConfigs).map(([key, steps]) => ({
     key,
@@ -18,7 +36,10 @@ export const TourHelpButton = () => {
   const handleStartCurrentTour = () => {
     console.log('TourHelpButton - Button clicked, starting tour');
     setIsOpen(false);
-    startTour();
+    // Pequeño delay para que cierre el panel primero
+    setTimeout(() => {
+      startTour();
+    }, 100);
   };
 
   const handleResetTours = () => {
@@ -28,7 +49,32 @@ export const TourHelpButton = () => {
   };
 
   const handleStartSpecificTour = (tourKey: string) => {
+    console.log('TourHelpButton - Starting specific tour:', tourKey);
     setIsOpen(false);
+    
+    const targetRoute = tourRouteMap[tourKey];
+    const currentPath = location.pathname.replace('/', '') || 'dashboard';
+    
+    if (!targetRoute) {
+      console.warn('TourHelpButton - No route found for tour:', tourKey);
+      return;
+    }
+    
+    // Si ya estamos en la ruta correcta, iniciar tour directamente
+    if (currentPath === tourKey) {
+      console.log('TourHelpButton - Already on correct page, starting tour directly');
+      setTimeout(() => {
+        startTour(tourKey);
+      }, 100);
+      return;
+    }
+    
+    // Guardar en sessionStorage que debemos iniciar el tour después de navegar
+    sessionStorage.setItem(PENDING_TOUR_KEY, tourKey);
+    console.log('TourHelpButton - Navigating to:', targetRoute);
+    
+    // Navegar a la ruta correspondiente
+    navigate(targetRoute);
   };
 
   return (
