@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 const VERIFICATION_TIMEOUT_MINUTES = 30;
 const SESSION_KEY = 'facial_verification_session';
+const SESSION_VERIFIED_KEY = 'facial_verification_done';
 
 interface FacialVerificationState {
   isVerified: boolean;
@@ -10,6 +11,24 @@ interface FacialVerificationState {
   isLoading: boolean;
   timeRemaining: number | null; // minutes remaining
 }
+
+// Helper to check if session is verified (persisted in sessionStorage)
+const isSessionVerified = (): boolean => {
+  try {
+    return sessionStorage.getItem(SESSION_VERIFIED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+// Helper to mark session as verified
+const markSessionVerified = () => {
+  try {
+    sessionStorage.setItem(SESSION_VERIFIED_KEY, 'true');
+  } catch {
+    console.warn('Could not save to sessionStorage');
+  }
+};
 
 export function useFacialVerification(userId: string | undefined) {
   const [state, setState] = useState<FacialVerificationState>({
@@ -19,8 +38,6 @@ export function useFacialVerification(userId: string | undefined) {
     timeRemaining: null,
   });
   
-  // Track if we've verified in this specific browser session
-  const sessionVerifiedRef = useRef<boolean>(false);
   const initializedRef = useRef<boolean>(false);
   
   // Initialize session tracking on mount
@@ -34,7 +51,8 @@ export function useFacialVerification(userId: string | undefined) {
       if (!existingSession) {
         const newSessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
         sessionStorage.setItem(SESSION_KEY, newSessionId);
-        sessionVerifiedRef.current = false;
+        // New session, clear verification status
+        sessionStorage.removeItem(SESSION_VERIFIED_KEY);
       }
     } catch {
       // sessionStorage might not be available
@@ -80,7 +98,7 @@ export function useFacialVerification(userId: string | undefined) {
       const diffMinutes = diffMs / (1000 * 60);
 
       // Check if verified recently AND in this browser session
-      if (diffMinutes <= VERIFICATION_TIMEOUT_MINUTES && sessionVerifiedRef.current) {
+      if (diffMinutes <= VERIFICATION_TIMEOUT_MINUTES && isSessionVerified()) {
         const remaining = Math.ceil(VERIFICATION_TIMEOUT_MINUTES - diffMinutes);
         setState({
           isVerified: true,
@@ -120,8 +138,8 @@ export function useFacialVerification(userId: string | undefined) {
         return false;
       }
 
-      // Mark this session as verified
-      sessionVerifiedRef.current = true;
+      // Mark this session as verified (persisted in sessionStorage)
+      markSessionVerified();
 
       // Update local state
       setState({
@@ -140,7 +158,11 @@ export function useFacialVerification(userId: string | undefined) {
 
   // Invalidate verification (force re-verification)
   const invalidateVerification = useCallback(() => {
-    sessionVerifiedRef.current = false;
+    try {
+      sessionStorage.removeItem(SESSION_VERIFIED_KEY);
+    } catch {
+      // ignore
+    }
     setState({
       isVerified: false,
       lastVerification: null,
