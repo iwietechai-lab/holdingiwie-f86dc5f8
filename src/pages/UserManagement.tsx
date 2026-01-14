@@ -18,7 +18,9 @@ import {
   ChevronUp,
   Edit,
   Building2,
-  LogOut
+  LogOut,
+  UserPlus,
+  ClipboardList,
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNav } from '@/components/MobileNav';
@@ -67,6 +69,10 @@ import { es } from 'date-fns/locale';
 import { UserEditDialog } from '@/components/UserEditDialog';
 import { getFullAccessEmails } from '@/config/allowedEmails';
 import { companies, getCompanyById } from '@/data/companies';
+import { CreateUserRequestDialog } from '@/components/CreateUserRequestDialog';
+import { UserRequestsList } from '@/components/UserRequestsList';
+import { useUserCreationRequests } from '@/hooks/useUserCreationRequests';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const AVAILABLE_ROLES = [
   { value: 'superadmin', label: 'Super Admin', icon: ShieldAlert, color: 'text-red-500' },
@@ -92,6 +98,23 @@ export const UserManagement = () => {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserWithDetails | null>(null);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [editingUser, setEditingUser] = useState<UserWithDetails | null>(null);
+  const [showCreateRequest, setShowCreateRequest] = useState(false);
+  
+  // Get pending requests count
+  const { pendingCount } = useUserCreationRequests(companyFilterId || undefined);
+  
+  // Check if current user can create requests (gerente, lider, or superadmin)
+  const canCreateRequests = useMemo(() => {
+    if (!profile) return false;
+    const allowedRoles = ['gerente_area', 'lider_area', 'jefe_area', 'superadmin', 'ceo'];
+    return allowedRoles.includes(profile.role || '') || profile.id === 'e5251256-2f23-4613-8f07-22b149fbad72';
+  }, [profile]);
+  
+  // Check if current user is CEO/superadmin
+  const isCEO = useMemo(() => {
+    if (!profile) return false;
+    return profile.id === 'e5251256-2f23-4613-8f07-22b149fbad72' || profile.role === 'ceo';
+  }, [profile]);
 
   // Update selected company when URL param changes
   useEffect(() => {
@@ -270,14 +293,24 @@ export const UserManagement = () => {
               </p>
             </div>
             
-            <Button
-              variant="outline"
-              onClick={() => fetchUsers()}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Actualizar
-            </Button>
+            <div className="flex gap-2">
+              {companyFilterId && canCreateRequests && (
+                <Button
+                  onClick={() => setShowCreateRequest(true)}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Solicitar Usuario
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => fetchUsers()}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </div>
           </header>
 
           {/* Mobile Header Content */}
@@ -295,14 +328,24 @@ export const UserManagement = () => {
                 )}
               </h2>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchUsers()}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex gap-2">
+              {companyFilterId && canCreateRequests && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateRequest(true)}
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchUsers()}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
 
           {/* Stats Cards */}
@@ -371,14 +414,33 @@ export const UserManagement = () => {
             </Card>
           )}
 
-          {/* Users Table */}
-          <Card className="bg-card/50 backdrop-blur-sm border-border">
-            <CardHeader className="p-4 md:p-6">
-              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-                <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                Lista de Usuarios
-              </CardTitle>
-            </CardHeader>
+          {/* Tabs for Users and Requests (when filtering by company) */}
+          {companyFilterId ? (
+            <Tabs defaultValue="users" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="users" className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Usuarios
+                </TabsTrigger>
+                <TabsTrigger value="requests" className="flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Solicitudes
+                  {pendingCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-primary text-primary-foreground rounded-full">
+                      {pendingCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="users">
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                      <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                      Lista de Usuarios de {companyFilter?.name}
+                    </CardTitle>
+                  </CardHeader>
             <CardContent className="p-2 md:p-6 md:pt-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -648,6 +710,107 @@ export const UserManagement = () => {
               )}
             </CardContent>
           </Card>
+              </TabsContent>
+
+              <TabsContent value="requests">
+                <Card className="bg-card/50 backdrop-blur-sm border-border">
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                      <ClipboardList className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                      Solicitudes de Nuevos Usuarios
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6 md:pt-0">
+                    <UserRequestsList companyId={companyFilterId} isCEO={isCEO} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            /* No company filter - show all users without tabs */
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                  <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                  Lista de Usuarios
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 md:p-6 md:pt-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay usuarios registrados
+                  </div>
+                ) : (
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Empresa</TableHead>
+                          <TableHead>Cargo</TableHead>
+                          <TableHead>Roles</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{user.full_name || 'Sin nombre'}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {user.company_id && (
+                                <span>{getCompanyById(user.company_id)?.name || user.company_id}</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{user.role || 'Sin cargo'}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 flex-wrap">
+                                {user.roles.map(r => getRoleBadge(r.role))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewAccessLogs(user)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingUser(user)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive"
+                                  onClick={() => setDeleteConfirmUser(user)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
 
@@ -760,6 +923,15 @@ export const UserManagement = () => {
         onSave={handleSaveUser}
         fullAccessEmails={getFullAccessEmails()}
       />
+
+      {/* Create User Request Dialog */}
+      {companyFilterId && (
+        <CreateUserRequestDialog
+          open={showCreateRequest}
+          onOpenChange={setShowCreateRequest}
+          companyId={companyFilterId}
+        />
+      )}
     </div>
   );
 };
