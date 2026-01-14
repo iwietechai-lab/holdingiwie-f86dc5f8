@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Users, 
   Shield, 
@@ -76,10 +76,15 @@ const AVAILABLE_ROLES = [
 
 export const UserManagement = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
   const { users, isLoading, error, fetchUsers, addRole, removeRole, deleteUser, getAccessLogsByUser, updateUserWithFullAccess } = useUserManagement();
   
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  // Get company filter from URL
+  const companyFilterId = searchParams.get('empresa');
+  const companyFilter = companyFilterId ? getCompanyById(companyFilterId) : null;
+  
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(companyFilterId);
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
   const [showAccessLogs, setShowAccessLogs] = useState(false);
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
@@ -87,6 +92,21 @@ export const UserManagement = () => {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserWithDetails | null>(null);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [editingUser, setEditingUser] = useState<UserWithDetails | null>(null);
+
+  // Update selected company when URL param changes
+  useEffect(() => {
+    if (companyFilterId) {
+      setSelectedCompany(companyFilterId);
+    }
+  }, [companyFilterId]);
+
+  // Filter users by company if company filter is active
+  const filteredUsers = useMemo(() => {
+    if (!companyFilterId) {
+      return users; // No filter - show all users
+    }
+    return users.filter(user => user.company_id === companyFilterId);
+  }, [users, companyFilterId]);
 
   const handleSaveUser = async (
     userId: string,
@@ -232,11 +252,21 @@ export const UserManagement = () => {
                 </Button>
                 <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                   <UserCog className="w-8 h-8 text-primary" />
-                  Gestión de Usuarios
+                  {companyFilter ? (
+                    <>
+                      <span className="text-xl">{companyFilter.icon}</span>
+                      Usuarios de {companyFilter.name}
+                    </>
+                  ) : (
+                    'Gestión de Usuarios'
+                  )}
                 </h1>
               </div>
               <p className="text-muted-foreground ml-12">
-                Administra usuarios, permisos y visualiza logs de acceso
+                {companyFilter 
+                  ? `Administra los usuarios de ${companyFilter.name}`
+                  : 'Administra usuarios, permisos y visualiza logs de acceso'
+                }
               </p>
             </div>
             
@@ -255,7 +285,14 @@ export const UserManagement = () => {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <UserCog className="w-5 h-5 text-primary" />
-                Gestión de Usuarios
+                {companyFilter ? (
+                  <>
+                    <span className="text-lg">{companyFilter.icon}</span>
+                    {companyFilter.name}
+                  </>
+                ) : (
+                  'Gestión de Usuarios'
+                )}
               </h2>
             </div>
             <Button
@@ -275,8 +312,8 @@ export const UserManagement = () => {
                 <div className="flex items-center gap-2 md:gap-3">
                   <Users className="w-6 h-6 md:w-8 md:h-8 text-primary shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-xl md:text-2xl font-bold text-foreground">{users.length}</p>
-                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Usuarios Totales</p>
+                    <p className="text-xl md:text-2xl font-bold text-foreground">{filteredUsers.length}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground truncate">Usuarios {companyFilter ? 'Empresa' : 'Totales'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -288,7 +325,7 @@ export const UserManagement = () => {
                   <ShieldAlert className="w-6 h-6 md:w-8 md:h-8 text-red-500 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-xl md:text-2xl font-bold text-foreground">
-                      {users.filter(u => u.roles.some(r => r.role === 'superadmin')).length}
+                      {filteredUsers.filter(u => u.roles.some(r => r.role === 'superadmin')).length}
                     </p>
                     <p className="text-[10px] md:text-xs text-muted-foreground truncate">Super Admins</p>
                   </div>
@@ -302,7 +339,7 @@ export const UserManagement = () => {
                   <ShieldCheck className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-xl md:text-2xl font-bold text-foreground">
-                      {users.filter(u => u.roles.some(r => r.role === 'manager')).length}
+                      {filteredUsers.filter(u => u.roles.some(r => r.role === 'manager')).length}
                     </p>
                     <p className="text-[10px] md:text-xs text-muted-foreground truncate">Managers</p>
                   </div>
@@ -316,7 +353,7 @@ export const UserManagement = () => {
                   <Clock className="w-6 h-6 md:w-8 md:h-8 text-green-500 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-xl md:text-2xl font-bold text-foreground">
-                      {users.filter(u => u.lastAccess && new Date(u.lastAccess) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}
+                      {filteredUsers.filter(u => u.lastAccess && new Date(u.lastAccess) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}
                     </p>
                     <p className="text-[10px] md:text-xs text-muted-foreground truncate">Activos (24h)</p>
                   </div>
@@ -347,15 +384,18 @@ export const UserManagement = () => {
                 <div className="flex items-center justify-center py-8">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : users.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No hay usuarios registrados
+                  {companyFilter 
+                    ? `No hay usuarios registrados en ${companyFilter.name}`
+                    : 'No hay usuarios registrados'
+                  }
                 </div>
               ) : (
                 <>
                   {/* Mobile Cards View */}
                   <div className="md:hidden space-y-3">
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                       <Card key={user.id} className="bg-card/30 border-border">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
@@ -423,7 +463,7 @@ export const UserManagement = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((user) => (
+                        {filteredUsers.map((user) => (
                           <React.Fragment key={user.id}>
                             <TableRow className="hover:bg-muted/50">
                               <TableCell>
