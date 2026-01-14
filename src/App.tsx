@@ -17,6 +17,7 @@ import MeetingsPage from "./pages/MeetingsPage";
 import VideoCallPage from "./pages/VideoCallPage";
 import TicketsPage from "./pages/TicketsPage";
 import MessagingPage from "./pages/MessagingPage";
+import TasksPage from "./pages/TasksPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/reuniones" element={<ProtectedRoute><MeetingsPage /></ProtectedRoute>} />
           <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
           <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
+          <Route path="/tareas" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
           <Route path="/mensajeria" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
           <Route path="/admin/face-setup" element={<ProtectedRoute><AdminFaceSetup /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
