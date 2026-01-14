@@ -75,8 +75,15 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   }, []);
 
   const handleFaceSuccess = useCallback(async () => {
-    // RealFaceRecognition already saved the embedding and marked session as verified
-    // Stop camera globally first
+    console.log('🎉 FacialVerificationGuard: Face success callback triggered');
+    
+    // Stop camera globally FIRST before anything else
+    stopAllCameraStreams();
+    
+    // Wait a moment for camera hardware to release
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Stop again just in case
     stopAllCameraStreams();
     
     // Update verification record
@@ -85,11 +92,14 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     // Trigger the tour to start after verification
     triggerTourFromVerification();
     
-    // Give time for camera to fully stop before hiding component
-    setTimeout(() => {
-      stopAllCameraStreams(); // Call again just in case
-      setShowFaceRecognition(false);
-    }, 800);
+    // Wait for camera to fully stop before hiding component
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Final cleanup
+    stopAllCameraStreams();
+    
+    console.log('✅ FacialVerificationGuard: All cleanup done, hiding face recognition');
+    setShowFaceRecognition(false);
   }, [recordVerification]);
 
   const handleCancel = async () => {
