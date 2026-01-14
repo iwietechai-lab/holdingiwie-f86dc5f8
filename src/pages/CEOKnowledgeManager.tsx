@@ -80,7 +80,7 @@ const CATEGORIES = [
 export default function CEOKnowledgeManager() {
   const navigate = useNavigate();
   const { profile } = useSupabaseAuth();
-  const { isSuperadmin } = useSuperadmin();
+  const { isSuperadmin, isCheckingRole } = useSuperadmin();
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -103,6 +103,9 @@ export default function CEOKnowledgeManager() {
   });
 
   useEffect(() => {
+    // Wait for role check to complete before redirecting
+    if (isCheckingRole) return;
+    
     if (!isSuperadmin) {
       toast.error('No tienes permisos para acceder a esta página');
       navigate('/dashboard');
@@ -110,7 +113,7 @@ export default function CEOKnowledgeManager() {
     }
     loadCompanies();
     loadAllUsers();
-  }, [isSuperadmin, navigate]);
+  }, [isSuperadmin, isCheckingRole, navigate]);
 
   useEffect(() => {
     if (selectedCompany) {
@@ -299,11 +302,12 @@ export default function CEOKnowledgeManager() {
     !userAccess.some(access => access.user_id === user.id)
   );
 
-  if (isLoading) {
+  if (isLoading || isCheckingRole) {
     return (
       <ResponsiveLayout>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="ml-4 text-muted-foreground">Verificando permisos...</p>
         </div>
       </ResponsiveLayout>
     );
