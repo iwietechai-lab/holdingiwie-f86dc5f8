@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Fingerprint, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,25 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
+
+// Global function to stop all active camera streams
+const stopAllCameraStreams = () => {
+  console.log('🛑 FacialVerificationGuard: Stopping all camera streams globally...');
+  // Get all video elements and stop their streams
+  const videos = document.querySelectorAll('video');
+  videos.forEach(video => {
+    const stream = video.srcObject as MediaStream | null;
+    if (stream && stream.getTracks) {
+      stream.getTracks().forEach(track => {
+        console.log('🛑 Stopping global track:', track.kind, track.label);
+        track.stop();
+        track.enabled = false;
+      });
+    }
+    video.srcObject = null;
+    video.pause();
+  });
+};
 
 interface FacialVerificationGuardProps {
   children: React.ReactNode;
@@ -39,19 +58,39 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     }
   }, [authLoading, verificationLoading, isAuthenticated, isVerified]);
 
-  const handleFaceSuccess = async () => {
+  // Cleanup camera when component unmounts or face recognition hides
+  useEffect(() => {
+    if (!showFaceRecognition) {
+      // When face recognition is hidden, ensure all cameras are stopped
+      stopAllCameraStreams();
+    }
+  }, [showFaceRecognition]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      stopAllCameraStreams();
+    };
+  }, []);
+
+  const handleFaceSuccess = useCallback(async () => {
     // RealFaceRecognition already saved the embedding and marked session as verified
-    // The camera should already be stopped by RealFaceRecognition component
-    // Just update local state and hide the modal
+    // Stop camera globally first
+    stopAllCameraStreams();
+    
+    // Update verification record
     await recordVerification();
-    // Small delay to ensure camera is fully stopped before hiding component
+    
+    // Give time for camera to fully stop before hiding component
     setTimeout(() => {
+      stopAllCameraStreams(); // Call again just in case
       setShowFaceRecognition(false);
-    }, 100);
-  };
+    }, 800);
+  }, [recordVerification]);
 
   const handleCancel = async () => {
-    // If user cancels, log them out
+    // Stop camera before logging out
+    stopAllCameraStreams();
     await logout();
     navigate('/login');
   };
