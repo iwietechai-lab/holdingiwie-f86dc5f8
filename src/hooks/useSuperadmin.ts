@@ -99,6 +99,24 @@ export function useSuperadmin(): UseSuperadminReturn {
         console.warn('Error fetching roles:', rolesError);
       }
 
+      // Fetch companies for association
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('*');
+      
+      if (companiesError) {
+        console.warn('Error fetching companies for users:', companiesError);
+      }
+
+      // Fetch departments for association
+      const { data: departmentsData, error: departmentsError } = await supabase
+        .from('departments')
+        .select('*');
+      
+      if (departmentsError) {
+        console.warn('Error fetching departments for users:', departmentsError);
+      }
+
       // Combine data
       const usersWithDetails: SuperadminUser[] = (profiles || []).map((profile: any) => {
         const userRoles = (roles || [])
@@ -109,6 +127,9 @@ export function useSuperadmin(): UseSuperadminReturn {
             role: r.role as AppRole,
             created_at: r.created_at,
           }));
+
+        const userCompany = (companiesData || []).find((c: any) => c.id === profile.company_id) || null;
+        const userDepartment = (departmentsData || []).find((d: any) => d.id === profile.department_id) || null;
 
         return {
           id: profile.id,
@@ -121,8 +142,8 @@ export function useSuperadmin(): UseSuperadminReturn {
           created_at: profile.created_at,
           updated_at: profile.updated_at,
           roles: userRoles,
-          company: null,
-          department: null,
+          company: userCompany,
+          department: userDepartment,
         };
       });
 
@@ -177,14 +198,20 @@ export function useSuperadmin(): UseSuperadminReturn {
 
   const updateUserProfile = useCallback(async (
     userId: string, 
-    updates: Partial<SuperadminUserProfile>
+    updates: Partial<SuperadminUserProfile> & {
+      gerencia_id?: string | null;
+      sub_gerencia_id?: string | null;
+      area_id?: string | null;
+      position_id?: string | null;
+      can_upload_documents?: boolean;
+    }
   ): Promise<{ success: boolean; error?: string }> => {
     if (!isSuperadmin) {
       return { success: false, error: 'No autorizado' };
     }
 
     try {
-      // Only include fields that exist in the database schema
+      // Include all fields that exist in the database schema
       const updateData: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
@@ -193,6 +220,13 @@ export function useSuperadmin(): UseSuperadminReturn {
       if (updates.company_id !== undefined) updateData.company_id = updates.company_id;
       if (updates.department_id !== undefined) updateData.department_id = updates.department_id;
       if (updates.role !== undefined) updateData.role = updates.role;
+      if (updates.gerencia_id !== undefined) updateData.gerencia_id = updates.gerencia_id;
+      if (updates.sub_gerencia_id !== undefined) updateData.sub_gerencia_id = updates.sub_gerencia_id;
+      if (updates.area_id !== undefined) updateData.area_id = updates.area_id;
+      if (updates.position_id !== undefined) updateData.position_id = updates.position_id;
+      if (updates.can_upload_documents !== undefined) updateData.can_upload_documents = updates.can_upload_documents;
+      
+      console.log('Updating user profile:', userId, updateData);
       
       const { error } = await supabase
         .from('user_profiles')

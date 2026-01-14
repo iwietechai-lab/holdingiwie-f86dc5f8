@@ -40,14 +40,20 @@ interface UserRequestsListProps {
 }
 
 const PERMISSION_LABELS: Record<keyof DashboardVisibility, string> = {
-  ver_perfiles: 'Ver perfiles',
-  ver_empresas: 'Ver empresas',
-  ver_reportes: 'Ver reportes',
+  ver_dashboard: 'Dashboard',
+  ver_ventas: 'Ventas',
   ver_documentos: 'Documentos',
-  ver_chatbot: 'Chatbot',
+  ver_chat_interno: 'Chat',
+  ver_tareas: 'Tareas',
+  ver_tickets: 'Tickets',
+  ver_reuniones: 'Reuniones',
+  ver_estructura_org: 'Org',
+  acceso_chatbot_empresa: 'Bot Empresa',
+  acceso_chatbot_ceo: 'Bot CEO',
+  gestionar_usuarios: 'Usuarios',
+  gestionar_conocimiento: 'Conocimiento',
+  ver_reportes: 'Reportes',
   ver_logs: 'Logs',
-  editar_usuarios: 'Editar usuarios',
-  gestionar_roles: 'Gestionar roles',
 };
 
 const StatusBadge = ({ status }: { status: string }) => {

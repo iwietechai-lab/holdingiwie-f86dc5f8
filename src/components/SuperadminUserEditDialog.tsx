@@ -44,15 +44,24 @@ import {
 import { useOrganization } from '@/hooks/useOrganization';
 import { supabase } from '@/lib/supabase';
 
-const VISIBILITY_LABELS: Record<keyof DashboardVisibility, string> = {
-  ver_perfiles: 'Ver Perfiles de Usuarios',
-  ver_empresas: 'Ver Empresas',
-  ver_reportes: 'Ver Reportes',
-  ver_documentos: 'Ver Documentos',
-  ver_chatbot: 'Acceder al Chatbot',
-  ver_logs: 'Ver Logs de Acceso',
-  editar_usuarios: 'Editar Usuarios',
-  gestionar_roles: 'Gestionar Roles',
+const VISIBILITY_LABELS: Record<keyof DashboardVisibility, { label: string; category: string }> = {
+  // Módulos principales
+  ver_dashboard: { label: 'Dashboard', category: 'Módulos Principales' },
+  ver_ventas: { label: 'Ventas', category: 'Módulos Principales' },
+  ver_documentos: { label: 'Gestor de Documentos', category: 'Módulos Principales' },
+  ver_chat_interno: { label: 'Chat Interno', category: 'Módulos Principales' },
+  ver_tareas: { label: 'Gestión de Tareas', category: 'Módulos Principales' },
+  ver_tickets: { label: 'Sistema de Tickets', category: 'Módulos Principales' },
+  ver_reuniones: { label: 'Reuniones', category: 'Módulos Principales' },
+  ver_estructura_org: { label: 'Estructura Organizacional', category: 'Módulos Principales' },
+  // Chatbots
+  acceso_chatbot_empresa: { label: 'Chatbot de Empresa', category: 'Asistentes IA' },
+  acceso_chatbot_ceo: { label: 'Chatbot CEO', category: 'Asistentes IA' },
+  // Gestión
+  gestionar_usuarios: { label: 'Gestionar Usuarios', category: 'Administración' },
+  gestionar_conocimiento: { label: 'Gestionar Base de Conocimiento', category: 'Administración' },
+  ver_reportes: { label: 'Reportes y Estadísticas', category: 'Administración' },
+  ver_logs: { label: 'Logs de Acceso', category: 'Administración' },
 };
 
 interface SuperadminUserEditDialogProps {
@@ -512,40 +521,48 @@ export function SuperadminUserEditDialog({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Eye className="w-4 h-4" />
-                Permisos del Dashboard
+                Permisos y Funcionalidades
               </Label>
               <p className="text-sm text-muted-foreground">
-                Selecciona qué secciones puede ver este usuario
+                Selecciona las herramientas y módulos que puede acceder este usuario
               </p>
             </div>
 
-            <div className="grid gap-3">
-              {Object.entries(VISIBILITY_LABELS).map(([key, label]) => {
-                const isChecked = visibility[key as keyof DashboardVisibility];
-                return (
-                  <div 
-                    key={key}
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 cursor-pointer"
-                    onClick={() => toggleVisibility(key as keyof DashboardVisibility)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {isChecked ? (
-                        <Eye className="w-4 h-4 text-primary" />
-                      ) : (
-                        <EyeOff className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className={isChecked ? 'text-foreground' : 'text-muted-foreground'}>
-                        {label}
-                      </span>
-                    </div>
-                    <Checkbox 
-                      checked={isChecked}
-                      onCheckedChange={() => toggleVisibility(key as keyof DashboardVisibility)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+            {/* Group by category */}
+            {['Módulos Principales', 'Asistentes IA', 'Administración'].map((category) => (
+              <div key={category} className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">{category}</h4>
+                <div className="grid gap-2">
+                  {Object.entries(VISIBILITY_LABELS)
+                    .filter(([_, config]) => config.category === category)
+                    .map(([key, config]) => {
+                      const isChecked = visibility[key as keyof DashboardVisibility];
+                      return (
+                        <div 
+                          key={key}
+                          className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 cursor-pointer"
+                          onClick={() => toggleVisibility(key as keyof DashboardVisibility)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isChecked ? (
+                              <Eye className="w-4 h-4 text-primary" />
+                            ) : (
+                              <EyeOff className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <span className={isChecked ? 'text-foreground' : 'text-muted-foreground'}>
+                              {config.label}
+                            </span>
+                          </div>
+                          <Checkbox 
+                            checked={isChecked}
+                            onCheckedChange={() => toggleVisibility(key as keyof DashboardVisibility)}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
           </TabsContent>
         </Tabs>
 
