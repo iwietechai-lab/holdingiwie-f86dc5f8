@@ -117,15 +117,15 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
   };
 
   return (
-    <Card className="w-full max-w-lg glass-effect gradient-border">
-      <CardHeader className="text-center space-y-2">
-        <div className="mx-auto w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
-          <User className="w-7 h-7 text-accent" />
+    <Card className="w-full max-w-lg glass-effect gradient-border mx-4">
+      <CardHeader className="text-center space-y-2 px-4 sm:px-6">
+        <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
+          <User className="w-6 h-6 sm:w-7 sm:h-7 text-accent" />
         </div>
-        <CardTitle className="text-xl font-bold text-foreground">
+        <CardTitle className="text-lg sm:text-xl font-bold text-foreground">
           Configuración de Perfil
         </CardTitle>
-        <CardDescription className="text-muted-foreground text-sm">
+        <CardDescription className="text-muted-foreground text-xs sm:text-sm">
           Completa tu información y establece tu contraseña permanente
         </CardDescription>
         {emailConfig && (
@@ -136,10 +136,10 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
         )}
       </CardHeader>
 
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="px-4 sm:px-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           {/* Names Row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="firstName" className="text-foreground text-sm">
                 Primer Nombre *
@@ -167,7 +167,7 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
           </div>
 
           {/* Last Names Row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="firstLastName" className="text-foreground text-sm">
                 Primer Apellido *

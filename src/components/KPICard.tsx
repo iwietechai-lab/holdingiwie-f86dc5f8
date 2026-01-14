@@ -31,32 +31,32 @@ export const KPICard = ({ title, value, change, icon: Icon, color = 'purple' }: 
   return (
     <div 
       className={cn(
-        "relative p-6 rounded-xl border bg-gradient-to-br backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] group",
+        "relative p-3 sm:p-6 rounded-xl border bg-gradient-to-br backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] group",
         colorClasses[color]
       )}
     >
       {/* Glow effect on hover */}
       <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 neon-glow-purple" />
       
-      <div className="relative flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-3xl font-bold text-foreground">{value}</p>
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="space-y-1 sm:space-y-2 min-w-0 flex-1">
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">{title}</p>
+          <p className="text-xl sm:text-3xl font-bold text-foreground">{value}</p>
           {change !== undefined && (
             <p className={cn(
-              "text-sm flex items-center gap-1",
+              "text-xs sm:text-sm flex items-center gap-1 flex-wrap",
               change >= 0 ? "text-green-400" : "text-destructive"
             )}>
               {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
-              <span className="text-muted-foreground ml-1">vs mes anterior</span>
+              <span className="text-muted-foreground ml-1 hidden sm:inline">vs mes anterior</span>
             </p>
           )}
         </div>
         <div className={cn(
-          "p-3 rounded-lg bg-card/50",
+          "p-2 sm:p-3 rounded-lg bg-card/50 shrink-0",
           iconColorClasses[color]
         )}>
-          <Icon className="w-6 h-6" />
+          <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
         </div>
       </div>
     </div>
