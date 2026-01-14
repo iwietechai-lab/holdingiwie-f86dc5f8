@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { TourOverlay } from './TourOverlay';
+import { InteractiveTourOverlay } from './InteractiveTourOverlay';
 import { TourHelpButton } from './TourHelpButton';
 
 export interface TourStep {
@@ -578,7 +578,7 @@ export const TourProvider = ({ children }: TourProviderProps) => {
   return (
     <TourContext.Provider value={value}>
       {children}
-      <TourOverlay />
+      <InteractiveTourOverlay />
       <TourHelpButton />
     </TourContext.Provider>
   );
