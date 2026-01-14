@@ -39,9 +39,12 @@ export const useDashboardStats = (selectedCompanyId: string | null) => {
     const fetchStats = async () => {
       setIsLoading(true);
       try {
+        // IWIE Holding shows all employees from all companies (it's the parent company)
+        const isHolding = selectedCompanyId === 'iwie-holding';
+        
         // Fetch employees count
         let employeesQuery = supabase.from('user_profiles').select('id, company_id');
-        if (selectedCompanyId) {
+        if (selectedCompanyId && !isHolding) {
           employeesQuery = employeesQuery.eq('company_id', selectedCompanyId);
         }
         const { data: employees, error: employeesError } = await employeesQuery;
@@ -52,7 +55,7 @@ export const useDashboardStats = (selectedCompanyId: string | null) => {
 
         // Fetch tickets
         let ticketsQuery = supabase.from('tickets').select('id, status, company_id');
-        if (selectedCompanyId) {
+        if (selectedCompanyId && !isHolding) {
           ticketsQuery = ticketsQuery.eq('company_id', selectedCompanyId);
         }
         const { data: tickets, error: ticketsError } = await ticketsQuery;
@@ -63,7 +66,7 @@ export const useDashboardStats = (selectedCompanyId: string | null) => {
 
         // Fetch meetings
         let meetingsQuery = supabase.from('meetings').select('id, status, company_id');
-        if (selectedCompanyId) {
+        if (selectedCompanyId && !isHolding) {
           meetingsQuery = meetingsQuery.eq('company_id', selectedCompanyId);
         }
         const { data: meetings, error: meetingsError } = await meetingsQuery;
