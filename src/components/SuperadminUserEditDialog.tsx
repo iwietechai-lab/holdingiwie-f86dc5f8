@@ -300,7 +300,7 @@ export function SuperadminUserEditDialog({
                 <Building2 className="w-4 h-4" />
                 Empresa
               </Label>
-              <Select value={companyId} onValueChange={setCompanyId}>
+              <Select value={companyId || "_none"} onValueChange={(v) => setCompanyId(v === "_none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona una empresa">
                     {selectedCompany && (
@@ -312,7 +312,7 @@ export function SuperadminUserEditDialog({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="_none">Sin asignar</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       <span className="flex items-center gap-2">
@@ -332,8 +332,8 @@ export function SuperadminUserEditDialog({
                 Área / Departamento
               </Label>
               <Select 
-                value={departmentId} 
-                onValueChange={setDepartmentId}
+                value={departmentId || "_none"} 
+                onValueChange={(v) => setDepartmentId(v === "_none" ? "" : v)}
                 disabled={!companyId || departments.length === 0}
               >
                 <SelectTrigger>
@@ -346,7 +346,7 @@ export function SuperadminUserEditDialog({
                   } />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="_none">Sin asignar</SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
