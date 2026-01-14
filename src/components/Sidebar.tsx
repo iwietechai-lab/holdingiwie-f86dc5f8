@@ -16,7 +16,8 @@ import {
   Calendar,
   Ticket,
   Network,
-  Bell
+  Bell,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -62,6 +63,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: Bot, label: 'Chatbot CEO', action: 'navigate', path: '/ceo-chatbot' },
     { icon: Calendar, label: 'Reuniones', action: 'navigate', path: '/reuniones' },
     { icon: Ticket, label: 'Tickets', action: 'navigate', path: '/tickets' },
+    { icon: MessageSquare, label: 'Mensajería', action: 'navigate', path: '/mensajeria' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
     // Only show superadmin panel to the superadmin user
