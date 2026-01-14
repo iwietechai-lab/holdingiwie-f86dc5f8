@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
+  TrendingDown,
   DollarSign, 
   Users, 
   CheckCircle2, 
@@ -12,7 +13,11 @@ import {
   LogOut,
   Menu,
   Ticket,
-  Calendar
+  Calendar,
+  AlertTriangle,
+  Package,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNav } from '@/components/MobileNav';
@@ -36,18 +41,10 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  PieChart as RePieChart,
+  Pie,
+  Cell,
 } from 'recharts';
-
-// Mock data for revenue chart (will be connected later when financial data is available)
-const revenueData = [
-  { month: 'Ene', value: 4000 },
-  { month: 'Feb', value: 3000 },
-  { month: 'Mar', value: 5000 },
-  { month: 'Abr', value: 4500 },
-  { month: 'May', value: 6000 },
-  { month: 'Jun', value: 5500 },
-  { month: 'Jul', value: 7000 },
-];
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -56,7 +53,11 @@ export const Dashboard = () => {
   const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
   
   // Fetch real stats from database
-  const { stats, tasksChartData, isLoading: statsLoading } = useDashboardStats(selectedCompany);
+  const { stats, tasksChartData, companyMetrics, revenueChartData, isLoading: statsLoading } = useDashboardStats(selectedCompany);
+
+  const formatCurrency = (value: number) => new Intl.NumberFormat('es-CL', { 
+    style: 'currency', currency: 'CLP', minimumFractionDigits: 0, notation: 'compact' 
+  }).format(value);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -198,7 +199,7 @@ export const Dashboard = () => {
             </p>
           </div>
 
-          {/* KPI Cards */}
+          {/* KPI Cards - Updated with real task data */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             <KPICard
               title="Empleados Activos"
@@ -208,74 +209,148 @@ export const Dashboard = () => {
               color="blue"
             />
             <KPICard
-              title="Tickets Totales"
-              value={statsLoading ? "..." : stats.totalTickets.toString()}
-              change={0}
-              icon={Ticket}
+              title="Total Tareas"
+              value={statsLoading ? "..." : stats.totalTasks.toString()}
+              change={stats.tasksCompletionRate}
+              icon={Target}
               color="purple"
             />
             <KPICard
-              title="Reuniones"
-              value={statsLoading ? "..." : stats.totalMeetings.toString()}
-              change={0}
-              icon={Calendar}
+              title="Ingresos Mes"
+              value={statsLoading ? "..." : formatCurrency(stats.totalMonthlyRevenue)}
+              change={Math.round(stats.revenueGrowth)}
+              icon={DollarSign}
               color="green"
             />
             <KPICard
               title="Tareas Completadas"
-              value={statsLoading ? "..." : `${stats.ticketCompletionRate}%`}
+              value={statsLoading ? "..." : `${stats.tasksCompletionRate}%`}
               change={0}
               icon={CheckCircle2}
               color="cyan"
             />
           </div>
 
+          {/* Secondary Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-cyan-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.totalBudgetItems}</p>
+                  <p className="text-[10px] text-muted-foreground">Items Inventario</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.totalQuotes}</p>
+                  <p className="text-[10px] text-muted-foreground">Cotizaciones</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.tasksNearDeadline}</p>
+                  <p className="text-[10px] text-muted-foreground">Por Vencer</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-red-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.tasksOverdue}</p>
+                  <p className="text-[10px] text-muted-foreground">Vencidas</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-orange-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.totalTickets}</p>
+                  <p className="text-[10px] text-muted-foreground">Tickets</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-green-400" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{stats.totalMeetings}</p>
+                  <p className="text-[10px] text-muted-foreground">Reuniones</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
           {/* Charts Row */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-            {/* Revenue Chart */}
+            {/* Revenue Chart - Now with real data */}
             <Card className="bg-card/50 backdrop-blur-sm border-border">
               <CardHeader className="p-4 md:p-6">
-                <CardTitle className="flex items-center gap-2 text-foreground text-sm md:text-base">
-                  <Activity className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  Ingresos Mensuales
+                <CardTitle className="flex items-center justify-between text-foreground text-sm md:text-base">
+                  <span className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                    Ingresos Mensuales
+                  </span>
+                  {stats.revenueGrowth !== 0 && (
+                    <span className={`flex items-center gap-1 text-sm ${stats.revenueGrowth > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {stats.revenueGrowth > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                      {Math.abs(stats.revenueGrowth).toFixed(1)}%
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-2 md:p-6 pt-0">
                 <div className="h-[200px] md:h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={revenueData}>
-                      <defs>
-                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(250, 89%, 65%)" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="hsl(250, 89%, 65%)" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 25%, 20%)" />
-                      <XAxis 
-                        dataKey="month" 
-                        stroke="hsl(215, 20%, 65%)"
-                        tick={{ fill: 'hsl(215, 20%, 65%)' }}
-                      />
-                      <YAxis 
-                        stroke="hsl(215, 20%, 65%)"
-                        tick={{ fill: 'hsl(215, 20%, 65%)' }}
-                      />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(230, 25%, 12%)',
-                          border: '1px solid hsl(230, 25%, 20%)',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="hsl(250, 89%, 65%)" 
-                        fillOpacity={1} 
-                        fill="url(#colorValue)" 
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {revenueChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={revenueChartData}>
+                        <defs>
+                          <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(250, 89%, 65%)" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="hsl(250, 89%, 65%)" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 25%, 20%)" />
+                        <XAxis 
+                          dataKey="month" 
+                          stroke="hsl(215, 20%, 65%)"
+                          tick={{ fill: 'hsl(215, 20%, 65%)' }}
+                        />
+                        <YAxis 
+                          stroke="hsl(215, 20%, 65%)"
+                          tick={{ fill: 'hsl(215, 20%, 65%)' }}
+                          tickFormatter={(v) => formatCurrency(v)}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            backgroundColor: 'hsl(230, 25%, 12%)',
+                            border: '1px solid hsl(230, 25%, 20%)',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number) => [formatCurrency(value), 'Ingresos']}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="value" 
+                          stroke="hsl(250, 89%, 65%)" 
+                          fillOpacity={1} 
+                          fill="url(#colorValue)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      Sin datos de ingresos
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -283,9 +358,14 @@ export const Dashboard = () => {
             {/* Tasks Chart */}
             <Card className="bg-card/50 backdrop-blur-sm border-border">
               <CardHeader className="p-4 md:p-6">
-                <CardTitle className="flex items-center gap-2 text-foreground text-sm md:text-base">
-                  <Target className="w-4 h-4 md:w-5 md:h-5 text-secondary" />
-                  Estado de Tareas
+                <CardTitle className="flex items-center justify-between text-foreground text-sm md:text-base">
+                  <span className="flex items-center gap-2">
+                    <Target className="w-4 h-4 md:w-5 md:h-5 text-secondary" />
+                    Estado de Tareas
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {stats.completedTasks}/{stats.totalTasks} completadas
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-2 md:p-6 pt-0">
@@ -324,15 +404,15 @@ export const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Companies Overview - clicking shows dev modal */}
-          {!selectedCompany && (
+          {/* Companies Overview with REAL metrics */}
+          {!selectedCompany && companyMetrics.length > 0 && (
             <div className="space-y-4">
               <h2 className="text-base md:text-xl font-semibold text-foreground flex items-center gap-2">
                 <PieChart className="w-4 h-4 md:w-5 md:h-5 text-accent" />
                 Resumen por Empresa
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
-                {companies.map((company, index) => (
+                {companyMetrics.map((company, index) => (
                   <Card 
                     key={company.id}
                     className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group"
@@ -348,16 +428,17 @@ export const Dashboard = () => {
                           <h3 className="font-semibold text-foreground truncate">
                             {company.name}
                           </h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {company.description}
-                          </p>
+                          <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                            <span>{company.employees} usuarios</span>
+                            <span>{company.tasks} tareas</span>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-foreground">
-                            ${(Math.random() * 500 + 100).toFixed(0)}K
+                            {formatCurrency(company.revenue)}
                           </p>
                           <p className="text-xs text-green-400">
-                            +{(Math.random() * 20 + 5).toFixed(1)}%
+                            {company.completedTasks}/{company.tasks} tareas
                           </p>
                         </div>
                       </div>
@@ -368,41 +449,41 @@ export const Dashboard = () => {
             </div>
           )}
 
-          {/* Quick stats */}
+          {/* Quick stats - Tasks & Tickets breakdown */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
                 <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8 text-green-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.completedTickets}</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Tickets resueltos</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.completedTasks}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Tareas completadas</p>
                 </div>
               </div>
             </Card>
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <Zap className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 shrink-0" />
+                <Zap className="w-6 h-6 md:w-8 md:h-8 text-blue-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.inProgressTickets}</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.inProgressTasks}</p>
                   <p className="text-[10px] md:text-xs text-muted-foreground truncate">En progreso</p>
                 </div>
               </div>
             </Card>
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <Target className="w-6 h-6 md:w-8 md:h-8 text-orange-400 shrink-0" />
+                <Target className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.openTickets}</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Tickets abiertos</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.pendingTasks}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Pendientes</p>
                 </div>
               </div>
             </Card>
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <PieChart className="w-6 h-6 md:w-8 md:h-8 text-blue-400 shrink-0" />
+                <DollarSign className="w-6 h-6 md:w-8 md:h-8 text-purple-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.totalCompanies}</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Empresas</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{formatCurrency(stats.totalInventoryValue)}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Valor inventario</p>
                 </div>
               </div>
             </Card>
