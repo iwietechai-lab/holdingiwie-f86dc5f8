@@ -11,6 +11,7 @@ import {
   Circle,
   Search,
   Filter,
+  Trash2,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -52,7 +53,7 @@ const STATUS_ICONS = {
 export default function TicketsPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
-  const { tickets, isLoading, createTicket, updateTicket, assignTicket, fetchTickets } = useTickets();
+  const { tickets, isLoading, createTicket, updateTicket, assignTicket, deleteTicket, fetchTickets } = useTickets();
   const { users, isSuperadmin } = useSuperadmin();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -122,6 +123,18 @@ export default function TicketsPage() {
       toast.success('Ticket asignado');
     } else {
       toast.error(result.error || 'Error al asignar ticket');
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este ticket? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    const result = await deleteTicket(ticketId);
+    if (result.success) {
+      toast.success('Ticket eliminado');
+    } else {
+      toast.error(result.error || 'Error al eliminar ticket');
     }
   };
 
@@ -410,6 +423,14 @@ export default function TicketsPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteTicket(ticket.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
                       </div>

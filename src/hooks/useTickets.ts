@@ -11,6 +11,7 @@ interface UseTicketsReturn {
   createTicket: (ticket: Omit<Ticket, 'id' | 'created_at' | 'updated_at'>) => Promise<{ success: boolean; data?: Ticket; error?: string }>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<{ success: boolean; error?: string }>;
   assignTicket: (id: string, userId: string) => Promise<{ success: boolean; error?: string }>;
+  deleteTicket: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useTickets(): UseTicketsReturn {
@@ -96,6 +97,24 @@ export function useTickets(): UseTicketsReturn {
     return updateTicket(id, { assigned_to: userId, status: 'in_progress' });
   }, [updateTicket]);
 
+  const deleteTicket = useCallback(async (
+    id: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error: deleteError } = await supabase
+        .from('tickets')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+      await fetchTickets();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting ticket:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Error deleting ticket' };
+    }
+  }, [fetchTickets]);
+
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
@@ -108,5 +127,6 @@ export function useTickets(): UseTicketsReturn {
     createTicket,
     updateTicket,
     assignTicket,
+    deleteTicket,
   };
 }
