@@ -235,9 +235,9 @@ export const Login = () => {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-row overflow-hidden">
-      {/* Left Side - Branding with Earth Background (50%) */}
-      <div className="relative w-1/2 h-full flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 flex flex-col lg:flex-row overflow-hidden">
+      {/* Left Side - Branding with Earth Background (hidden on mobile, 50% on desktop) */}
+      <div className="hidden lg:flex relative lg:w-1/2 h-full flex-col items-center justify-center overflow-hidden">
         {/* Animated Earth Background */}
         <div 
           className="absolute inset-0 animate-earth-drift"
@@ -293,11 +293,11 @@ export const Login = () => {
         <div className="absolute top-1/4 right-10 w-10 h-10 rounded-full bg-gradient-to-br from-secondary/15 to-accent/15 blur-lg animate-float" style={{ animationDelay: '3s' }} />
       </div>
       
-      {/* Right Side - Login/Register Form (50%) */}
-      <div className="relative w-1/2 h-full flex flex-col items-center justify-center overflow-hidden p-6">
+      {/* Right Side - Login/Register Form (100% on mobile, 50% on desktop) */}
+      <div className="relative w-full lg:w-1/2 h-full flex flex-col items-center justify-center overflow-hidden p-4 lg:p-6">
         {/* Background with subtle animation */}
         <div 
-          className="absolute inset-0 animate-earth-drift opacity-30"
+          className="absolute inset-0 animate-earth-drift opacity-50 lg:opacity-30"
           style={{
             backgroundImage: `url(${earthImage})`,
             backgroundSize: '150%',
@@ -306,7 +306,7 @@ export const Login = () => {
         />
         
         {/* Dark overlay for readability */}
-        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-background/90 lg:bg-background/95 backdrop-blur-sm" />
         
         {/* Subtle stars */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
@@ -322,9 +322,22 @@ export const Login = () => {
             />
           ))}
         </div>
+
+        {/* Mobile Header - Only visible on mobile */}
+        <div className="lg:hidden relative z-10 text-center mb-4 animate-slide-up">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border border-primary/30">
+              <Rocket className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold neon-text tracking-wider">HOLDING IWIE</h1>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground italic">"Creatividad Colaborativa"</p>
+        </div>
         
         {/* Form Card */}
-        <Card className="relative z-10 w-full max-w-md glass-effect gradient-border animate-slide-up max-h-[90vh] overflow-y-auto">
+        <Card className="relative z-10 w-full max-w-md glass-effect gradient-border animate-slide-up max-h-[85vh] lg:max-h-[90vh] overflow-y-auto">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-secondary/20 flex items-center justify-center neon-glow-blue border border-secondary/30">
               <Shield className="w-7 h-7 text-secondary" />
