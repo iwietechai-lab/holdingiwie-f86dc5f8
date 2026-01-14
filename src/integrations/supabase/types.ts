@@ -183,6 +183,67 @@ export type Database = {
           },
         ]
       }
+      chat_participants: {
+        Row: {
+          chat_id: string
+          id: string
+          joined_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          id?: string
+          joined_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          id?: string
+          joined_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_participants_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_summaries: {
+        Row: {
+          chat_id: string
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          summary: string | null
+        }
+        Insert: {
+          chat_id: string
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          summary?: string | null
+        }
+        Update: {
+          chat_id?: string
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_summaries_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatbots: {
         Row: {
           avatar_url: string | null
@@ -225,6 +286,44 @@ export type Database = {
             foreignKeyName: "chatbots_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chats: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          last_message_at: string | null
+          title: string
+          type: Database["public"]["Enums"]["chat_type"]
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          title: string
+          type: Database["public"]["Enums"]["chat_type"]
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["chat_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chats_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -544,6 +643,38 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          chat_id: string
+          content: string
+          id: string
+          sender_id: string
+          sent_at: string | null
+        }
+        Insert: {
+          chat_id: string
+          content: string
+          id?: string
+          sender_id: string
+          sent_at?: string | null
+        }
+        Update: {
+          chat_id?: string
+          content?: string
+          id?: string
+          sender_id?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
             referencedColumns: ["id"]
           },
         ]
@@ -980,6 +1111,11 @@ export type Database = {
       app_role: "superadmin" | "admin" | "manager" | "employee" | "user"
       approval_priority: "baja" | "media" | "alta" | "urgente"
       approval_status: "pending" | "approved" | "rejected"
+      chat_type:
+        | "one_to_one"
+        | "group_company"
+        | "group_multi_company"
+        | "global"
       meeting_request_status:
         | "pendiente"
         | "aprobada"
@@ -1117,6 +1253,12 @@ export const Constants = {
       app_role: ["superadmin", "admin", "manager", "employee", "user"],
       approval_priority: ["baja", "media", "alta", "urgente"],
       approval_status: ["pending", "approved", "rejected"],
+      chat_type: [
+        "one_to_one",
+        "group_company",
+        "group_multi_company",
+        "global",
+      ],
       meeting_request_status: [
         "pendiente",
         "aprobada",
