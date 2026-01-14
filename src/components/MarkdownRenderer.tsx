@@ -1,9 +1,17 @@
 import { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 
 interface MarkdownRendererProps {
   content: string;
   className?: string;
 }
+
+// Configure DOMPurify with allowed tags and attributes
+const PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span'],
+  ALLOWED_ATTR: ['class'],
+  KEEP_CONTENT: true,
+};
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
   const renderedContent = useMemo(() => {
@@ -41,7 +49,8 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
       return line;
     });
     
-    return processedLines.join('<br />');
+    // Sanitize the final HTML to prevent XSS attacks
+    return DOMPurify.sanitize(processedLines.join('<br />'), PURIFY_CONFIG);
   }, [content]);
 
   return (
