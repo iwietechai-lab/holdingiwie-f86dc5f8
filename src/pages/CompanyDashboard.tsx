@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Users, 
   CheckCircle2, 
@@ -17,6 +17,7 @@ import {
   Package,
   AlertTriangle,
   Zap,
+  ArrowLeft,
 } from 'lucide-react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { SpaceBackground } from '@/components/SpaceBackground';
@@ -33,6 +34,7 @@ import {
 
 export const CompanyDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile, isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [showSaleDialog, setShowSaleDialog] = useState(false);
@@ -44,9 +46,15 @@ export const CompanyDashboard = () => {
     if (!authLoading && !isAuthenticated) navigate('/login');
   }, [authLoading, isAuthenticated, navigate]);
 
+  // Initialize from URL query param first, then fallback to profile
   useEffect(() => {
-    if (profile?.company_id && !selectedCompany) setSelectedCompany(profile.company_id);
-  }, [profile, selectedCompany]);
+    const empresaParam = searchParams.get('empresa');
+    if (empresaParam) {
+      setSelectedCompany(empresaParam);
+    } else if (profile?.company_id && !selectedCompany) {
+      setSelectedCompany(profile.company_id);
+    }
+  }, [profile, selectedCompany, searchParams]);
 
   if (authLoading) {
     return (
@@ -62,17 +70,41 @@ export const CompanyDashboard = () => {
     style: 'currency', currency: 'CLP', minimumFractionDigits: 0, notation: 'compact' 
   }).format(value);
 
+  // Helper to navigate while maintaining company context
+  const navigateWithCompany = (path: string) => {
+    if (selectedCompany) {
+      navigate(`${path}?empresa=${selectedCompany}`);
+    } else {
+      navigate(path);
+    }
+  };
+
+  const handleBackToMain = () => {
+    navigate('/dashboard');
+  };
+
   return (
     <ResponsiveLayout selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany}>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-              <Briefcase className="h-8 w-8 text-cyan-400" />
-              {company ? <><span className="text-3xl">{company.icon}</span>{company.name}</> : 'Dashboard Empresa'}
-            </h1>
-            <p className="text-slate-400 mt-1">Métricas, avances y gestión integral</p>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleBackToMain}
+              className="text-slate-400 hover:text-white hover:bg-slate-700"
+              title="Volver al menú principal"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+                <Briefcase className="h-8 w-8 text-cyan-400" />
+                {company ? <><span className="text-3xl">{company.icon}</span>{company.name}</> : 'Dashboard Empresa'}
+              </h1>
+              <p className="text-slate-400 mt-1">Métricas, avances y gestión integral</p>
+            </div>
           </div>
           {selectedCompany && (
             <Button onClick={() => setShowSaleDialog(true)} className="bg-green-600 hover:bg-green-700">
@@ -311,7 +343,7 @@ export const CompanyDashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
             { icon: Target, label: 'Tareas', path: '/tareas', color: 'cyan' },
-            { icon: FileText, label: 'Documentos', path: '/documentos', color: 'blue' },
+            { icon: FileText, label: 'Documentos', path: '/gestor-documentos', color: 'blue' },
             { icon: Calendar, label: 'Reuniones', path: '/reuniones', color: 'green' },
             { icon: Ticket, label: 'Tickets', path: '/tickets', color: 'purple' },
             { icon: Package, label: 'Presupuestos', path: '/presupuestos', color: 'orange' },
@@ -320,7 +352,7 @@ export const CompanyDashboard = () => {
               key={label} 
               variant="outline" 
               className={`h-auto p-4 flex flex-col items-center gap-2 bg-slate-800/50 border-slate-700 hover:border-${color}-500 hover:bg-${color}-500/10`} 
-              onClick={() => navigate(path)}
+              onClick={() => navigateWithCompany(path)}
             >
               <Icon className={`h-8 w-8 text-${color}-400`} />
               <span className="text-white">{label}</span>
