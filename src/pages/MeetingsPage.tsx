@@ -5,12 +5,12 @@ import {
   Plus,
   Clock,
   MapPin,
-  Users,
-  Edit,
   Trash2,
   Video,
   CheckCircle,
   XCircle,
+  Settings,
+  CalendarPlus,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,9 @@ import { MEETING_STATUS_LABELS } from '@/types/organization';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { CeoAvailabilityManager } from '@/components/CeoAvailabilityManager';
+import { BookMeetingDialog } from '@/components/BookMeetingDialog';
+import { useCeoAvailability } from '@/hooks/useCeoAvailability';
 
 const STATUS_COLORS = {
   scheduled: 'bg-blue-500/20 text-blue-400 border-blue-500',
@@ -54,6 +58,7 @@ export default function MeetingsPage() {
   const { isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
   const { meetings, isLoading, createMeeting, updateMeeting, deleteMeeting, fetchMeetings } = useMeetings();
   const { users } = useSuperadmin();
+  const { requests } = useCeoAvailability();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -138,6 +143,14 @@ export default function MeetingsPage() {
     m => new Date(m.scheduled_at) < new Date() || m.status === 'cancelled'
   );
 
+  // Get users with availability configured (potential hosts)
+  const hostsWithAvailability = users.filter(u => 
+    u.id !== user?.id && (profile?.role === 'superadmin' || profile?.role === 'admin' || profile?.role === 'manager')
+  );
+
+  // Count pending requests for current user
+  const myPendingRequests = requests.filter(r => r.host_id === user?.id && r.status === 'pending');
+
   return (
     <div className="min-h-screen flex">
       <SpaceBackground />
@@ -153,22 +166,11 @@ export default function MeetingsPage() {
                 Reuniones
               </h1>
               <p className="text-muted-foreground">
-                Gestiona las reuniones de tu empresa
+                Gestiona tu disponibilidad y reuniones
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <a
-                href="https://calendar.app.google/iouQyVL54CS5tvK56"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="border-primary/50 hover:bg-primary/10">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Agendar en Google Calendar
-                </Button>
-              </a>
-
               <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                 <DialogTrigger asChild>
                   <Button className="bg-gradient-to-r from-primary to-secondary">
@@ -241,7 +243,7 @@ export default function MeetingsPage() {
           </header>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="bg-card/50 backdrop-blur-sm border-border">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -249,6 +251,17 @@ export default function MeetingsPage() {
                   <div>
                     <p className="text-2xl font-bold text-foreground">{upcomingMeetings.length}</p>
                     <p className="text-xs text-muted-foreground">Próximas</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-8 h-8 text-orange-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{myPendingRequests.length}</p>
+                    <p className="text-xs text-muted-foreground">Pendientes</p>
                   </div>
                 </div>
               </CardContent>
@@ -281,107 +294,191 @@ export default function MeetingsPage() {
             </Card>
           </div>
 
-          {/* Upcoming Meetings */}
-          <Card className="bg-card/50 backdrop-blur-sm border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                Próximas Reuniones ({upcomingMeetings.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : upcomingMeetings.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No hay reuniones programadas</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {upcomingMeetings.map((meeting) => (
-                    <div
-                      key={meeting.id}
-                      className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-foreground">{meeting.title}</h3>
-                            <Badge
-                              variant="outline"
-                              className={STATUS_COLORS[meeting.status]}
-                            >
-                              {MEETING_STATUS_LABELS[meeting.status]}
-                            </Badge>
-                          </div>
-                          {meeting.description && (
-                            <p className="text-sm text-muted-foreground mb-3">
-                              {meeting.description}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {format(new Date(meeting.scheduled_at), "PPP 'a las' p", { locale: es })}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {meeting.duration_minutes} min
-                            </span>
-                            {meeting.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-4 h-4" />
-                                {meeting.location}
-                              </span>
-                            )}
-                            {meeting.meeting_url && (
-                              <a
-                                href={meeting.meeting_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-primary hover:underline"
-                              >
-                                <Video className="w-4 h-4" />
-                                Unirse
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={meeting.status}
-                            onValueChange={(value) => handleStatusChange(meeting.id, value)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-popover">
-                              {Object.entries(MEETING_STATUS_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(meeting.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
+          {/* Tabs for different views */}
+          <Tabs defaultValue="meetings" className="space-y-4">
+            <TabsList className="bg-muted/50">
+              <TabsTrigger value="meetings" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Mis Reuniones
+              </TabsTrigger>
+              <TabsTrigger value="availability" className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Mi Disponibilidad
+                {myPendingRequests.length > 0 && (
+                  <Badge variant="destructive" className="ml-1 text-xs px-1.5">
+                    {myPendingRequests.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="flex items-center gap-2">
+                <CalendarPlus className="w-4 h-4" />
+                Agendar con Otros
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Meetings Tab */}
+            <TabsContent value="meetings" className="space-y-4">
+              <Card className="bg-card/50 backdrop-blur-sm border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    Próximas Reuniones ({upcomingMeetings.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ) : upcomingMeetings.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No hay reuniones programadas</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {upcomingMeetings.map((meeting) => (
+                        <div
+                          key={meeting.id}
+                          className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-foreground">{meeting.title}</h3>
+                                <Badge
+                                  variant="outline"
+                                  className={STATUS_COLORS[meeting.status]}
+                                >
+                                  {MEETING_STATUS_LABELS[meeting.status]}
+                                </Badge>
+                              </div>
+                              {meeting.description && (
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {meeting.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  {format(new Date(meeting.scheduled_at), "PPP 'a las' p", { locale: es })}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  {meeting.duration_minutes} min
+                                </span>
+                                {meeting.location && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-4 h-4" />
+                                    {meeting.location}
+                                  </span>
+                                )}
+                                {meeting.meeting_url && (
+                                  <a
+                                    href={meeting.meeting_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-primary hover:underline"
+                                  >
+                                    <Video className="w-4 h-4" />
+                                    Unirse
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={meeting.status}
+                                onValueChange={(value) => handleStatusChange(meeting.id, value)}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover">
+                                  {Object.entries(MEETING_STATUS_LABELS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                      {label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(meeting.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Availability Tab */}
+            <TabsContent value="availability">
+              {user?.id && <CeoAvailabilityManager userId={user.id} />}
+            </TabsContent>
+
+            {/* Schedule with Others Tab */}
+            <TabsContent value="schedule" className="space-y-4">
+              <Card className="bg-card/50 backdrop-blur-sm border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarPlus className="w-5 h-5 text-primary" />
+                    Agendar Reunión con Otros
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {users.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <CalendarPlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No hay usuarios disponibles para agendar</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {users.filter(u => u.id !== user?.id).map((targetUser) => (
+                        <div
+                          key={targetUser.id}
+                          className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                              <span className="text-primary font-medium">
+                                {targetUser.full_name?.charAt(0) || targetUser.email?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {targetUser.full_name || 'Sin nombre'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{targetUser.email}</p>
+                            </div>
+                          </div>
+                          <BookMeetingDialog
+                            hostId={targetUser.id}
+                            hostName={targetUser.full_name || targetUser.email || 'Usuario'}
+                            requesterId={user?.id || ''}
+                            trigger={
+                              <Button variant="outline" size="sm" className="w-full">
+                                <CalendarPlus className="w-4 h-4 mr-2" />
+                                Solicitar Reunión
+                              </Button>
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
