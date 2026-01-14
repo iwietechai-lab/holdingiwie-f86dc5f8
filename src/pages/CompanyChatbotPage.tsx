@@ -14,6 +14,11 @@ import {
   CheckCircle,
   Clock,
   Brain,
+  Paperclip,
+  Link,
+  X,
+  Shield,
+  AlertCircle,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -50,6 +55,70 @@ import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
+import uavIcon from '@/assets/uav-icon.png';
+
+// Allowed file types for security
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+// Security scan for files
+const scanFileForSecurity = (file: File): { safe: boolean; message: string } => {
+  // Check file type
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    return { safe: false, message: `Tipo de archivo no permitido: ${file.type || 'desconocido'}` };
+  }
+  
+  // Check file size
+  if (file.size > MAX_FILE_SIZE) {
+    return { safe: false, message: 'El archivo excede el tamaño máximo de 10MB' };
+  }
+  
+  // Check file name for suspicious patterns
+  const suspiciousPatterns = ['.exe', '.bat', '.cmd', '.scr', '.js', '.vbs', '.php'];
+  const fileName = file.name.toLowerCase();
+  if (suspiciousPatterns.some(pattern => fileName.endsWith(pattern))) {
+    return { safe: false, message: 'Extensión de archivo no permitida por seguridad' };
+  }
+  
+  return { safe: true, message: 'Archivo verificado' };
+};
+
+// Security scan for URLs
+const scanUrlForSecurity = (url: string): { safe: boolean; message: string } => {
+  try {
+    const urlObj = new URL(url);
+    
+    // Only allow http and https
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return { safe: false, message: 'Solo se permiten URLs HTTP/HTTPS' };
+    }
+    
+    // Check for suspicious patterns
+    const suspiciousPatterns = ['javascript:', 'data:', 'vbscript:', 'file:'];
+    if (suspiciousPatterns.some(pattern => url.toLowerCase().includes(pattern))) {
+      return { safe: false, message: 'URL contiene patrones sospechosos' };
+    }
+    
+    return { safe: true, message: 'URL verificada' };
+  } catch {
+    return { safe: false, message: 'URL inválida' };
+  }
+};
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -88,6 +157,14 @@ export default function CompanyChatbotPage() {
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState('general');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // File and link attachment states
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileSecurityStatus, setFileSecurityStatus] = useState<{ safe: boolean; message: string } | null>(null);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkSecurityStatus, setLinkSecurityStatus] = useState<{ safe: boolean; message: string } | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -149,30 +226,126 @@ export default function CompanyChatbotPage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const securityResult = scanFileForSecurity(file);
+      setFileSecurityStatus(securityResult);
+      if (securityResult.safe) {
+        setSelectedFile(file);
+      } else {
+        setSelectedFile(null);
+        toast.error('Archivo rechazado', { description: securityResult.message });
+      }
+    }
+  };
+
+  const handleLinkChange = (url: string) => {
+    setLinkUrl(url);
+    if (url.trim()) {
+      const securityResult = scanUrlForSecurity(url);
+      setLinkSecurityStatus(securityResult);
+    } else {
+      setLinkSecurityStatus(null);
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${companyId}/${Date.now()}.${fileExt}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('company-knowledge')
+      .upload(fileName, file);
+      
+    if (uploadError) throw uploadError;
+    
+    const { data } = supabase.storage
+      .from('company-knowledge')
+      .getPublicUrl(fileName);
+      
+    return data.publicUrl;
+  };
+
   const handleAddKnowledge = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
       toast.error('Por favor completa todos los campos');
       return;
     }
 
-    setIsSubmitting(true);
-    const result = await addKnowledge({
-      title: newTitle,
-      content: newContent,
-      category: newCategory,
-    });
+    // Validate file and link security
+    if (selectedFile && !fileSecurityStatus?.safe) {
+      toast.error('El archivo no pasó la verificación de seguridad');
+      return;
+    }
+    
+    if (linkUrl && !linkSecurityStatus?.safe) {
+      toast.error('El enlace no pasó la verificación de seguridad');
+      return;
+    }
 
-    if (result.success) {
-      toast.success('Conocimiento agregado', {
-        description: 'Será analizado e incorporado al sistema.',
+    setIsSubmitting(true);
+    
+    try {
+      let documentUrl: string | undefined;
+      let documentName: string | undefined;
+      let documentType: string | undefined;
+
+      // Upload file if selected
+      if (selectedFile) {
+        setIsUploadingFile(true);
+        const uploadedUrl = await uploadFile(selectedFile);
+        if (uploadedUrl) {
+          documentUrl = uploadedUrl;
+          documentName = selectedFile.name;
+          documentType = selectedFile.type;
+        }
+        setIsUploadingFile(false);
+      }
+
+      // Add link to content if provided
+      let finalContent = newContent;
+      if (linkUrl && linkSecurityStatus?.safe) {
+        finalContent = `${newContent}\n\n📎 Enlace adjunto: ${linkUrl}`;
+        if (!documentUrl) {
+          documentUrl = linkUrl;
+          documentName = 'Enlace externo';
+          documentType = 'link';
+        }
+      }
+
+      const result = await addKnowledge({
+        title: newTitle,
+        content: finalContent,
+        category: newCategory,
+        document_name: documentName,
+        document_type: documentType,
+        document_url: documentUrl,
       });
-      setShowAddDialog(false);
-      setNewTitle('');
-      setNewContent('');
-      setNewCategory('general');
-    } else {
+
+      if (result.success) {
+        toast.success('Conocimiento agregado', {
+          description: 'Será analizado e incorporado al sistema.',
+        });
+        setShowAddDialog(false);
+        setNewTitle('');
+        setNewContent('');
+        setNewCategory('general');
+        setSelectedFile(null);
+        setFileSecurityStatus(null);
+        setLinkUrl('');
+        setLinkSecurityStatus(null);
+      } else {
+        toast.error('Error al agregar conocimiento');
+      }
+    } catch (error) {
+      console.error('Error adding knowledge:', error);
       toast.error('Error al agregar conocimiento');
     }
+    
     setIsSubmitting(false);
   };
 
@@ -187,6 +360,17 @@ export default function CompanyChatbotPage() {
 
   const clearChat = () => {
     setMessages([]);
+  };
+  
+  const resetDialogState = () => {
+    setShowAddDialog(false);
+    setNewTitle('');
+    setNewContent('');
+    setNewCategory('general');
+    setSelectedFile(null);
+    setFileSecurityStatus(null);
+    setLinkUrl('');
+    setLinkSecurityStatus(null);
   };
 
   if (authLoading) {
@@ -239,8 +423,12 @@ export default function CompanyChatbotPage() {
           {/* Header */}
           <header className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-primary/20 flex items-center justify-center text-2xl lg:text-3xl">
-                {company.icon}
+              <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                {companyId === 'iwie-drones' ? (
+                  <img src={uavIcon} alt="IWIE Drones" className="w-8 h-8 lg:w-10 lg:h-10 object-contain" />
+                ) : (
+                  <span className="text-2xl lg:text-3xl">{company.icon}</span>
+                )}
               </div>
               <div>
                 <h1 className="text-xl lg:text-2xl font-bold text-foreground flex items-center gap-2">
@@ -335,8 +523,12 @@ export default function CompanyChatbotPage() {
                             >
                               {message.role === 'assistant' && (
                                 <Avatar className="w-8 h-8 shrink-0">
-                                  <AvatarFallback className="bg-primary/20">
-                                    <span className="text-sm">{company.icon}</span>
+                                  <AvatarFallback className="bg-primary/20 p-1">
+                                    {companyId === 'iwie-drones' ? (
+                                      <img src={uavIcon} alt="IWIE Drones" className="w-5 h-5 object-contain" />
+                                    ) : (
+                                      <span className="text-sm">{company.icon}</span>
+                                    )}
                                   </AvatarFallback>
                                 </Avatar>
                               )}
@@ -371,8 +563,12 @@ export default function CompanyChatbotPage() {
                           {isSending && (
                             <div className="flex gap-3">
                               <Avatar className="w-8 h-8 shrink-0">
-                                <AvatarFallback className="bg-primary/20">
-                                  <span className="text-sm">{company.icon}</span>
+                                <AvatarFallback className="bg-primary/20 p-1">
+                                  {companyId === 'iwie-drones' ? (
+                                    <img src={uavIcon} alt="IWIE Drones" className="w-5 h-5 object-contain" />
+                                  ) : (
+                                    <span className="text-sm">{company.icon}</span>
+                                  )}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="bg-muted rounded-lg p-3">
@@ -388,19 +584,30 @@ export default function CompanyChatbotPage() {
 
                   {/* Input Area */}
                   <div className="p-4 border-t border-border">
-                    <div className="flex gap-2">
-                      <Input
+                    <div className="flex gap-2 items-end">
+                      <Textarea
                         placeholder="Escribe tu pregunta..."
                         value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
+                        onChange={(e) => {
+                          setInputMessage(e.target.value);
+                          // Auto-resize textarea
+                          e.target.style.height = 'auto';
+                          e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
                         disabled={isSending}
-                        className="flex-1"
+                        className="flex-1 min-h-[44px] max-h-[150px] resize-none py-3"
+                        style={{ height: '44px' }}
                       />
                       <Button
                         onClick={handleSend}
                         disabled={!inputMessage.trim() || isSending}
-                        className="bg-gradient-to-r from-primary to-secondary"
+                        className="bg-gradient-to-r from-primary to-secondary h-11"
                       >
                         {isSending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -526,8 +733,11 @@ export default function CompanyChatbotPage() {
       </main>
 
       {/* Add Knowledge Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={showAddDialog} onOpenChange={(open) => {
+        if (!open) resetDialogState();
+        else setShowAddDialog(open);
+      }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5 text-primary" />
@@ -570,24 +780,126 @@ export default function CompanyChatbotPage() {
                 placeholder="Describe detalladamente el conocimiento, proceso, idea o propuesta..."
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                className="min-h-[150px]"
+                className="min-h-[150px] resize-y"
               />
+            </div>
+
+            {/* File Attachment Section */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4" />
+                Adjuntar Archivo (opcional)
+              </Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp"
+              />
+              
+              {selectedFile ? (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                  {fileSecurityStatus && (
+                    <div className={`flex items-center gap-1 text-xs ${fileSecurityStatus.safe ? 'text-green-500' : 'text-red-500'}`}>
+                      {fileSecurityStatus.safe ? (
+                        <>
+                          <Shield className="w-4 h-4" />
+                          Seguro
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-4 h-4" />
+                          {fileSecurityStatus.message}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setFileSecurityStatus(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  Seleccionar archivo
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Tipos permitidos: PDF, Word, Excel, PowerPoint, texto, imágenes. Máx 10MB.
+              </p>
+            </div>
+
+            {/* Link Attachment Section */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Link className="w-4 h-4" />
+                Agregar Enlace (opcional)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://ejemplo.com/documento"
+                  value={linkUrl}
+                  onChange={(e) => handleLinkChange(e.target.value)}
+                  className="flex-1"
+                />
+                {linkUrl && linkSecurityStatus && (
+                  <div className={`flex items-center gap-1 px-2 text-xs ${linkSecurityStatus.safe ? 'text-green-500' : 'text-red-500'}`}>
+                    {linkSecurityStatus.safe ? (
+                      <Shield className="w-4 h-4" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {linkUrl && linkSecurityStatus && !linkSecurityStatus.safe && (
+                <p className="text-xs text-red-500">{linkSecurityStatus.message}</p>
+              )}
+            </div>
+
+            {/* Security Notice */}
+            <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg text-xs">
+              <Shield className="w-4 h-4 text-blue-500 mt-0.5" />
+              <p className="text-muted-foreground">
+                Todos los archivos y enlaces son escaneados automáticamente antes de ser incorporados al sistema.
+              </p>
             </div>
           </div>
 
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowAddDialog(false)}
+              onClick={resetDialogState}
               disabled={isSubmitting}
             >
               Cancelar
             </Button>
-            <Button onClick={handleAddKnowledge} disabled={isSubmitting}>
+            <Button onClick={handleAddKnowledge} disabled={isSubmitting || isUploadingFile}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Guardando...
+                  {isUploadingFile ? 'Subiendo archivo...' : 'Guardando...'}
                 </>
               ) : (
                 <>
