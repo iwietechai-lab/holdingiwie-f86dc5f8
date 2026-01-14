@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNav } from '@/components/MobileNav';
 import { SpaceBackground } from '@/components/SpaceBackground';
+import { getCompanyById } from '@/data/companies';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,10 @@ export const ResponsiveLayout = ({
   const selectedCompany = externalSelectedCompany !== undefined ? externalSelectedCompany : internalSelectedCompany;
   const setSelectedCompany = externalOnSelectCompany || setInternalSelectedCompany;
 
+  // Get company name for header
+  const company = selectedCompany ? getCompanyById(selectedCompany) : null;
+  const headerTitle = company ? company.name : 'IWIE Holding';
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {showBackground && <SpaceBackground />}
@@ -40,7 +45,10 @@ export const ResponsiveLayout = ({
           selectedCompany={selectedCompany}
           onSelectCompany={setSelectedCompany}
         />
-        <h1 className="text-lg font-bold text-foreground neon-text">IWIE Holding</h1>
+        <h1 className="text-lg font-bold text-foreground neon-text flex items-center gap-2">
+          {company && <span>{company.icon}</span>}
+          {headerTitle}
+        </h1>
         <div className="w-10" /> {/* Spacer for centering */}
       </header>
 
