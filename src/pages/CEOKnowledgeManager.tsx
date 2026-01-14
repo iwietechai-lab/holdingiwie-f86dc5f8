@@ -60,13 +60,26 @@ interface Company {
   color?: string;
 }
 
+type AccessLevel = 'global_holding' | 'empresa' | 'proyecto' | 'desarrollo' | 'confidencial';
+
 interface UserAccess {
   id: string;
   user_id: string;
   company_id: string;
+  access_level: AccessLevel;
+  allowed_categories: string[];
+  notes?: string;
   user_name?: string;
   user_email?: string;
 }
+
+const ACCESS_LEVELS = [
+  { value: 'global_holding' as AccessLevel, label: 'Global Holding', description: 'Acceso a todo el conocimiento de todas las empresas' },
+  { value: 'empresa' as AccessLevel, label: 'Empresa', description: 'Acceso a todo el conocimiento de la empresa seleccionada' },
+  { value: 'proyecto' as AccessLevel, label: 'Proyecto', description: 'Acceso limitado a información de proyectos' },
+  { value: 'desarrollo' as AccessLevel, label: 'Desarrollo', description: 'Acceso a información de desarrollo técnico' },
+  { value: 'confidencial' as AccessLevel, label: 'Confidencial', description: 'Acceso a información confidencial estratégica' },
+];
 
 interface UserProfile {
   id: string;
@@ -123,6 +136,19 @@ export default function CEOKnowledgeManager() {
   const [chatInput, setChatInput] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [selectedEntryForAnalysis, setSelectedEntryForAnalysis] = useState<KnowledgeEntry | null>(null);
+  
+  // Access grant dialog state
+  const [showGrantAccessDialog, setShowGrantAccessDialog] = useState(false);
+  const [selectedUserForAccess, setSelectedUserForAccess] = useState<UserProfile | null>(null);
+  const [accessConfig, setAccessConfig] = useState<{
+    access_level: AccessLevel;
+    allowed_categories: string[];
+    notes: string;
+  }>({
+    access_level: 'empresa',
+    allowed_categories: ['informacion'],
+    notes: '',
+  });
 
   useEffect(() => {
     if (isCheckingRole) return;
@@ -353,24 +379,50 @@ export default function CEOKnowledgeManager() {
     }
   };
 
-  const handleGrantAccess = async (userId: string) => {
+  const openGrantAccessDialog = (user: UserProfile) => {
+    setSelectedUserForAccess(user);
+    setAccessConfig({
+      access_level: 'empresa',
+      allowed_categories: ['informacion'],
+      notes: '',
+    });
+    setShowGrantAccessDialog(true);
+  };
+
+  const handleGrantAccess = async () => {
+    if (!selectedUserForAccess) return;
+    
     try {
       const { error } = await supabase
         .from('ceo_knowledge_access')
         .insert({
-          user_id: userId,
+          user_id: selectedUserForAccess.id,
           company_id: selectedCompany,
           granted_by: profile?.id,
+          access_level: accessConfig.access_level,
+          allowed_categories: accessConfig.allowed_categories,
+          notes: accessConfig.notes || null,
         });
 
       if (error) throw error;
 
-      toast.success('Acceso concedido');
+      toast.success(`Acceso concedido a ${selectedUserForAccess.full_name || selectedUserForAccess.email}`);
+      setShowGrantAccessDialog(false);
+      setSelectedUserForAccess(null);
       loadUserAccess();
     } catch (error) {
       console.error('Error granting access:', error);
       toast.error('Error al conceder acceso');
     }
+  };
+
+  const toggleCategory = (category: string) => {
+    setAccessConfig(prev => ({
+      ...prev,
+      allowed_categories: prev.allowed_categories.includes(category)
+        ? prev.allowed_categories.filter(c => c !== category)
+        : [...prev.allowed_categories, category],
+    }));
   };
 
   const handleRevokeAccess = async (accessId: string) => {
@@ -931,32 +983,55 @@ export default function CEOKnowledgeManager() {
                     Usuarios con Acceso
                   </CardTitle>
                   <CardDescription>
-                    Estos usuarios pueden consultar el conocimiento de {getCompanyName(selectedCompany)} aunque no pertenezcan a esta empresa
+                    Estos usuarios pueden consultar el conocimiento de {getCompanyName(selectedCompany)} según su nivel de acceso
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {userAccess.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No hay usuarios con acceso especial. Los usuarios de {getCompanyName(selectedCompany)} tienen acceso automático.
+                      No hay usuarios con acceso especial. Los usuarios de {getCompanyName(selectedCompany)} tienen acceso automático al contenido no confidencial.
                     </p>
                   ) : (
-                    <div className="space-y-2">
-                      {userAccess.map((access) => (
-                        <div key={access.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                          <div>
-                            <p className="font-medium">{access.user_name}</p>
-                            <p className="text-sm text-muted-foreground">{access.user_email}</p>
+                    <div className="space-y-3">
+                      {userAccess.map((access) => {
+                        const levelInfo = ACCESS_LEVELS.find(l => l.value === access.access_level);
+                        return (
+                          <div key={access.id} className="flex items-start justify-between p-4 rounded-lg bg-muted/30">
+                            <div className="space-y-2">
+                              <div>
+                                <p className="font-medium">{access.user_name}</p>
+                                <p className="text-sm text-muted-foreground">{access.user_email}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Badge variant="secondary">
+                                  {levelInfo?.label || access.access_level}
+                                </Badge>
+                                {access.access_level !== 'global_holding' && access.access_level !== 'empresa' && (
+                                  access.allowed_categories?.map((cat: string) => {
+                                    const catInfo = CATEGORIES.find(c => c.value === cat);
+                                    return (
+                                      <Badge key={cat} variant="outline" className="text-xs">
+                                        {catInfo?.label || cat}
+                                      </Badge>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              {access.notes && (
+                                <p className="text-xs text-muted-foreground italic">{access.notes}</p>
+                              )}
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleRevokeAccess(access.id)}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Revocar
+                            </Button>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleRevokeAccess(access.id)}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Revocar
-                          </Button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -981,7 +1056,7 @@ export default function CEOKnowledgeManager() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleGrantAccess(user.id)}
+                            onClick={() => openGrantAccessDialog(user)}
                           >
                             <Plus className="w-4 h-4 mr-1" />
                             Conceder
@@ -997,6 +1072,122 @@ export default function CEOKnowledgeManager() {
                   </ScrollArea>
                 </CardContent>
               </Card>
+
+              {/* Grant Access Dialog */}
+              <Dialog open={showGrantAccessDialog} onOpenChange={setShowGrantAccessDialog}>
+                <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Configurar Acceso</DialogTitle>
+                    <DialogDescription>
+                      Define el nivel de acceso y las categorías que puede consultar {selectedUserForAccess?.full_name || selectedUserForAccess?.email}
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-6 py-4">
+                    {/* Access Level Selection */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Nivel de Acceso</Label>
+                      <div className="space-y-2">
+                        {ACCESS_LEVELS.map((level) => (
+                          <div 
+                            key={level.value}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              accessConfig.access_level === level.value 
+                                ? 'border-primary bg-primary/10' 
+                                : 'border-border hover:bg-muted/50'
+                            }`}
+                            onClick={() => setAccessConfig(prev => ({ ...prev, access_level: level.value }))}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                accessConfig.access_level === level.value 
+                                  ? 'border-primary' 
+                                  : 'border-muted-foreground'
+                              }`}>
+                                {accessConfig.access_level === level.value && (
+                                  <div className="w-2 h-2 rounded-full bg-primary" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{level.label}</p>
+                                <p className="text-xs text-muted-foreground">{level.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Category Filters - Only show for proyecto, desarrollo, confidencial */}
+                    {['proyecto', 'desarrollo', 'confidencial'].includes(accessConfig.access_level) && (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Categorías Permitidas</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Selecciona qué tipo de información puede consultar este usuario
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {CATEGORIES.map((cat) => {
+                            const isSelected = accessConfig.allowed_categories.includes(cat.value);
+                            const Icon = cat.icon;
+                            return (
+                              <div
+                                key={cat.value}
+                                className={`p-3 rounded-lg border cursor-pointer transition-colors flex items-center gap-2 ${
+                                  isSelected 
+                                    ? 'border-primary bg-primary/10' 
+                                    : 'border-border hover:bg-muted/50'
+                                }`}
+                                onClick={() => toggleCategory(cat.value)}
+                              >
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                                  isSelected ? 'bg-primary border-primary' : 'border-muted-foreground'
+                                }`}>
+                                  {isSelected && (
+                                    <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <Icon className={`w-4 h-4 ${cat.color}`} />
+                                <span className="text-sm">{cat.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {accessConfig.allowed_categories.length === 0 && (
+                          <p className="text-xs text-destructive">Debes seleccionar al menos una categoría</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Notas (opcional)</Label>
+                      <Textarea
+                        value={accessConfig.notes}
+                        onChange={(e) => setAccessConfig(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Razón del acceso, limitaciones, etc."
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowGrantAccessDialog(false)}>
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={handleGrantAccess}
+                      disabled={
+                        ['proyecto', 'desarrollo', 'confidencial'].includes(accessConfig.access_level) && 
+                        accessConfig.allowed_categories.length === 0
+                      }
+                    >
+                      Conceder Acceso
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           </Tabs>
         )}
