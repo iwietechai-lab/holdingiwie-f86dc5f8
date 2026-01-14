@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 
 export interface UserProfile {
   id: string;
@@ -41,27 +40,39 @@ export function useUserManagement() {
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+
+  // Check superadmin status first
+  const checkSuperadminStatus = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data, error: rpcError } = await supabase.rpc('is_superadmin');
+      
+      if (rpcError) {
+        console.error('Error checking superadmin:', rpcError);
+        return false;
+      }
+      
+      return data === true;
+    } catch (err) {
+      console.error('Error in superadmin check:', err);
+      return false;
+    }
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Get current user to verify superadmin status
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      // Check superadmin status using SECURITY DEFINER function
+      const superadminStatus = await checkSuperadminStatus();
+      setIsSuperadmin(superadminStatus);
       
-      if (!currentUser) {
-        throw new Error('No authenticated user');
-      }
-
-      // Check by UUID for hardcoded superadmin
-      const isHardcodedSuperadmin = currentUser.id === SUPERADMIN_USER_ID;
-      
-      if (!isHardcodedSuperadmin) {
+      if (!superadminStatus) {
         throw new Error('No tienes permisos para ver usuarios');
       }
 
-      // Fetch profiles
+      // Fetch profiles - RLS will allow superadmin to see all
       const { data: profiles, error: profilesError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -72,7 +83,14 @@ export function useUserManagement() {
         throw profilesError;
       }
 
-      // Fetch access logs
+      // Fetch user roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+      
+      const userRoles = rolesError ? [] : (rolesData || []);
+
+      // Fetch access logs - RLS will allow superadmin to see all
       const { data: logsData, error: logsError } = await supabase
         .from('access_logs')
         .select('*')
@@ -83,8 +101,17 @@ export function useUserManagement() {
 
       // Combine data
       const usersWithDetails: UserWithDetails[] = (profiles || []).map((profile) => {
+        const roles = userRoles
+          .filter((r: any) => r.user_id === profile.id)
+          .map((r: any) => ({
+            id: r.id,
+            user_id: r.user_id,
+            role: r.role,
+          }));
+        
         const userLogs = accessLogs.filter((l) => l.user_id === profile.id);
         const lastAccess = userLogs.length > 0 ? userLogs[0].timestampt : null;
+        const hasSuperadminRole = roles.some((r: UserRole) => r.role === 'superadmin');
 
         return {
           id: profile.id,
@@ -94,8 +121,8 @@ export function useUserManagement() {
           company_id: profile.company_id,
           avatar_url: null,
           created_at: profile.created_at,
-          has_full_access: profile.id === SUPERADMIN_USER_ID,
-          roles: [],
+          has_full_access: hasSuperadminRole,
+          roles: roles,
           accessLogs: userLogs as AccessLog[],
           lastAccess,
         };
@@ -108,21 +135,32 @@ export function useUserManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [checkSuperadminStatus]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
   const addRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     try {
-      // Update role in user_profiles
+      // Insert role into user_roles table
       const { error } = await supabase
+        .from('user_roles')
+        .insert({ user_id: userId, role })
+        .select();
+
+      if (error) throw error;
+      
+      // Also update role in user_profiles for compatibility
+      await supabase
         .from('user_profiles')
         .update({ role })
         .eq('id', userId);
 
-      if (error) throw error;
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -132,13 +170,25 @@ export function useUserManagement() {
   };
 
   const removeRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     try {
       const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('role', role);
+
+      if (error) throw error;
+      
+      // Update user_profiles role to 'user'
+      await supabase
         .from('user_profiles')
         .update({ role: 'user' })
         .eq('id', userId);
 
-      if (error) throw error;
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -148,6 +198,10 @@ export function useUserManagement() {
   };
 
   const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     try {
       // Remove has_full_access from updates if it exists - it's computed
       const { has_full_access, ...profileUpdates } = updates as any;
@@ -174,6 +228,10 @@ export function useUserManagement() {
       company_id: string;
     }
   ) => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     try {
       const { error } = await supabase
         .from('user_profiles')
@@ -195,6 +253,10 @@ export function useUserManagement() {
   };
 
   const deleteUser = async (userId: string) => {
+    if (!isSuperadmin) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     try {
       // Delete profile
       const { error } = await supabase
@@ -232,6 +294,7 @@ export function useUserManagement() {
     users,
     isLoading,
     error,
+    isSuperadmin,
     fetchUsers,
     addRole,
     removeRole,

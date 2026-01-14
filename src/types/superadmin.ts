@@ -105,6 +105,7 @@ export interface SuperadminUser extends SuperadminUserProfile {
   department?: DbDepartment | null;
 }
 
-// The superadmin user ID - only this user can be superadmin
-export const SUPERADMIN_USER_ID = 'cbd3f2f3-b5c1-4346-b925-ba1a7888bae8';
+// Superadmin is now determined by user_roles table, not hardcoded UUID
+// This is kept for backward compatibility but should not be used for auth checks
+export const SUPERADMIN_USER_ID = 'e5251256-2f23-4613-8f07-22b149fbad72';
 export const SUPERADMIN_EMAIL = 'mauricio@iwie.space';
