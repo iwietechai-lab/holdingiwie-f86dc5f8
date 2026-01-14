@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import CompanyDashboard from "./pages/CompanyDashboard";
 import Chatbot from "./pages/Chatbot";
 import GestorDocumentos from "./pages/GestorDocumentos";
 import AdminFaceSetup from "./pages/AdminFaceSetup";
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/empresa" element={<ProtectedRoute><CompanyDashboard /></ProtectedRoute>} />
           <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
           <Route path="/ceo-chatbot" element={<ProtectedRoute><CEOChatbotPage /></ProtectedRoute>} />
           <Route path="/ceo-knowledge" element={<ProtectedRoute><CEOKnowledgeManager /></ProtectedRoute>} />

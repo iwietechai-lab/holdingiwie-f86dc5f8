@@ -456,6 +456,103 @@ export type Database = {
         }
         Relationships: []
       }
+      company_metrics: {
+        Row: {
+          active_users: number | null
+          company_id: string
+          completed_tasks: number | null
+          created_at: string | null
+          id: string
+          metric_date: string
+          monthly_revenue: number | null
+          pending_tasks: number | null
+          total_documents: number | null
+          total_meetings: number | null
+          total_tasks: number | null
+          total_tickets: number | null
+        }
+        Insert: {
+          active_users?: number | null
+          company_id: string
+          completed_tasks?: number | null
+          created_at?: string | null
+          id?: string
+          metric_date?: string
+          monthly_revenue?: number | null
+          pending_tasks?: number | null
+          total_documents?: number | null
+          total_meetings?: number | null
+          total_tasks?: number | null
+          total_tickets?: number | null
+        }
+        Update: {
+          active_users?: number | null
+          company_id?: string
+          completed_tasks?: number | null
+          created_at?: string | null
+          id?: string
+          metric_date?: string
+          monthly_revenue?: number | null
+          pending_tasks?: number | null
+          total_documents?: number | null
+          total_meetings?: number | null
+          total_tasks?: number | null
+          total_tickets?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_metrics_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_sales: {
+        Row: {
+          amount: number
+          category: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          sale_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          sale_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          sale_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           company_id: string | null
