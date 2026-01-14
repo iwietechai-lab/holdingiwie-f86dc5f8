@@ -50,10 +50,71 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      departments: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           company_id: string | null
           created_at: string | null
+          dashboard_visibility: Json | null
+          department_id: string | null
           email: string | null
           facial_embedding: Json | null
           full_name: string | null
@@ -65,6 +126,8 @@ export type Database = {
         Insert: {
           company_id?: string | null
           created_at?: string | null
+          dashboard_visibility?: Json | null
+          department_id?: string | null
           email?: string | null
           facial_embedding?: Json | null
           full_name?: string | null
@@ -76,6 +139,8 @@ export type Database = {
         Update: {
           company_id?: string | null
           created_at?: string | null
+          dashboard_visibility?: Json | null
+          department_id?: string | null
           email?: string | null
           facial_embedding?: Json | null
           full_name?: string | null
@@ -84,7 +149,15 @@ export type Database = {
           role?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
