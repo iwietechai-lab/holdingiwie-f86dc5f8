@@ -10,7 +10,9 @@ import {
   PieChart,
   Activity,
   LogOut,
-  Menu
+  Menu,
+  Ticket,
+  Calendar
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNav } from '@/components/MobileNav';
@@ -19,6 +21,7 @@ import { CEOChatbot } from '@/components/CEOChatbot';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { companies, getCompanyById } from '@/data/companies';
 import { hasFullAccess } from '@/config/allowedEmails';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +38,7 @@ import {
   Bar,
 } from 'recharts';
 
-// Mock data for charts
+// Mock data for revenue chart (will be connected later when financial data is available)
 const revenueData = [
   { month: 'Ene', value: 4000 },
   { month: 'Feb', value: 3000 },
@@ -46,17 +49,14 @@ const revenueData = [
   { month: 'Jul', value: 7000 },
 ];
 
-const tasksData = [
-  { name: 'Completadas', value: 85 },
-  { name: 'En progreso', value: 45 },
-  { name: 'Pendientes', value: 23 },
-];
-
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, isLoading, logout } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
+  
+  // Fetch real stats from database
+  const { stats, tasksChartData, isLoading: statsLoading } = useDashboardStats(selectedCompany);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -201,30 +201,30 @@ export const Dashboard = () => {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             <KPICard
-              title="Ingresos Totales"
-              value="$2.4M"
-              change={12.5}
-              icon={DollarSign}
-              color="green"
-            />
-            <KPICard
-              title="Rentabilidad"
-              value="34.2%"
-              change={5.2}
-              icon={TrendingUp}
-              color="purple"
-            />
-            <KPICard
               title="Empleados Activos"
-              value={selectedCompany ? "48" : "384"}
-              change={8.1}
+              value={statsLoading ? "..." : stats.totalEmployees.toString()}
+              change={0}
               icon={Users}
               color="blue"
             />
             <KPICard
+              title="Tickets Totales"
+              value={statsLoading ? "..." : stats.totalTickets.toString()}
+              change={0}
+              icon={Ticket}
+              color="purple"
+            />
+            <KPICard
+              title="Reuniones"
+              value={statsLoading ? "..." : stats.totalMeetings.toString()}
+              change={0}
+              icon={Calendar}
+              color="green"
+            />
+            <KPICard
               title="Tareas Completadas"
-              value="85%"
-              change={-2.3}
+              value={statsLoading ? "..." : `${stats.ticketCompletionRate}%`}
+              change={0}
               icon={CheckCircle2}
               color="cyan"
             />
@@ -291,7 +291,7 @@ export const Dashboard = () => {
               <CardContent className="p-2 md:p-6 pt-0">
                 <div className="h-[200px] md:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={tasksData} layout="vertical">
+                    <BarChart data={tasksChartData.length > 0 ? tasksChartData : [{ name: 'Sin datos', value: 0 }]} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 25%, 20%)" />
                       <XAxis 
                         type="number"
@@ -372,37 +372,37 @@ export const Dashboard = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
+                <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8 text-green-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.completedTickets}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Tickets resueltos</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
                 <Zap className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">156</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Proyectos activos</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.inProgressTickets}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">En progreso</p>
                 </div>
               </div>
             </Card>
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <Target className="w-6 h-6 md:w-8 md:h-8 text-green-400 shrink-0" />
+                <Target className="w-6 h-6 md:w-8 md:h-8 text-orange-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">94%</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Objetivos cumplidos</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.openTickets}</p>
+                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Tickets abiertos</p>
                 </div>
               </div>
             </Card>
             <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <Users className="w-6 h-6 md:w-8 md:h-8 text-blue-400 shrink-0" />
+                <PieChart className="w-6 h-6 md:w-8 md:h-8 text-blue-400 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">10</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.totalCompanies}</p>
                   <p className="text-[10px] md:text-xs text-muted-foreground truncate">Empresas</p>
-                </div>
-              </div>
-            </Card>
-            <Card className="bg-card/30 backdrop-blur-sm border-border p-3 md:p-4">
-              <div className="flex items-center gap-2 md:gap-3">
-                <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-purple-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-lg md:text-2xl font-bold text-foreground">+27%</p>
-                  <p className="text-[10px] md:text-xs text-muted-foreground truncate">Crecimiento anual</p>
                 </div>
               </div>
             </Card>
