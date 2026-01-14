@@ -384,6 +384,7 @@ export const tourConfigs: Record<string, TourStep[]> = {
 
 const TOUR_STORAGE_KEY = 'iwie_tours_completed';
 const TOUR_TRIGGER_KEY = 'iwie_tour_trigger';
+const PENDING_TOUR_KEY = 'iwie_pending_tour';
 
 interface TourContextType {
   isActive: boolean;
@@ -422,6 +423,7 @@ export const TourProvider = ({ children }: TourProviderProps) => {
   const [completedTours, setCompletedTours] = useState<string[]>([]);
   const [shouldTrigger, setShouldTrigger] = useState(false);
   const hasInitialized = useRef(false);
+  const hasPendingTourProcessed = useRef(false);
 
   // Get current page key from route
   const getCurrentPageKey = useCallback((): string => {
@@ -441,6 +443,34 @@ export const TourProvider = ({ children }: TourProviderProps) => {
       setShouldTrigger(true);
     }
   }, []);
+
+  // Check for pending tour from navigation (from TourHelpButton)
+  useEffect(() => {
+    const pendingTour = sessionStorage.getItem(PENDING_TOUR_KEY);
+    const currentPage = getCurrentPageKey();
+    
+    console.log('TourProvider - Checking pending tour:', pendingTour, 'Current page:', currentPage);
+    
+    if (pendingTour && pendingTour === currentPage && !hasPendingTourProcessed.current) {
+      hasPendingTourProcessed.current = true;
+      console.log('TourProvider - Found pending tour, starting:', pendingTour);
+      
+      // Limpiar el tour pendiente
+      sessionStorage.removeItem(PENDING_TOUR_KEY);
+      
+      // Iniciar el tour con un pequeño delay para que la página se renderice
+      setTimeout(() => {
+        setCurrentStepIndex(0);
+        setIsActive(true);
+        console.log('TourProvider - Pending tour started');
+      }, 500);
+    }
+  }, [getCurrentPageKey, location.pathname]);
+
+  // Reset pending tour flag when route changes
+  useEffect(() => {
+    hasPendingTourProcessed.current = false;
+  }, [location.pathname]);
 
   // Get current tour steps
   const getCurrentTour = useCallback((): TourStep[] => {
