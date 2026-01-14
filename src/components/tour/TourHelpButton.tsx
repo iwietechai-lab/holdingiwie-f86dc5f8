@@ -16,8 +16,12 @@ export const TourHelpButton = () => {
   }));
 
   const handleStartCurrentTour = () => {
-    startTour();
+    console.log('Button clicked - starting tour');
     setIsOpen(false);
+    // Small delay to ensure panel closes first
+    setTimeout(() => {
+      startTour();
+    }, 200);
   };
 
   const handleStartSpecificTour = (tourKey: string) => {

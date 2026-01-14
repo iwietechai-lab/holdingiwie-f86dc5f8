@@ -423,9 +423,15 @@ export const useTour = () => {
 
   const startTour = useCallback((pageKey?: string) => {
     const key = pageKey || getCurrentPageKey();
+    console.log('Starting tour for:', key, 'Available:', !!tourConfigs[key]);
     if (tourConfigs[key]) {
+      // Reset the initialization flag to allow manual restart
+      hasInitialized.current = false;
       setCurrentStepIndex(0);
-      setIsActive(true);
+      // Use setTimeout to ensure state updates properly
+      setTimeout(() => {
+        setIsActive(true);
+      }, 100);
       // Clear the trigger flag
       sessionStorage.removeItem(TOUR_TRIGGER_KEY);
     }
