@@ -11,15 +11,17 @@ import {
   Calendar,
   Ticket,
   CalendarDays,
+  Brain,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { useChatbot } from '@/hooks/useChatbot';
+import { useCEOChatbot } from '@/hooks/useCEOChatbot';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTickets } from '@/hooks/useTickets';
 import { useAvailabilitySlots } from '@/hooks/useAvailabilitySlots';
 import { useMeetingRequests } from '@/hooks/useMeetingRequests';
+import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,11 +42,12 @@ const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Vierne
 export default function CEOChatbotPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading, profile } = useSupabaseAuth();
-  const { chatbot, messages, isLoading, isSending, sendMessage, clearConversation } = useChatbot();
+  const { messages, isLoading, isSending, sendMessage, clearConversation } = useCEOChatbot();
   const { createMeeting } = useMeetings();
   const { createTicket } = useTickets();
   const { slots } = useAvailabilitySlots();
   const { createRequest } = useMeetingRequests();
+  const { isSuperadmin } = useSuperadmin();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
@@ -208,20 +211,33 @@ export default function CEOChatbotPage() {
                   Asistente del CEO
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  {chatbot?.name || 'Chatbot CEO'}
+                  Chatbot CEO para {profile?.company_id ? profile.company_id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'tu empresa'}
                 </p>
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearConversation}
-              className="text-muted-foreground"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Limpiar chat
-            </Button>
+            <div className="flex items-center gap-2">
+              {isSuperadmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/ceo-knowledge')}
+                  className="text-primary border-primary/30 hover:bg-primary/10"
+                >
+                  <Brain className="w-4 h-4 mr-2" />
+                  Gestionar Conocimiento
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearConversation}
+                className="text-muted-foreground"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Limpiar chat
+              </Button>
+            </div>
           </header>
 
           {/* Chat Area */}
