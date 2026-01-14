@@ -21,10 +21,12 @@ import {
   MessageSquare,
   ClipboardList,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { companies } from '@/data/companies';
+import { companies, getCompanyById } from '@/data/companies';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -48,7 +50,7 @@ const companyMenuItems = [
   { icon: MessageSquare, label: 'Chat Interno', path: '/mensajeria', queryParam: true },
   { icon: ClipboardList, label: 'Tareas', path: '/tareas', queryParam: true },
   { icon: Ticket, label: 'Tickets', path: '/tickets', queryParam: true },
-  { icon: Bot, label: 'Chatbot', path: '/ceo-chatbot', queryParam: true },
+  { icon: Bot, label: 'Chatbot Empresa', path: '/chatbot-empresa', queryParam: true },
   { icon: Calendar, label: 'Reuniones', path: '/reuniones', queryParam: true },
 ];
 
@@ -61,8 +63,21 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
   const [expandedCompanies, setExpandedCompanies] = useState<string[]>([]);
   
+  // Active company mode - when a company is selected, others are hidden
+  const [activeCompanyMode, setActiveCompanyMode] = useState<string | null>(null);
+  
   // Check if current user is superadmin by UUID
   const isSuperadmin = user?.id === SUPERADMIN_USER_ID;
+
+  // Sync active company mode with URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const empresaParam = params.get('empresa');
+    if (empresaParam && !activeCompanyMode) {
+      setActiveCompanyMode(empresaParam);
+      setExpandedCompanies([empresaParam]);
+    }
+  }, [location.search]);
 
   const handleLogout = async () => {
     await logout();
@@ -84,6 +99,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
   const handleCompanyMenuClick = (companyId: string, menuItem: typeof companyMenuItems[0]) => {
     onSelectCompany(companyId);
+    setActiveCompanyMode(companyId);
     if (menuItem.queryParam) {
       const params = new URLSearchParams();
       params.set('empresa', companyId);
@@ -94,6 +110,20 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     } else {
       navigate(menuItem.path);
     }
+  };
+
+  const handleEnterCompanyMode = (companyId: string) => {
+    setActiveCompanyMode(companyId);
+    setExpandedCompanies([companyId]);
+    onSelectCompany(companyId);
+    navigate(`/empresa?empresa=${companyId}`);
+  };
+
+  const handleExitCompanyMode = () => {
+    setActiveCompanyMode(null);
+    setExpandedCompanies([]);
+    onSelectCompany(null);
+    navigate('/dashboard');
   };
 
   const globalMenuItems = [
@@ -110,6 +140,9 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     }] : []),
   ];
 
+  // Get the active company data
+  const activeCompany = activeCompanyMode ? getCompanyById(activeCompanyMode) : null;
+
   return (
     <>
       <aside 
@@ -122,12 +155,16 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center neon-glow shrink-0">
-              <Rocket className="w-6 h-6 text-primary" />
+              {activeCompanyMode && activeCompany ? (
+                <span className="text-xl">{activeCompany.icon}</span>
+              ) : (
+                <Rocket className="w-6 h-6 text-primary" />
+              )}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden flex-1">
                 <h1 className="font-bold text-lg text-sidebar-foreground neon-text truncate">
-                  IWIE Holding
+                  {activeCompanyMode && activeCompany ? activeCompany.name : 'IWIE Holding'}
                 </h1>
                 <p className="text-xs text-muted-foreground truncate">
                   {profile?.full_name || 'Usuario'} • {profile?.role || 'Usuario'}
@@ -149,146 +186,179 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Global menu items */}
-          <div className="space-y-2">
-            {!isCollapsed && (
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
-                Menú Principal
-              </p>
-            )}
-            {globalMenuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.path ? location.pathname === item.path : false;
-              
-              const handleClick = () => {
-                if (item.action === 'dev') {
-                  handleDevClick(item.label);
-                } else if (item.action === 'navigate' && item.path) {
-                  navigate(item.path);
-                }
-              };
-              
-              const button = (
-                <button
-                  key={item.label}
-                  onClick={handleClick}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                    isActive 
-                      ? "bg-primary/20 text-primary neon-glow-purple" 
-                      : "text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
+          {/* Exit company mode button */}
+          {activeCompanyMode && !isCollapsed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExitCompanyMode}
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Salir al Menú Principal
+            </Button>
+          )}
+
+          {activeCompanyMode && isCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExitCompanyMode}
+                  className="w-full"
                 >
-                  <Icon className="w-5 h-5 shrink-0" />
-                  {!isCollapsed && <span className="truncate">{item.label}</span>}
-                </button>
-              );
+                  <X className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Salir al Menú Principal</TooltipContent>
+            </Tooltip>
+          )}
 
-              if (isCollapsed) {
-                return (
-                  <Tooltip key={item.label}>
-                    <TooltipTrigger asChild>{button}</TooltipTrigger>
-                    <TooltipContent side="right">{item.label}</TooltipContent>
-                  </Tooltip>
+          {/* Show global menu only when NOT in company mode */}
+          {!activeCompanyMode && (
+            <div className="space-y-2">
+              {!isCollapsed && (
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
+                  Menú Principal
+                </p>
+              )}
+              {globalMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.path ? location.pathname === item.path : false;
+                
+                const handleClick = () => {
+                  if (item.action === 'dev') {
+                    handleDevClick(item.label);
+                  } else if (item.action === 'navigate' && item.path) {
+                    navigate(item.path);
+                  }
+                };
+                
+                const button = (
+                  <button
+                    key={item.label}
+                    onClick={handleClick}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                      isActive 
+                        ? "bg-primary/20 text-primary neon-glow-purple" 
+                        : "text-sidebar-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                  </button>
                 );
-              }
 
-              return <div key={item.label}>{button}</div>;
-            })}
-          </div>
+                if (isCollapsed) {
+                  return (
+                    <Tooltip key={item.label}>
+                      <TooltipTrigger asChild>{button}</TooltipTrigger>
+                      <TooltipContent side="right">{item.label}</TooltipContent>
+                    </Tooltip>
+                  );
+                }
 
-          {/* Companies list with expandable menus */}
+                return <div key={item.label}>{button}</div>;
+              })}
+            </div>
+          )}
+
+          {/* Companies list or active company menu */}
           <div className="space-y-2">
-            {!isCollapsed && (
+            {!isCollapsed && !activeCompanyMode && (
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
                 Empresas
               </p>
             )}
             
-            {/* Individual companies with submenus */}
-            {companies.map((company) => {
-              const isExpanded = expandedCompanies.includes(company.id);
-              const isSelected = selectedCompany === company.id;
-              
-              if (isCollapsed) {
-                // Collapsed view - just show company icon with tooltip
-                return (
-                  <Tooltip key={company.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          onSelectCompany(company.id);
-                          navigate(`/empresa?empresa=${company.id}`);
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                          isSelected 
-                            ? "bg-primary/20 text-primary" 
-                            : "text-sidebar-foreground hover:bg-sidebar-accent"
-                        )}
-                      >
-                        <span className="text-xl shrink-0">{company.icon}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{company.name}</TooltipContent>
-                  </Tooltip>
-                );
-              }
-
-              // Expanded view with collapsible submenu
-              return (
-                <Collapsible 
-                  key={company.id} 
-                  open={isExpanded}
-                  onOpenChange={() => toggleCompanyExpanded(company.id)}
-                >
-                  <CollapsibleTrigger asChild>
+            {activeCompanyMode && activeCompany ? (
+              // Active company mode - show only the menu items for this company
+              <div className="space-y-1">
+                {!isCollapsed && (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
+                    {activeCompany.name}
+                  </p>
+                )}
+                {companyMenuItems.map((menuItem) => {
+                  const Icon = menuItem.icon;
+                  const currentParams = new URLSearchParams(location.search);
+                  const isMenuActive = location.pathname === menuItem.path && 
+                    currentParams.get('empresa') === activeCompanyMode &&
+                    (!menuItem.section || currentParams.get('section') === menuItem.section);
+                  
+                  const button = (
                     <button
+                      onClick={() => handleCompanyMenuClick(activeCompanyMode, menuItem)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                        isSelected 
-                          ? "bg-primary/20 text-primary" 
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                        isMenuActive
+                          ? "bg-primary/20 text-primary"
                           : "text-sidebar-foreground hover:bg-sidebar-accent"
                       )}
                     >
-                      <span className="text-xl shrink-0">{company.icon}</span>
-                      <span className="truncate text-sm flex-1 text-left">{company.name}</span>
-                      <ChevronDown 
-                        className={cn(
-                          "w-4 h-4 transition-transform duration-200",
-                          isExpanded && "rotate-180"
-                        )} 
-                      />
+                      <Icon className="w-5 h-5 shrink-0" />
+                      {!isCollapsed && <span className="truncate">{menuItem.label}</span>}
                     </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pl-4 mt-1 space-y-1">
-                    {companyMenuItems.map((menuItem) => {
-                      const Icon = menuItem.icon;
-                      const currentParams = new URLSearchParams(location.search);
-                      const isMenuActive = location.pathname === menuItem.path && 
-                        currentParams.get('empresa') === company.id &&
-                        (!menuItem.section || currentParams.get('section') === menuItem.section);
-                      
-                      return (
+                  );
+
+                  if (isCollapsed) {
+                    return (
+                      <Tooltip key={menuItem.label}>
+                        <TooltipTrigger asChild>{button}</TooltipTrigger>
+                        <TooltipContent side="right">{menuItem.label}</TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return <div key={menuItem.label}>{button}</div>;
+                })}
+              </div>
+            ) : (
+              // Normal mode - show all companies
+              companies.map((company) => {
+                if (isCollapsed) {
+                  // Collapsed view - just show company icon with tooltip
+                  return (
+                    <Tooltip key={company.id}>
+                      <TooltipTrigger asChild>
                         <button
-                          key={menuItem.label}
-                          onClick={() => handleCompanyMenuClick(company.id, menuItem)}
+                          onClick={() => handleEnterCompanyMode(company.id)}
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm",
-                            isMenuActive
-                              ? "bg-primary/15 text-primary"
-                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                            selectedCompany === company.id 
+                              ? "bg-primary/20 text-primary" 
+                              : "text-sidebar-foreground hover:bg-sidebar-accent"
                           )}
                         >
-                          <Icon className="w-4 h-4 shrink-0" />
-                          <span className="truncate">{menuItem.label}</span>
+                          <span className="text-xl shrink-0">{company.icon}</span>
                         </button>
-                      );
-                    })}
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{company.name}</TooltipContent>
+                    </Tooltip>
+                  );
+                }
+
+                // Expanded view - show company name that can be clicked
+                return (
+                  <button
+                    key={company.id}
+                    onClick={() => handleEnterCompanyMode(company.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                      selectedCompany === company.id 
+                        ? "bg-primary/20 text-primary" 
+                        : "text-sidebar-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <span className="text-xl shrink-0">{company.icon}</span>
+                    <span className="truncate text-sm flex-1 text-left">{company.name}</span>
+                    <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                );
+              })
+            )}
           </div>
         </nav>
 

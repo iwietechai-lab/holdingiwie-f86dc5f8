@@ -19,6 +19,7 @@ import VideoCallPage from "./pages/VideoCallPage";
 import TicketsPage from "./pages/TicketsPage";
 import MessagingPage from "./pages/MessagingPage";
 import TasksPage from "./pages/TasksPage";
+import CompanyChatbotPage from "./pages/CompanyChatbotPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
           <Route path="/tareas" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
           <Route path="/mensajeria" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
+          <Route path="/chatbot-empresa" element={<ProtectedRoute><CompanyChatbotPage /></ProtectedRoute>} />
           <Route path="/admin/face-setup" element={<ProtectedRoute><AdminFaceSetup /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
           <Route path="/superadmin" element={<ProtectedRoute><SuperadminDashboard /></ProtectedRoute>} />

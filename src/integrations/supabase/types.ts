@@ -145,6 +145,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ceo_chat_sessions: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ceo_knowledge: {
         Row: {
           analyzed_summary: string | null
@@ -253,6 +280,7 @@ export type Database = {
           id: string
           metadata: Json | null
           role: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -262,6 +290,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           role?: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -271,6 +300,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           role?: string
+          session_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -279,6 +309,13 @@ export type Database = {
             columns: ["chatbot_id"]
             isOneToOne: false
             referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_chat_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -453,6 +490,69 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      company_knowledge: {
+        Row: {
+          analysis_summary: string | null
+          analyzed_at: string | null
+          approved_at: string | null
+          approved_by: string | null
+          category: string | null
+          company_id: string
+          content: string
+          contributor_id: string
+          created_at: string | null
+          document_name: string | null
+          document_type: string | null
+          document_url: string | null
+          id: string
+          is_analyzed: boolean | null
+          is_approved_for_ceo: boolean | null
+          key_points: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          analysis_summary?: string | null
+          analyzed_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string | null
+          company_id: string
+          content: string
+          contributor_id: string
+          created_at?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          document_url?: string | null
+          id?: string
+          is_analyzed?: boolean | null
+          is_approved_for_ceo?: boolean | null
+          key_points?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          analysis_summary?: string | null
+          analyzed_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string | null
+          company_id?: string
+          content?: string
+          contributor_id?: string
+          created_at?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          document_url?: string | null
+          id?: string
+          is_analyzed?: boolean | null
+          is_approved_for_ceo?: boolean | null
+          key_points?: Json | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
