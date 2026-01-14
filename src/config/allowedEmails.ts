@@ -44,6 +44,18 @@ export const ALLOWED_EMAILS: AllowedEmailConfig[] = [
     company_id: 'iwie-holding',
     department: 'Dirección General',
   },
+  {
+    email: 'cesar@iwie.space',
+    role: 'Gerente de Operaciones',
+    company_id: 'iwie-holding',
+    department: 'Operaciones',
+  },
+  {
+    email: 'paulo@iwie.space',
+    role: 'Gerente Financiero',
+    company_id: 'iwie-holding',
+    department: 'Finanzas',
+  },
 ];
 
 // Default users with full platform access (can see all features like CEO)
