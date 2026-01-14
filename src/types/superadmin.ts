@@ -36,25 +36,40 @@ export const APP_ROLE_PRIORITY: Record<AppRole, number> = {
 
 // Dashboard visibility configuration
 export interface DashboardVisibility {
-  ver_perfiles: boolean;
-  ver_empresas: boolean;
-  ver_reportes: boolean;
+  // Módulos principales
+  ver_dashboard: boolean;
+  ver_ventas: boolean;
   ver_documentos: boolean;
-  ver_chatbot: boolean;
+  ver_chat_interno: boolean;
+  ver_tareas: boolean;
+  ver_tickets: boolean;
+  ver_reuniones: boolean;
+  ver_estructura_org: boolean;
+  // Chatbots
+  acceso_chatbot_empresa: boolean;
+  acceso_chatbot_ceo: boolean;
+  // Gestión
+  gestionar_usuarios: boolean;
+  gestionar_conocimiento: boolean;
+  ver_reportes: boolean;
   ver_logs: boolean;
-  editar_usuarios: boolean;
-  gestionar_roles: boolean;
 }
 
 export const DEFAULT_DASHBOARD_VISIBILITY: DashboardVisibility = {
-  ver_perfiles: false,
-  ver_empresas: false,
-  ver_reportes: false,
+  ver_dashboard: true,
+  ver_ventas: false,
   ver_documentos: true,
-  ver_chatbot: true,
+  ver_chat_interno: true,
+  ver_tareas: true,
+  ver_tickets: true,
+  ver_reuniones: true,
+  ver_estructura_org: false,
+  acceso_chatbot_empresa: true,
+  acceso_chatbot_ceo: false,
+  gestionar_usuarios: false,
+  gestionar_conocimiento: false,
+  ver_reportes: false,
   ver_logs: false,
-  editar_usuarios: false,
-  gestionar_roles: false,
 };
 
 // Company from database

@@ -54,14 +54,20 @@ interface CreateUserRequestDialogProps {
 }
 
 const PERMISSION_LABELS: Record<keyof DashboardVisibility, string> = {
-  ver_perfiles: 'Ver perfiles de usuarios',
-  ver_empresas: 'Ver información de empresas',
-  ver_reportes: 'Ver reportes y estadísticas',
-  ver_documentos: 'Acceso a documentos',
-  ver_chatbot: 'Acceso al chatbot',
-  ver_logs: 'Ver logs del sistema',
-  editar_usuarios: 'Editar usuarios',
-  gestionar_roles: 'Gestionar roles',
+  ver_dashboard: 'Dashboard',
+  ver_ventas: 'Ventas',
+  ver_documentos: 'Documentos',
+  ver_chat_interno: 'Chat Interno',
+  ver_tareas: 'Tareas',
+  ver_tickets: 'Tickets',
+  ver_reuniones: 'Reuniones',
+  ver_estructura_org: 'Estructura Organizacional',
+  acceso_chatbot_empresa: 'Chatbot Empresa',
+  acceso_chatbot_ceo: 'Chatbot CEO',
+  gestionar_usuarios: 'Gestionar Usuarios',
+  gestionar_conocimiento: 'Gestionar Conocimiento',
+  ver_reportes: 'Reportes',
+  ver_logs: 'Logs',
 };
 
 export function CreateUserRequestDialog({
