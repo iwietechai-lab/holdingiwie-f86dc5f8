@@ -129,7 +129,7 @@ export const Dashboard = () => {
       <SpaceBackground />
       
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block" data-tour="sidebar">
+      <div className="hidden lg:block">
         <Sidebar 
           selectedCompany={selectedCompany} 
           onSelectCompany={setSelectedCompany} 
@@ -200,7 +200,7 @@ export const Dashboard = () => {
           </div>
 
           {/* KPI Cards - Updated with real task data */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6" data-tour="kpis">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             <KPICard
               title="Empleados Activos"
               value={statsLoading ? "..." : stats.totalEmployees.toString()}
@@ -290,7 +290,7 @@ export const Dashboard = () => {
           </div>
 
           {/* Charts Row */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6" data-tour="charts">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
             {/* Revenue Chart - Now with real data */}
             <Card className="bg-card/50 backdrop-blur-sm border-border">
               <CardHeader className="p-4 md:p-6">
@@ -406,7 +406,7 @@ export const Dashboard = () => {
 
           {/* Companies Overview with REAL metrics */}
           {!selectedCompany && companyMetrics.length > 0 && (
-            <div className="space-y-4" data-tour="companies">
+            <div className="space-y-4">
               <h2 className="text-base md:text-xl font-semibold text-foreground flex items-center gap-2">
                 <PieChart className="w-4 h-4 md:w-5 md:h-5 text-accent" />
                 Resumen por Empresa

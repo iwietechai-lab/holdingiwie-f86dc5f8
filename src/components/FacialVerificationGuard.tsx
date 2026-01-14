@@ -7,7 +7,6 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
-import { triggerTourFromVerification } from '@/components/tour';
 
 // Global function to stop all active camera streams
 const stopAllCameraStreams = () => {
@@ -88,9 +87,6 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     
     // Update verification record
     await recordVerification();
-    
-    // Trigger the tour to start after verification
-    triggerTourFromVerification();
     
     // Wait for camera to fully stop before hiding component
     await new Promise(resolve => setTimeout(resolve, 500));

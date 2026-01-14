@@ -176,9 +176,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
               </div>
             )}
             {/* Notifications button */}
-            <div data-tour="notifications">
-              <NotificationsPopover />
-            </div>
+            <NotificationsPopover />
           </div>
         </div>
 
