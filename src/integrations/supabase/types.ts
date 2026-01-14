@@ -147,35 +147,50 @@ export type Database = {
       }
       ceo_knowledge: {
         Row: {
+          analyzed_summary: string | null
           category: string
           company_id: string | null
           content: string
           created_at: string | null
           created_by: string | null
+          document_name: string | null
+          document_type: string | null
+          document_url: string | null
           id: string
           is_confidential: boolean | null
+          key_points: Json | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          analyzed_summary?: string | null
           category: string
           company_id?: string | null
           content: string
           created_at?: string | null
           created_by?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          document_url?: string | null
           id?: string
           is_confidential?: boolean | null
+          key_points?: Json | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          analyzed_summary?: string | null
           category?: string
           company_id?: string | null
           content?: string
           created_at?: string | null
           created_by?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          document_url?: string | null
           id?: string
           is_confidential?: boolean | null
+          key_points?: Json | null
           title?: string
           updated_at?: string | null
         }
