@@ -80,7 +80,7 @@ export default function SuperadminDashboard() {
     const matchesSearch = 
       (user.full_name?.toLowerCase().includes(searchLower) || false) ||
       (user.email?.toLowerCase().includes(searchLower) || false) ||
-      (user.position?.toLowerCase().includes(searchLower) || false);
+      (user.role?.toLowerCase().includes(searchLower) || false);
 
     // Role filter
     const matchesRole = roleFilter === 'all' || user.roles.some(r => r.role === roleFilter);
@@ -396,19 +396,11 @@ export default function SuperadminDashboard() {
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {user.avatar_url ? (
-                              <img 
-                                src={user.avatar_url} 
-                                alt={user.full_name || 'Avatar'}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                                <span className="text-lg font-bold text-primary">
-                                  {(user.full_name || user.email || '?')[0].toUpperCase()}
-                                </span>
-                              </div>
-                            )}
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                              <span className="text-lg font-bold text-primary">
+                                {(user.full_name || user.email || '?')[0].toUpperCase()}
+                              </span>
+                            </div>
                             <div>
                               <p className="font-medium text-foreground flex items-center gap-2">
                                 {user.full_name || 'Sin nombre'}
@@ -452,7 +444,7 @@ export default function SuperadminDashboard() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">
-                            {user.position || 'Sin definir'}
+                            {user.role || 'Sin definir'}
                           </span>
                         </TableCell>
                         <TableCell>

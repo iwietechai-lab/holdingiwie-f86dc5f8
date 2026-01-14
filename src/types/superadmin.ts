@@ -81,10 +81,9 @@ export interface SuperadminUserProfile {
   id: string;
   full_name: string | null;
   email: string | null;
-  avatar_url: string | null;
   company_id: string | null;
   department_id: string | null;
-  position: string | null;
+  role: string | null;
   dashboard_visibility: DashboardVisibility | null;
   created_at: string | null;
   updated_at?: string | null;

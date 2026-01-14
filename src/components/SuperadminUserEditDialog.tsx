@@ -60,8 +60,6 @@ interface SuperadminUserEditDialogProps {
     full_name: string | null;
     company_id: string | null;
     department_id: string | null;
-    position: string | null;
-    avatar_url: string | null;
   }) => Promise<{ success: boolean; error?: string }>;
   onSaveRole: (userId: string, role: AppRole) => Promise<{ success: boolean; error?: string }>;
   onSaveVisibility: (userId: string, visibility: DashboardVisibility) => Promise<{ success: boolean; error?: string }>;
@@ -80,8 +78,6 @@ export function SuperadminUserEditDialog({
   const [fullName, setFullName] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
-  const [position, setPosition] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('colaborador');
   const [visibility, setVisibility] = useState<DashboardVisibility>(DEFAULT_DASHBOARD_VISIBILITY);
   const [isSaving, setIsSaving] = useState(false);
@@ -92,8 +88,6 @@ export function SuperadminUserEditDialog({
       setFullName(user.full_name || '');
       setCompanyId(user.company_id || '');
       setDepartmentId(user.department_id || '');
-      setPosition(user.position || '');
-      setAvatarUrl(user.avatar_url || '');
       setVisibility(user.dashboard_visibility || DEFAULT_DASHBOARD_VISIBILITY);
       
       // Set current role (use first role if exists)
@@ -128,8 +122,6 @@ export function SuperadminUserEditDialog({
       full_name: fullName || null,
       company_id: companyId || null,
       department_id: departmentId || null,
-      position: position || null,
-      avatar_url: avatarUrl || null,
     });
 
     setIsSaving(false);
@@ -164,8 +156,6 @@ export function SuperadminUserEditDialog({
       full_name: fullName || null,
       company_id: companyId || null,
       department_id: departmentId || null,
-      position: position || null,
-      avatar_url: avatarUrl || null,
     });
 
     if (!profileResult.success) {
@@ -239,26 +229,6 @@ export function SuperadminUserEditDialog({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Ingresa el nombre completo"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="position">Cargo / Posición</Label>
-              <Input
-                id="position"
-                value={position}
-                onChange={(e) => setPosition(e.target.value)}
-                placeholder="Ej: Director de Tecnología"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="avatarUrl">URL del Avatar</Label>
-              <Input
-                id="avatarUrl"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://..."
               />
             </div>
           </TabsContent>

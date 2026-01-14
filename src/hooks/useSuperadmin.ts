@@ -114,10 +114,9 @@ export function useSuperadmin(): UseSuperadminReturn {
           id: profile.id,
           full_name: profile.full_name,
           email: profile.email,
-          avatar_url: profile.avatar_url || null,
           company_id: profile.company_id,
           department_id: profile.department_id || null,
-          position: profile.position || null,
+          role: profile.role || null,
           dashboard_visibility: profile.dashboard_visibility || DEFAULT_DASHBOARD_VISIBILITY,
           created_at: profile.created_at,
           updated_at: profile.updated_at,
@@ -185,16 +184,19 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
 
     try {
+      // Only include fields that exist in the database schema
+      const updateData: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (updates.full_name !== undefined) updateData.full_name = updates.full_name;
+      if (updates.company_id !== undefined) updateData.company_id = updates.company_id;
+      if (updates.department_id !== undefined) updateData.department_id = updates.department_id;
+      if (updates.role !== undefined) updateData.role = updates.role;
+      
       const { error } = await supabase
         .from('user_profiles')
-        .update({
-          full_name: updates.full_name,
-          company_id: updates.company_id,
-          department_id: updates.department_id,
-          position: updates.position,
-          avatar_url: updates.avatar_url,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', userId);
 
       if (error) throw error;
