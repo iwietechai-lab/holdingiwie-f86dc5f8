@@ -6,12 +6,13 @@ import { ChatList } from '@/components/ChatList';
 import { ChatWindow } from '@/components/ChatWindow';
 import { CreateChatDialog } from '@/components/CreateChatDialog';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { Chat } from '@/hooks/useChats';
+import { useChats, Chat } from '@/hooks/useChats';
 import { MessageSquare } from 'lucide-react';
 
 export default function MessagingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading } = useSupabaseAuth();
+  const { chats } = useChats();
   
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -23,9 +24,40 @@ export default function MessagingPage() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
+  // When a chat is created, auto-select it
   const handleChatCreated = (chatId: string) => {
-    // The chat list will update automatically via realtime
+    // Find the chat from the list and select it
+    const createdChat = chats.find(c => c.id === chatId);
+    if (createdChat) {
+      setSelectedChat(createdChat);
+    } else {
+      // If not found yet (due to timing), we'll wait for chats to update
+      // Use a small timeout to wait for the realtime update
+      setTimeout(() => {
+        const updatedChat = chats.find(c => c.id === chatId);
+        if (updatedChat) {
+          setSelectedChat(updatedChat);
+        }
+      }, 500);
+    }
   };
+
+  // Effect to select chat after chats list updates
+  const [pendingChatId, setPendingChatId] = useState<string | null>(null);
+
+  const handleChatCreatedWithPending = (chatId: string) => {
+    setPendingChatId(chatId);
+  };
+
+  useEffect(() => {
+    if (pendingChatId && chats.length > 0) {
+      const chat = chats.find(c => c.id === pendingChatId);
+      if (chat) {
+        setSelectedChat(chat);
+        setPendingChatId(null);
+      }
+    }
+  }, [chats, pendingChatId]);
 
   if (authLoading) {
     return (
@@ -91,7 +123,7 @@ export default function MessagingPage() {
       <CreateChatDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
-        onChatCreated={handleChatCreated}
+        onChatCreated={handleChatCreatedWithPending}
       />
     </div>
   );

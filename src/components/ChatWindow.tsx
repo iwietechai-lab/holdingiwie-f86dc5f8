@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
   Send, 
   Loader2, 
@@ -14,13 +14,16 @@ import {
   ArrowLeft,
   Building2,
   Globe,
-  MessageSquare
+  MessageSquare,
+  Smile
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useChatMessages, useChatParticipants, useChatSummaries, Chat, ChatType } from '@/hooks/useChats';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -37,7 +40,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [isSending, setIsSending] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showSummaries, setShowSummaries] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -50,6 +55,10 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     const success = await sendMessage(inputMessage);
     if (success) {
       setInputMessage('');
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
     setIsSending(false);
   };
@@ -59,6 +68,22 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleEmojiSelect = (emoji: any) => {
+    setInputMessage(prev => prev + emoji.native);
+    setShowEmojiPicker(false);
+    textareaRef.current?.focus();
+  };
+
+  // Auto-resize textarea
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+    // Auto-resize logic with max height
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    const maxHeight = 120; // max 5-6 lines approximately
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
   };
 
   const handleGenerateSummary = async () => {
@@ -210,18 +235,38 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
         {/* Input */}
         <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
+          <div className="flex gap-2 items-end">
+            <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <Smile className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-auto p-0 border-0">
+                <Picker 
+                  data={data} 
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="dark"
+                  locale="es"
+                  previewPosition="none"
+                  skinTonePosition="none"
+                />
+              </PopoverContent>
+            </Popover>
+            <Textarea
+              ref={textareaRef}
               placeholder="Escribe tu mensaje..."
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={handleTextareaChange}
               onKeyDown={handleKeyPress}
               disabled={isSending}
-              className="flex-1"
+              className="flex-1 min-h-[40px] max-h-[120px] resize-none py-2"
+              rows={1}
             />
             <Button
               onClick={handleSend}
               disabled={!inputMessage.trim() || isSending}
+              className="shrink-0"
             >
               {isSending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
