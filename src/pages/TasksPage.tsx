@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
-import { useTasks } from '@/hooks/useTasks';
+import { useTasks, EisenhowerPriority, AlertStatus } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
 import { TaskCard } from '@/components/tasks/TaskCard';
-import { Plus, Search, Filter, LayoutGrid, List, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter, LayoutGrid, List, RefreshCw, Target, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export default function TasksPage() {
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -20,7 +21,9 @@ export default function TasksPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [filterEisenhower, setFilterEisenhower] = useState<string>('all');
+  const [filterAlert, setFilterAlert] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'eisenhower'>('list');
 
   const { tasks, isLoading, createTask, updateTask, deleteTask, addComment, getTaskComments, refetch } = useTasks(
     selectedCompany || userCompanyId,
@@ -65,23 +68,39 @@ export default function TasksPage() {
 
   const canCreateTask = isSuperadmin || userRole === 'gerente_area' || userRole === 'lider_area' || userRole === 'admin';
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.area.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
-    const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
-    const matchesCompany = !selectedCompany || selectedCompany === 'all' || task.company_id === selectedCompany;
-    
-    return matchesSearch && matchesPriority && matchesStatus && matchesCompany;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (task.responsible_name?.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
+      const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
+      const matchesCompany = !selectedCompany || selectedCompany === 'all' || task.company_id === selectedCompany;
+      const matchesEisenhower = filterEisenhower === 'all' || task.eisenhower_priority === filterEisenhower;
+      const matchesAlert = filterAlert === 'all' || task.alert_status === filterAlert;
+      
+      return matchesSearch && matchesPriority && matchesStatus && matchesCompany && matchesEisenhower && matchesAlert;
+    });
+  }, [tasks, searchTerm, filterPriority, filterStatus, selectedCompany, filterEisenhower, filterAlert]);
 
-  const taskStats = {
+  const taskStats = useMemo(() => ({
     total: filteredTasks.length,
     pending: filteredTasks.filter(t => t.status === 'pendiente').length,
     inProgress: filteredTasks.filter(t => t.status === 'en_progreso').length,
     completed: filteredTasks.filter(t => t.status === 'completada').length,
     blocked: filteredTasks.filter(t => t.status === 'bloqueada').length,
-  };
+    porVencer: filteredTasks.filter(t => t.alert_status === 'por_vencer').length,
+    vencidas: filteredTasks.filter(t => t.alert_status === 'vencida').length,
+  }), [filteredTasks]);
+
+  // Eisenhower matrix grouping
+  const eisenhowerGroups = useMemo(() => ({
+    urgente_importante: filteredTasks.filter(t => t.eisenhower_priority === 'urgente_importante'),
+    no_urgente_importante: filteredTasks.filter(t => t.eisenhower_priority === 'no_urgente_importante'),
+    urgente_no_importante: filteredTasks.filter(t => t.eisenhower_priority === 'urgente_no_importante'),
+    no_urgente_no_importante: filteredTasks.filter(t => t.eisenhower_priority === 'no_urgente_no_importante'),
+    sin_clasificar: filteredTasks.filter(t => !t.eisenhower_priority),
+  }), [filteredTasks]);
 
   return (
     <ResponsiveLayout
@@ -123,12 +142,14 @@ export default function TasksPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
           <StatCard label="Total" value={taskStats.total} color="cyan" />
           <StatCard label="Pendientes" value={taskStats.pending} color="slate" />
           <StatCard label="En Progreso" value={taskStats.inProgress} color="blue" />
           <StatCard label="Completadas" value={taskStats.completed} color="green" />
           <StatCard label="Bloqueadas" value={taskStats.blocked} color="red" />
+          <StatCard label="Por Vencer" value={taskStats.porVencer} color="yellow" icon={<Clock className="h-4 w-4" />} />
+          <StatCard label="Vencidas" value={taskStats.vencidas} color="red" icon={<AlertTriangle className="h-4 w-4" />} />
         </div>
 
         {/* Filters */}
@@ -185,12 +206,25 @@ export default function TasksPage() {
             </SelectContent>
           </Select>
 
+          <Select value={filterAlert} onValueChange={setFilterAlert}>
+            <SelectTrigger className="w-36 bg-slate-900 border-slate-600 text-white">
+              <SelectValue placeholder="Alerta" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-800 border-slate-600">
+              <SelectItem value="all" className="text-white">Todas</SelectItem>
+              <SelectItem value="al_dia" className="text-white">✅ Al día</SelectItem>
+              <SelectItem value="por_vencer" className="text-white">⚠️ Por vencer</SelectItem>
+              <SelectItem value="vencida" className="text-white">🔴 Vencida</SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="flex gap-1">
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="icon"
               onClick={() => setViewMode('list')}
               className={viewMode === 'list' ? 'bg-cyan-600' : 'border-slate-600'}
+              title="Vista Lista"
             >
               <List className="h-4 w-4" />
             </Button>
@@ -199,13 +233,23 @@ export default function TasksPage() {
               size="icon"
               onClick={() => setViewMode('grid')}
               className={viewMode === 'grid' ? 'bg-cyan-600' : 'border-slate-600'}
+              title="Vista Cuadrícula"
             >
               <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'eisenhower' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setViewMode('eisenhower')}
+              className={viewMode === 'eisenhower' ? 'bg-cyan-600' : 'border-slate-600'}
+              title="Matriz Eisenhower"
+            >
+              <Target className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Tasks List */}
+        {/* Tasks Display */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="h-8 w-8 text-cyan-500 animate-spin" />
@@ -220,7 +264,83 @@ export default function TasksPage() {
               </Button>
             )}
           </div>
+        ) : viewMode === 'eisenhower' ? (
+          // Eisenhower Matrix View
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Urgente e Importante - HACER */}
+            <div className="bg-red-950/20 border border-red-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <h3 className="font-bold text-red-400">HACER - Urgente e Importante</h3>
+                <Badge className="bg-red-500/20 text-red-300">{eisenhowerGroups.urgente_importante.length}</Badge>
+              </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {eisenhowerGroups.urgente_importante.map(task => (
+                  <TaskCard key={task.id} task={task} onUpdate={updateTask} onDelete={deleteTask} onAddComment={addComment} getComments={getTaskComments} canEdit={canCreateTask} />
+                ))}
+              </div>
+            </div>
+
+            {/* No Urgente pero Importante - PROGRAMAR */}
+            <div className="bg-blue-950/20 border border-blue-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <h3 className="font-bold text-blue-400">PROGRAMAR - Importante, No Urgente</h3>
+                <Badge className="bg-blue-500/20 text-blue-300">{eisenhowerGroups.no_urgente_importante.length}</Badge>
+              </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {eisenhowerGroups.no_urgente_importante.map(task => (
+                  <TaskCard key={task.id} task={task} onUpdate={updateTask} onDelete={deleteTask} onAddComment={addComment} getComments={getTaskComments} canEdit={canCreateTask} />
+                ))}
+              </div>
+            </div>
+
+            {/* Urgente pero No Importante - DELEGAR */}
+            <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <h3 className="font-bold text-yellow-400">DELEGAR - Urgente, No Importante</h3>
+                <Badge className="bg-yellow-500/20 text-yellow-300">{eisenhowerGroups.urgente_no_importante.length}</Badge>
+              </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {eisenhowerGroups.urgente_no_importante.map(task => (
+                  <TaskCard key={task.id} task={task} onUpdate={updateTask} onDelete={deleteTask} onAddComment={addComment} getComments={getTaskComments} canEdit={canCreateTask} />
+                ))}
+              </div>
+            </div>
+
+            {/* No Urgente y No Importante - ELIMINAR */}
+            <div className="bg-slate-800/50 border border-slate-600 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-slate-500"></div>
+                <h3 className="font-bold text-slate-400">ELIMINAR - No Urgente, No Importante</h3>
+                <Badge className="bg-slate-500/20 text-slate-300">{eisenhowerGroups.no_urgente_no_importante.length}</Badge>
+              </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {eisenhowerGroups.no_urgente_no_importante.map(task => (
+                  <TaskCard key={task.id} task={task} onUpdate={updateTask} onDelete={deleteTask} onAddComment={addComment} getComments={getTaskComments} canEdit={canCreateTask} />
+                ))}
+              </div>
+            </div>
+
+            {/* Sin clasificar */}
+            {eisenhowerGroups.sin_clasificar.length > 0 && (
+              <div className="lg:col-span-2 bg-purple-950/20 border border-purple-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <h3 className="font-bold text-purple-400">Sin Clasificar Eisenhower</h3>
+                  <Badge className="bg-purple-500/20 text-purple-300">{eisenhowerGroups.sin_clasificar.length}</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                  {eisenhowerGroups.sin_clasificar.map(task => (
+                    <TaskCard key={task.id} task={task} onUpdate={updateTask} onDelete={deleteTask} onAddComment={addComment} getComments={getTaskComments} canEdit={canCreateTask} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
+          // List or Grid View
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
             {filteredTasks.map(task => (
               <TaskCard
@@ -250,18 +370,22 @@ export default function TasksPage() {
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color, icon }: { label: string; value: number; color: string; icon?: React.ReactNode }) {
   const colors: Record<string, string> = {
     cyan: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400',
     slate: 'bg-slate-500/10 border-slate-500/30 text-slate-400',
     blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
     green: 'bg-green-500/10 border-green-500/30 text-green-400',
     red: 'bg-red-500/10 border-red-500/30 text-red-400',
+    yellow: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
   };
 
   return (
     <div className={`p-4 rounded-lg border ${colors[color]}`}>
-      <p className="text-2xl font-bold">{value}</p>
+      <div className="flex items-center gap-2">
+        {icon}
+        <p className="text-2xl font-bold">{value}</p>
+      </div>
       <p className="text-sm opacity-80">{label}</p>
     </div>
   );
