@@ -18,7 +18,8 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useChatbot } from '@/hooks/useChatbot';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTickets } from '@/hooks/useTickets';
-import { useCeoAvailability } from '@/hooks/useCeoAvailability';
+import { useAvailabilitySlots } from '@/hooks/useAvailabilitySlots';
+import { useMeetingRequests } from '@/hooks/useMeetingRequests';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,8 @@ export default function CEOChatbotPage() {
   const { chatbot, messages, isLoading, isSending, sendMessage, clearConversation } = useChatbot();
   const { createMeeting } = useMeetings();
   const { createTicket } = useTickets();
-  const { availability, createMeetingRequest } = useCeoAvailability();
+  const { slots } = useAvailabilitySlots();
+  const { createRequest } = useMeetingRequests();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
@@ -78,22 +80,20 @@ export default function CEOChatbotPage() {
     }
   }, [messages]);
 
-  // Get available days (days of week that have availability)
-  const availableDayNumbers = [...new Set(
-    availability.filter(a => a.is_active).map(a => a.day_of_week)
-  )];
+  // Get available dates from slots
+  const availableDates = slots.map(s => s.available_date);
 
   // Get available time slots for a selected date
   const getTimeSlotsForDate = (date: Date) => {
-    const dayOfWeek = getDay(date);
-    return availability.filter(a => a.day_of_week === dayOfWeek && a.is_active);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return slots.filter(s => s.available_date === dateStr);
   };
 
   // Check if a date is available
   const isDateAvailable = (date: Date) => {
-    const dayOfWeek = getDay(date);
     const today = startOfDay(new Date());
-    return date >= today && availableDayNumbers.includes(dayOfWeek);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return date >= today && availableDates.includes(dateStr);
   };
 
   const handleAction = async (metadata: any) => {
@@ -131,30 +131,36 @@ export default function CEOChatbotPage() {
     }
 
     // Find a CEO user to send the request to
-    const ceoUserId = availability[0]?.user_id;
+    const ceoUserId = slots[0]?.user_id;
     if (!ceoUserId) {
       toast.error('No se encontró el CEO para enviar la solicitud');
       return;
     }
 
-    const result = await createMeetingRequest({
-      host_id: ceoUserId,
-      requester_id: user.id,
+    // Parse duration
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const endHours = hours + Math.floor((minutes + pendingMeeting.duration_minutes) / 60);
+    const endMinutes = (minutes + pendingMeeting.duration_minutes) % 60;
+    const endTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+
+    const result = await createRequest({
+      creator_id: user.id,
+      title: pendingMeeting.title,
+      description: pendingMeeting.description,
+      participants: [ceoUserId],
       requested_date: format(selectedDate, 'yyyy-MM-dd'),
-      requested_time: selectedTime,
+      requested_start_time: selectedTime,
+      requested_end_time: endTime,
       duration_minutes: pendingMeeting.duration_minutes,
-      message: `${pendingMeeting.title}: ${pendingMeeting.description}`,
-      status: 'pending',
+      priority: 'media',
     });
 
-    if (result.success) {
+    if (result) {
       toast.success('Solicitud de reunión enviada. El CEO la revisará pronto.');
       setShowMeetingDialog(false);
       setPendingMeeting(null);
       setSelectedDate(undefined);
       setSelectedTime('');
-    } else {
-      toast.error(result.error || 'Error al enviar la solicitud');
     }
   };
 
@@ -369,7 +375,7 @@ export default function CEOChatbotPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Días disponibles: {availableDayNumbers.map(d => DAY_NAMES[d]).join(', ')}
+                  Fechas con disponibilidad: {availableDates.length > 0 ? availableDates.slice(0, 5).join(', ') + (availableDates.length > 5 ? '...' : '') : 'Ninguna'}
                 </p>
               </div>
 
