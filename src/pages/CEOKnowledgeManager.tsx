@@ -588,9 +588,9 @@ export default function CEOKnowledgeManager() {
                 <Brain className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Gestor de Conocimiento CEO</h1>
+                <h1 className="text-2xl font-bold">Base de Conocimiento Gerencial</h1>
                 <p className="text-muted-foreground text-sm">
-                  Administra la información y analiza cómo comunicarla a tu equipo
+                  Enseña al sistema tu conocimiento de gestión empresarial
                 </p>
               </div>
             </div>
@@ -651,14 +651,14 @@ export default function CEOKnowledgeManager() {
                   <DialogTrigger asChild>
                     <Button className="gap-2">
                       <Plus className="w-4 h-4" />
-                      Agregar Conocimiento
+                      Enseñar Conocimiento
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Agregar Conocimiento</DialogTitle>
+                      <DialogTitle>Enseñar Conocimiento</DialogTitle>
                       <DialogDescription>
-                        Añade información, estrategias o directrices para {getCompanyName(selectedCompany)}
+                        Comparte tu conocimiento gerencial para que el sistema aprenda sobre {getCompanyName(selectedCompany)}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -771,13 +771,13 @@ export default function CEOKnowledgeManager() {
                 <Card className="border-dashed">
                   <CardContent className="py-12 text-center">
                     <Brain className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <h3 className="font-semibold mb-2">Sin conocimiento configurado</h3>
+                    <h3 className="font-semibold mb-2">Comienza a enseñar al sistema</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Agrega información para que el chatbot pueda compartirla con tu equipo
+                      Comparte tu conocimiento gerencial para que el sistema aprenda cómo gestionas tus empresas
                     </p>
                     <Button onClick={() => setShowAddDialog(true)}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Agregar primer conocimiento
+                      Enseñar primer conocimiento
                     </Button>
                   </CardContent>
                 </Card>
@@ -869,10 +869,10 @@ export default function CEOKnowledgeManager() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Brain className="w-5 h-5 text-primary" />
-                    Asistente de Análisis
+                    Tu Asistente Gerencial
                   </CardTitle>
                   <CardDescription>
-                    Pregúntame sobre el conocimiento cargado. Te ayudaré a entender y estructurar la información para comunicarla efectivamente.
+                    He aprendido de tu conocimiento. Pregúntame lo que necesites y te ayudaré basándome en lo que me has enseñado.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
@@ -882,37 +882,37 @@ export default function CEOKnowledgeManager() {
                       {chatMessages.length === 0 ? (
                         <div className="text-center py-12">
                           <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                          <h3 className="font-semibold mb-2">Analiza tu conocimiento</h3>
+                          <h3 className="font-semibold mb-2">Estoy listo para asistirte</h3>
                           <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                            Puedo ayudarte a entender mejor la información, sugerir cómo comunicarla a tu equipo, y responder preguntas sobre estrategias y directrices.
+                            He aprendido del conocimiento que me compartiste. Ahora puedo ayudarte a recordar estrategias, estructurar ideas o responder consultas basándome en lo que me enseñaste.
                           </p>
                           <div className="flex flex-wrap gap-2 justify-center">
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                setChatInput('¿Cuáles son los puntos clave del conocimiento cargado?');
+                                setChatInput('¿Qué estrategias tengo definidas para esta empresa?');
                               }}
                             >
-                              Puntos clave
+                              Mis estrategias
                             </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                setChatInput('¿Cómo debo comunicar esta información a mi equipo?');
+                                setChatInput('Ayúdame a estructurar un mensaje para mi equipo');
                               }}
                             >
-                              Cómo comunicar
+                              Estructurar mensaje
                             </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                setChatInput('Resume las estrategias principales');
+                                setChatInput('Dame un resumen de las directrices principales');
                               }}
                             >
-                              Resumir estrategias
+                              Resumen de directrices
                             </Button>
                           </div>
                         </div>
@@ -954,7 +954,7 @@ export default function CEOKnowledgeManager() {
                     <Input
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Pregunta sobre el conocimiento..."
+                      placeholder="Pregúntame sobre lo que me enseñaste..."
                       onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
                       disabled={isSendingChat || knowledgeEntries.length === 0}
                     />
@@ -967,7 +967,7 @@ export default function CEOKnowledgeManager() {
                   </div>
                   {knowledgeEntries.length === 0 && (
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Agrega conocimiento primero para poder analizarlo
+                      Enséñame tu conocimiento primero para poder asistirte
                     </p>
                   )}
                 </CardContent>
