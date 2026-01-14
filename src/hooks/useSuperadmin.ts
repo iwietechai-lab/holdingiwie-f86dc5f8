@@ -175,6 +175,22 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
   }, [isSuperadmin, fetchUsers]);
 
+  // Map AppRole to valid database roles
+  const mapAppRoleToDbRole = (appRole: AppRole): 'superadmin' | 'admin' | 'manager' | 'employee' | 'user' => {
+    const roleMapping: Record<AppRole, 'superadmin' | 'admin' | 'manager' | 'employee' | 'user'> = {
+      'superadmin': 'superadmin',
+      'ceo': 'admin',
+      'gerente_area': 'manager',
+      'lider_area': 'manager',
+      'jefe_area': 'manager',
+      'jefe_seccion': 'manager',
+      'colaborador': 'employee',
+      'investigador': 'employee',
+      'asesor': 'user',
+    };
+    return roleMapping[appRole] || 'user';
+  };
+
   const updateUserRole = useCallback(async (
     userId: string,
     newRole: AppRole
@@ -184,6 +200,9 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
 
     try {
+      // Map the app role to a valid database role
+      const dbRole = mapAppRoleToDbRole(newRole);
+      
       // Remove existing roles for this user (except superadmin if they're not the target)
       const { error: deleteError } = await supabase
         .from('user_roles')
@@ -191,27 +210,34 @@ export function useSuperadmin(): UseSuperadminReturn {
         .eq('user_id', userId)
         .neq('role', 'superadmin');
 
-      if (deleteError) throw deleteError;
-
-      // Add new role - cast to valid DB role type
-      const validDbRoles = ['superadmin', 'admin', 'manager', 'employee', 'user'] as const;
-      const dbRole = validDbRoles.includes(newRole as any) ? newRole : 'user';
-      
-      if (dbRole !== 'superadmin') {
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: dbRole as 'admin' | 'employee' | 'manager' | 'superadmin' | 'user' });
-
-        if (insertError) throw insertError;
+      if (deleteError) {
+        console.error('Error deleting existing roles:', deleteError);
+        throw deleteError;
       }
 
-      // Also update role in user_profiles for compatibility
+      // Add new role if not superadmin (superadmin role should not be assigned this way)
+      if (newRole !== 'superadmin') {
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: dbRole });
+
+        if (insertError) {
+          console.error('Error inserting new role:', insertError);
+          throw insertError;
+        }
+      }
+
+      // Also update role in user_profiles for display purposes (stores the app role name)
       const { error } = await supabase
         .from('user_profiles')
         .update({ role: newRole })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating user_profiles role:', error);
+        throw error;
+      }
+      
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -242,22 +268,21 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
 
     try {
-      // Cast role to valid DB type
-      const validDbRoles = ['superadmin', 'admin', 'manager', 'employee', 'user'] as const;
-      const dbRole = validDbRoles.includes(role as any) ? role : 'user';
+      // Map app role to db role
+      const dbRole = mapAppRoleToDbRole(role);
       
       const { error } = await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId)
-        .eq('role', dbRole as 'admin' | 'employee' | 'manager' | 'superadmin' | 'user');
+        .eq('role', dbRole);
 
       if (error) throw error;
       
-      // Update user_profiles role to 'user' if removing their role
+      // Update user_profiles role to 'colaborador' if removing their role
       await supabase
         .from('user_profiles')
-        .update({ role: 'user' })
+        .update({ role: 'colaborador' })
         .eq('id', userId);
 
       await fetchUsers();
