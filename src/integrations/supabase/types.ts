@@ -1093,6 +1093,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_chat_participant: {
+        Args: { p_chat_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_superadmin: { Args: never; Returns: boolean }
       save_facial_embedding: {
         Args: {
