@@ -1,22 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Brain, 
   Plus, 
   Trash2, 
-  Save, 
   Building2, 
   FileText, 
   Target, 
   Lightbulb, 
   TrendingUp, 
   BookOpen,
-  Users,
   Shield,
-  ChevronDown,
+  ArrowLeft,
+  Upload,
+  MessageSquare,
+  Send,
+  Sparkles,
+  FileUp,
   X,
-  Check,
-  ArrowLeft
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,12 +31,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 interface KnowledgeEntry {
   id: string;
@@ -44,6 +46,11 @@ interface KnowledgeEntry {
   content: string;
   is_confidential: boolean;
   created_at: string;
+  document_url?: string | null;
+  document_name?: string | null;
+  document_type?: string | null;
+  analyzed_summary?: string | null;
+  key_points?: any[] | null;
 }
 
 interface Company {
@@ -68,6 +75,11 @@ interface UserProfile {
   company_id: string | null;
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 const CATEGORIES = [
   { value: 'estrategia', label: 'Estrategia', icon: Target, color: 'text-blue-400' },
   { value: 'proyeccion', label: 'Proyección', icon: TrendingUp, color: 'text-green-400' },
@@ -81,6 +93,8 @@ export default function CEOKnowledgeManager() {
   const navigate = useNavigate();
   const { profile } = useSupabaseAuth();
   const { isSuperadmin, isCheckingRole } = useSuperadmin();
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -89,10 +103,11 @@ export default function CEOKnowledgeManager() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Dialog states
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAccessDialog, setShowAccessDialog] = useState(false);
   
   // New entry form
   const [newEntry, setNewEntry] = useState({
@@ -101,9 +116,15 @@ export default function CEOKnowledgeManager() {
     content: '',
     is_confidential: false,
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // Chatbot state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isSendingChat, setIsSendingChat] = useState(false);
+  const [selectedEntryForAnalysis, setSelectedEntryForAnalysis] = useState<KnowledgeEntry | null>(null);
 
   useEffect(() => {
-    // Wait for role check to complete before redirecting
     if (isCheckingRole) return;
     
     if (!isSuperadmin) {
@@ -121,6 +142,10 @@ export default function CEOKnowledgeManager() {
       loadUserAccess();
     }
   }, [selectedCompany]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const loadCompanies = async () => {
     try {
@@ -167,7 +192,24 @@ export default function CEOKnowledgeManager() {
         .order('category', { ascending: true });
 
       if (error) throw error;
-      setKnowledgeEntries(data || []);
+      
+      // Parse entries with proper typing
+      const entries: KnowledgeEntry[] = (data || []).map(entry => ({
+        id: entry.id,
+        company_id: entry.company_id,
+        category: entry.category,
+        title: entry.title,
+        content: entry.content,
+        is_confidential: entry.is_confidential || false,
+        created_at: entry.created_at,
+        document_url: entry.document_url,
+        document_name: entry.document_name,
+        document_type: entry.document_type,
+        analyzed_summary: entry.analyzed_summary,
+        key_points: entry.key_points ? (Array.isArray(entry.key_points) ? entry.key_points : []) : null,
+      }));
+      
+      setKnowledgeEntries(entries);
     } catch (error) {
       console.error('Error loading knowledge:', error);
       toast.error('Error al cargar conocimiento');
@@ -185,15 +227,14 @@ export default function CEOKnowledgeManager() {
 
       if (error) throw error;
       
-      // Enrich with user names
-      const enrichedAccess = await Promise.all((data || []).map(async (access) => {
+      const enrichedAccess = (data || []).map((access) => {
         const user = allUsers.find(u => u.id === access.user_id);
         return {
           ...access,
           user_name: user?.full_name || 'Usuario desconocido',
           user_email: user?.email || '',
         };
-      }));
+      });
       
       setUserAccess(enrichedAccess);
     } catch (error) {
@@ -201,29 +242,90 @@ export default function CEOKnowledgeManager() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Tipo de archivo no soportado. Usa PDF, DOC, DOCX o TXT.');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('El archivo es demasiado grande. Máximo 50MB.');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadDocument = async (): Promise<{ url: string; name: string; type: string } | null> => {
+    if (!selectedFile) return null;
+    
+    setIsUploading(true);
+    try {
+      const fileName = `${selectedCompany}/${Date.now()}-${selectedFile.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('ceo-knowledge-docs')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('ceo-knowledge-docs')
+        .getPublicUrl(fileName);
+
+      return {
+        url: urlData.publicUrl,
+        name: selectedFile.name,
+        type: selectedFile.type,
+      };
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      toast.error('Error al subir documento');
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleAddEntry = async () => {
-    if (!newEntry.title.trim() || !newEntry.content.trim()) {
-      toast.error('Por favor completa todos los campos');
+    if (!newEntry.title.trim() || (!newEntry.content.trim() && !selectedFile)) {
+      toast.error('Por favor completa el título y contenido o sube un documento');
       return;
     }
 
     setIsSaving(true);
     try {
+      let documentData = null;
+      if (selectedFile) {
+        documentData = await uploadDocument();
+      }
+
+      const insertData: any = {
+        company_id: selectedCompany,
+        category: newEntry.category,
+        title: newEntry.title,
+        content: newEntry.content || `Documento: ${selectedFile?.name}`,
+        is_confidential: newEntry.is_confidential,
+        created_by: profile?.id,
+      };
+
+      if (documentData) {
+        insertData.document_url = documentData.url;
+        insertData.document_name = documentData.name;
+        insertData.document_type = documentData.type;
+      }
+
       const { error } = await supabase
         .from('ceo_knowledge')
-        .insert({
-          company_id: selectedCompany,
-          category: newEntry.category,
-          title: newEntry.title,
-          content: newEntry.content,
-          is_confidential: newEntry.is_confidential,
-          created_by: profile?.id,
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
       toast.success('Conocimiento agregado exitosamente');
       setNewEntry({ category: 'informacion', title: '', content: '', is_confidential: false });
+      setSelectedFile(null);
       setShowAddDialog(false);
       loadKnowledge();
     } catch (error) {
@@ -288,6 +390,114 @@ export default function CEOKnowledgeManager() {
     }
   };
 
+  const analyzeKnowledge = async (entry: KnowledgeEntry) => {
+    setIsAnalyzing(true);
+    setSelectedEntryForAnalysis(entry);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-knowledge', {
+        body: {
+          action: 'analyze',
+          content: entry.content,
+          title: entry.title,
+          category: entry.category,
+          companyName: getCompanyName(entry.company_id),
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Update the entry with analysis
+        await supabase
+          .from('ceo_knowledge')
+          .update({
+            analyzed_summary: data.summary,
+            key_points: data.keyPoints,
+          })
+          .eq('id', entry.id);
+
+        // Add analysis to chat
+        setChatMessages([
+          { role: 'assistant', content: data.response }
+        ]);
+        
+        toast.success('Análisis completado');
+        loadKnowledge();
+      }
+    } catch (error) {
+      console.error('Error analyzing knowledge:', error);
+      toast.error('Error al analizar conocimiento');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage = chatInput;
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsSendingChat(true);
+
+    try {
+      // Build context from all knowledge entries
+      const knowledgeContext = knowledgeEntries
+        .map(e => `**${e.title}** (${e.category}):\n${e.content}`)
+        .join('\n\n---\n\n');
+
+      const { data, error } = await supabase.functions.invoke('analyze-knowledge', {
+        body: {
+          action: 'chat',
+          message: userMessage,
+          context: `Empresa: ${getCompanyName(selectedCompany)}\n\nConocimiento disponible:\n${knowledgeContext}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      }
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      toast.error('Error al enviar mensaje');
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, hubo un error al procesar tu mensaje.' }]);
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
+  const suggestChatbotResponse = async (entry: KnowledgeEntry) => {
+    setIsSendingChat(true);
+    setChatMessages([]);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-knowledge', {
+        body: {
+          action: 'suggest_response',
+          message: `Para el conocimiento "${entry.title}", ¿cómo debería el chatbot CEO comunicar esta información al equipo?`,
+          context: `Título: ${entry.title}\nCategoría: ${entry.category}\nContenido: ${entry.content}\nConfidencial: ${entry.is_confidential ? 'Sí' : 'No'}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setChatMessages([
+          { role: 'user', content: `Sugiere cómo comunicar "${entry.title}" al equipo` },
+          { role: 'assistant', content: data.response }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error getting suggestion:', error);
+      toast.error('Error al obtener sugerencia');
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
   const getCategoryInfo = (category: string) => {
     return CATEGORIES.find(c => c.value === category) || CATEGORIES[4];
   };
@@ -296,7 +506,6 @@ export default function CEOKnowledgeManager() {
     return companies.find(c => c.id === companyId)?.name || companyId;
   };
 
-  // Filter users who don't have access yet and are not from this company
   const usersWithoutAccess = allUsers.filter(user => 
     user.company_id !== selectedCompany && 
     !userAccess.some(access => access.user_id === user.id)
@@ -319,7 +528,7 @@ export default function CEOKnowledgeManager() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/superadmin')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/ceo-chatbot')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-3">
@@ -329,7 +538,7 @@ export default function CEOKnowledgeManager() {
               <div>
                 <h1 className="text-2xl font-bold">Gestor de Conocimiento CEO</h1>
                 <p className="text-muted-foreground text-sm">
-                  Administra la información que el chatbot comparte con tu equipo
+                  Administra la información y analiza cómo comunicarla a tu equipo
                 </p>
               </div>
             </div>
@@ -365,14 +574,18 @@ export default function CEOKnowledgeManager() {
 
         {selectedCompany && (
           <Tabs defaultValue="knowledge" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="knowledge" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Conocimiento
               </TabsTrigger>
+              <TabsTrigger value="analysis" className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Analizar
+              </TabsTrigger>
               <TabsTrigger value="access" className="flex items-center gap-2">
                 <Shield className="w-4 h-4" />
-                Control de Acceso
+                Accesos
               </TabsTrigger>
             </TabsList>
 
@@ -389,7 +602,7 @@ export default function CEOKnowledgeManager() {
                       Agregar Conocimiento
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Agregar Conocimiento</DialogTitle>
                       <DialogDescription>
@@ -435,6 +648,48 @@ export default function CEOKnowledgeManager() {
                           rows={5}
                         />
                       </div>
+                      
+                      {/* Document Upload */}
+                      <div className="space-y-2">
+                        <Label>Documento (opcional)</Label>
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          {selectedFile ? (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileUp className="w-5 h-5 text-primary" />
+                                <span className="text-sm">{selectedFile.name}</span>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => setSelectedFile(null)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="gap-2"
+                            >
+                              <Upload className="w-4 h-4" />
+                              Subir Documento
+                            </Button>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2">
+                            PDF, DOC, DOCX o TXT (máx. 50MB)
+                          </p>
+                        </div>
+                      </div>
+                      
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={newEntry.is_confidential}
@@ -447,8 +702,13 @@ export default function CEOKnowledgeManager() {
                       <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                         Cancelar
                       </Button>
-                      <Button onClick={handleAddEntry} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                      <Button onClick={handleAddEntry} disabled={isSaving || isUploading}>
+                        {(isSaving || isUploading) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {isUploading ? 'Subiendo...' : 'Guardando...'}
+                          </>
+                        ) : 'Guardar'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -494,28 +754,53 @@ export default function CEOKnowledgeManager() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-medium truncate">{entry.title}</h4>
+                                  <span className="font-medium truncate">{entry.title}</span>
                                   {entry.is_confidential && (
-                                    <Badge variant="destructive" className="text-xs">
-                                      Confidencial
+                                    <Badge variant="destructive" className="text-xs">Confidencial</Badge>
+                                  )}
+                                  {entry.document_name && (
+                                    <Badge variant="outline" className="text-xs">
+                                      <FileUp className="w-3 h-3 mr-1" />
+                                      Documento
+                                    </Badge>
+                                  )}
+                                  {entry.analyzed_summary && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Sparkles className="w-3 h-3 mr-1" />
+                                      Analizado
                                     </Badge>
                                   )}
                                 </div>
                                 <p className="text-sm text-muted-foreground line-clamp-2">
                                   {entry.content}
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {new Date(entry.created_at).toLocaleDateString('es-ES')}
-                                </p>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteEntry(entry.id)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => analyzeKnowledge(entry)}
+                                  disabled={isAnalyzing}
+                                  title="Analizar"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => suggestChatbotResponse(entry)}
+                                  title="Sugerir respuesta"
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteEntry(entry.id)}
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </CardContent>
@@ -526,102 +811,190 @@ export default function CEOKnowledgeManager() {
               )}
             </TabsContent>
 
+            {/* Analysis Tab with Internal Chatbot */}
+            <TabsContent value="analysis" className="space-y-4">
+              <Card className="h-[600px] flex flex-col">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-primary" />
+                    Asistente de Análisis
+                  </CardTitle>
+                  <CardDescription>
+                    Pregúntame sobre el conocimiento cargado. Te ayudaré a entender y estructurar la información para comunicarla efectivamente.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col min-h-0">
+                  {/* Chat Messages */}
+                  <ScrollArea className="flex-1 pr-4">
+                    <div className="space-y-4 pb-4">
+                      {chatMessages.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                          <h3 className="font-semibold mb-2">Analiza tu conocimiento</h3>
+                          <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                            Puedo ayudarte a entender mejor la información, sugerir cómo comunicarla a tu equipo, y responder preguntas sobre estrategias y directrices.
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setChatInput('¿Cuáles son los puntos clave del conocimiento cargado?');
+                              }}
+                            >
+                              Puntos clave
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setChatInput('¿Cómo debo comunicar esta información a mi equipo?');
+                              }}
+                            >
+                              Cómo comunicar
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setChatInput('Resume las estrategias principales');
+                              }}
+                            >
+                              Resumir estrategias
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        chatMessages.map((msg, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                                msg.role === 'user'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted'
+                              }`}
+                            >
+                              {msg.role === 'assistant' ? (
+                                <MarkdownRenderer content={msg.content} />
+                              ) : (
+                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      {isSendingChat && (
+                        <div className="flex justify-start">
+                          <div className="bg-muted rounded-2xl px-4 py-3">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                  </ScrollArea>
+                  
+                  {/* Chat Input */}
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Pregunta sobre el conocimiento..."
+                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+                      disabled={isSendingChat || knowledgeEntries.length === 0}
+                    />
+                    <Button 
+                      onClick={sendChatMessage}
+                      disabled={!chatInput.trim() || isSendingChat || knowledgeEntries.length === 0}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {knowledgeEntries.length === 0 && (
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Agrega conocimiento primero para poder analizarlo
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Access Control Tab */}
             <TabsContent value="access" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Usuarios con acceso a {getCompanyName(selectedCompany)}
+                    <Shield className="w-5 h-5" />
+                    Usuarios con Acceso
                   </CardTitle>
                   <CardDescription>
-                    Por defecto, los usuarios solo pueden ver información de su propia empresa. 
-                    Aquí puedes otorgar acceso adicional a otras empresas.
+                    Estos usuarios pueden consultar el conocimiento de {getCompanyName(selectedCompany)} aunque no pertenezcan a esta empresa
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Current Access List */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Accesos otorgados</Label>
-                    {userAccess.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No hay accesos adicionales configurados
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {userAccess.map((access) => (
-                          <div 
-                            key={access.id}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                <Users className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">{access.user_name}</p>
-                                <p className="text-xs text-muted-foreground">{access.user_email}</p>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRevokeAccess(access.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Revocar
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Grant Access */}
-                  <div className="border-t pt-4">
-                    <Label className="text-sm font-medium">Otorgar nuevo acceso</Label>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Selecciona usuarios de otras empresas para darles acceso a esta información
+                <CardContent>
+                  {userAccess.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay usuarios con acceso especial. Los usuarios de {getCompanyName(selectedCompany)} tienen acceso automático.
                     </p>
-                    
-                    {usersWithoutAccess.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        Todos los usuarios externos ya tienen acceso
-                      </p>
-                    ) : (
-                      <ScrollArea className="h-60 border rounded-lg p-2">
-                        <div className="space-y-2">
-                          {usersWithoutAccess.map((user) => (
-                            <div 
-                              key={user.id}
-                              className="flex items-center justify-between p-2 rounded hover:bg-muted/50"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                  <Users className="w-4 h-4 text-muted-foreground" />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">{user.full_name || 'Sin nombre'}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {user.email} • {getCompanyName(user.company_id || '')}
-                                  </p>
-                                </div>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleGrantAccess(user.id)}
-                              >
-                                <Check className="w-4 h-4 mr-1" />
-                                Otorgar
-                              </Button>
-                            </div>
-                          ))}
+                  ) : (
+                    <div className="space-y-2">
+                      {userAccess.map((access) => (
+                        <div key={access.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                          <div>
+                            <p className="font-medium">{access.user_name}</p>
+                            <p className="text-sm text-muted-foreground">{access.user_email}</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleRevokeAccess(access.id)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Revocar
+                          </Button>
                         </div>
-                      </ScrollArea>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Conceder Acceso</CardTitle>
+                  <CardDescription>
+                    Selecciona usuarios de otras empresas para darles acceso a este conocimiento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2">
+                      {usersWithoutAccess.map((user) => (
+                        <div key={user.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30">
+                          <div>
+                            <p className="font-medium">{user.full_name || 'Sin nombre'}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleGrantAccess(user.id)}
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Conceder
+                          </Button>
+                        </div>
+                      ))}
+                      {usersWithoutAccess.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Todos los usuarios ya tienen acceso
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
             </TabsContent>
