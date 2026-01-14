@@ -38,7 +38,7 @@ type RecognitionStatus =
   | 'success'
   | 'failed';
 
-type LivenessChallenge = 'turn-left' | 'turn-right' | 'nod' | 'blink';
+type LivenessChallenge = 'turn-left' | 'turn-right' | 'nod-up' | 'nod-down';
 
 const FACE_API_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 const SIMILARITY_THRESHOLD = 0.75;
@@ -50,8 +50,8 @@ const LIVENESS_TIMEOUT_SECONDS = 15;
 const CHALLENGE_MESSAGES: Record<LivenessChallenge, string> = {
   'turn-left': '👈 Gira la cabeza hacia la IZQUIERDA',
   'turn-right': '👉 Gira la cabeza hacia la DERECHA',
-  'nod': '👆👇 Asiente con la cabeza (sí)',
-  'blink': '👁️ Parpadea lentamente 2 veces'
+  'nod-up': '👆 Mueve la cabeza hacia ARRIBA',
+  'nod-down': '👇 Mueve la cabeza hacia ABAJO'
 };
 
 export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRecognitionProps) => {
@@ -323,9 +323,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     return (A + B) / (2.0 * C);
   };
 
-  // Select random liveness challenge
+  // Select random liveness challenge (only head movements)
   const selectRandomChallenge = (): LivenessChallenge => {
-    const challenges: LivenessChallenge[] = ['turn-left', 'turn-right', 'blink'];
+    const challenges: LivenessChallenge[] = ['turn-left', 'turn-right', 'nod-up', 'nod-down'];
     return challenges[Math.floor(Math.random() * challenges.length)];
   };
 
@@ -364,14 +364,13 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     const deltaY = currentY - initialY;
     
     // Movement threshold (adjust based on video resolution)
-    const MOVEMENT_THRESHOLD = 25;
-    let progress = 0;
+    const MOVEMENT_THRESHOLD = 20; // Reduced for easier detection
 
     switch (challenge) {
       case 'turn-left':
         // Nose moves RIGHT in mirrored video when turning left
-        progress = Math.min(100, Math.max(0, (deltaX / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progress);
+        const progressLeft = Math.min(100, Math.max(0, (deltaX / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progressLeft);
         if (deltaX > MOVEMENT_THRESHOLD) {
           console.log('✅ LIVENESS: Turn left detected! DeltaX:', deltaX.toFixed(2));
           return true;
@@ -380,58 +379,38 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
       case 'turn-right':
         // Nose moves LEFT in mirrored video when turning right
-        progress = Math.min(100, Math.max(0, (Math.abs(deltaX) / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progress);
+        const progressRight = Math.min(100, Math.max(0, (Math.abs(deltaX) / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progressRight);
         if (deltaX < -MOVEMENT_THRESHOLD) {
           console.log('✅ LIVENESS: Turn right detected! DeltaX:', deltaX.toFixed(2));
           return true;
         }
         break;
 
-      case 'nod':
-        // Head moves down then up
-        progress = Math.min(100, Math.max(0, (Math.abs(deltaY) / MOVEMENT_THRESHOLD) * 100));
-        setLivenessProgress(progress);
-        if (Math.abs(deltaY) > MOVEMENT_THRESHOLD) {
-          console.log('✅ LIVENESS: Nod detected! DeltaY:', deltaY.toFixed(2));
+      case 'nod-up':
+        // Head moves up (nose goes up in video, Y decreases)
+        const progressUp = Math.min(100, Math.max(0, (Math.abs(deltaY) / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progressUp);
+        if (deltaY < -MOVEMENT_THRESHOLD) {
+          console.log('✅ LIVENESS: Nod up detected! DeltaY:', deltaY.toFixed(2));
           return true;
         }
         break;
 
-      case 'blink':
-        const leftEAR = calculateEAR(landmarks.getLeftEye());
-        const rightEAR = calculateEAR(landmarks.getRightEye());
-        const avgEAR = (leftEAR + rightEAR) / 2;
-        
-        eyeRatioHistoryRef.current.push(avgEAR);
-        if (eyeRatioHistoryRef.current.length > 20) {
-          eyeRatioHistoryRef.current.shift();
-        }
-
-        // Show progress based on eye closure
-        const earProgress = Math.min(100, Math.max(0, ((0.3 - avgEAR) / 0.1) * 100));
-        setLivenessProgress(earProgress);
-
-        // Detect blink pattern
-        if (eyeRatioHistoryRef.current.length >= 8) {
-          const recent = eyeRatioHistoryRef.current.slice(-8);
-          const min = Math.min(...recent);
-          const max = Math.max(...recent);
-          const current = recent[recent.length - 1];
-          
-          // Blink: significant EAR drop followed by recovery
-          if (max - min > 0.06 && min < 0.25 && current > min + 0.03) {
-            console.log('✅ LIVENESS: Blink detected! EAR min:', min.toFixed(3), 'max:', max.toFixed(3));
-            setLivenessProgress(100);
-            return true;
-          }
+      case 'nod-down':
+        // Head moves down (nose goes down in video, Y increases)
+        const progressDown = Math.min(100, Math.max(0, (deltaY / MOVEMENT_THRESHOLD) * 100));
+        setLivenessProgress(progressDown);
+        if (deltaY > MOVEMENT_THRESHOLD) {
+          console.log('✅ LIVENESS: Nod down detected! DeltaY:', deltaY.toFixed(2));
+          return true;
         }
         break;
     }
 
     // Log progress periodically
     if (nosePositionsRef.current.length % 15 === 0) {
-      console.log(`🔍 Liveness check - Challenge: ${challenge}, DeltaX: ${deltaX.toFixed(2)}, DeltaY: ${deltaY.toFixed(2)}, Progress: ${progress.toFixed(0)}%`);
+      console.log(`🔍 Liveness check - Challenge: ${challenge}, DeltaX: ${deltaX.toFixed(2)}, DeltaY: ${deltaY.toFixed(2)}`);
     }
 
     return false;
@@ -919,22 +898,21 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
                       <span className="text-4xl animate-bounce">👉</span>
                     </>
                   )}
-                  {currentChallenge === 'blink' && (
+                  {currentChallenge === 'nod-up' && (
                     <>
-                      <span className="text-4xl">👁️</span>
+                      <span className="text-4xl animate-bounce">👆</span>
                       <div className="text-center">
-                        <p className="text-lg font-bold">PARPADEA</p>
-                        <p className="text-sm opacity-80">Cierra y abre los ojos lentamente</p>
+                        <p className="text-lg font-bold">MIRA HACIA ARRIBA</p>
+                        <p className="text-sm opacity-80">Levanta la cabeza hacia arriba</p>
                       </div>
-                      <span className="text-4xl">👁️</span>
                     </>
                   )}
-                  {currentChallenge === 'nod' && (
+                  {currentChallenge === 'nod-down' && (
                     <>
-                      <span className="text-4xl animate-bounce">👆👇</span>
+                      <span className="text-4xl animate-bounce">👇</span>
                       <div className="text-center">
-                        <p className="text-lg font-bold">ASIENTE</p>
-                        <p className="text-sm opacity-80">Mueve tu cabeza de arriba a abajo</p>
+                        <p className="text-lg font-bold">MIRA HACIA ABAJO</p>
+                        <p className="text-sm opacity-80">Baja la cabeza hacia abajo</p>
                       </div>
                     </>
                   )}
