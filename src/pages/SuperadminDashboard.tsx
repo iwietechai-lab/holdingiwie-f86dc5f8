@@ -46,7 +46,6 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   SuperadminUser, 
-  APP_ROLE_LABELS, 
   AppRole,
   SUPERADMIN_USER_ID
 } from '@/types/superadmin';
@@ -134,23 +133,31 @@ export default function SuperadminDashboard() {
     return result;
   };
 
-  const getRoleBadge = (role: AppRole) => {
-    const colors: Record<AppRole, string> = {
-      superadmin: 'bg-red-500/20 text-red-400 border-red-500',
-      ceo: 'bg-purple-500/20 text-purple-400 border-purple-500',
-      gerente_area: 'bg-yellow-500/20 text-yellow-400 border-yellow-500',
-      lider_area: 'bg-blue-500/20 text-blue-400 border-blue-500',
-      jefe_area: 'bg-cyan-500/20 text-cyan-400 border-cyan-500',
-      jefe_seccion: 'bg-teal-500/20 text-teal-400 border-teal-500',
-      colaborador: 'bg-green-500/20 text-green-400 border-green-500',
-      investigador: 'bg-orange-500/20 text-orange-400 border-orange-500',
-      asesor: 'bg-pink-500/20 text-pink-400 border-pink-500',
-    };
+  // Map database roles to display labels
+  const DB_ROLE_LABELS: Record<string, string> = {
+    superadmin: 'Super Admin',
+    admin: 'Admin',
+    manager: 'Manager',
+    employee: 'Empleado',
+    user: 'Usuario',
+  };
+
+  const DB_ROLE_COLORS: Record<string, string> = {
+    superadmin: 'bg-red-500/20 text-red-400 border-red-500',
+    admin: 'bg-purple-500/20 text-purple-400 border-purple-500',
+    manager: 'bg-yellow-500/20 text-yellow-400 border-yellow-500',
+    employee: 'bg-green-500/20 text-green-400 border-green-500',
+    user: 'bg-gray-500/20 text-gray-400 border-gray-500',
+  };
+
+  const getRoleBadge = (role: string) => {
+    const color = DB_ROLE_COLORS[role] || 'bg-gray-500/20 text-gray-400 border-gray-500';
+    const label = DB_ROLE_LABELS[role] || role;
 
     return (
-      <Badge variant="outline" className={`${colors[role]} border`}>
+      <Badge variant="outline" className={`${color} border`}>
         {role === 'superadmin' && <Crown className="w-3 h-3 mr-1" />}
-        {APP_ROLE_LABELS[role]}
+        {label}
       </Badge>
     );
   };
@@ -342,11 +349,11 @@ export default function SuperadminDashboard() {
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     <SelectItem value="all">Todos los roles</SelectItem>
-                    {Object.entries(APP_ROLE_LABELS).map(([role, label]) => (
-                      <SelectItem key={role} value={role}>
-                        {label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="employee">Empleado</SelectItem>
+                    <SelectItem value="user">Usuario</SelectItem>
                   </SelectContent>
                 </Select>
 
