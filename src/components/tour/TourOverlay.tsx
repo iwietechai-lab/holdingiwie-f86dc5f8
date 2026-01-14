@@ -172,7 +172,7 @@ export const TourOverlay = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999]"
+        className="fixed inset-0 z-[9999] pointer-events-none"
       >
         {/* Backdrop with spotlight effect */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -411,7 +411,7 @@ export const TourOverlay = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.9 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300, delay: 0.2 }}
-              className="absolute z-10 w-[360px] max-w-[90vw]"
+              className="absolute z-10 w-[360px] max-w-[90vw] pointer-events-auto"
               style={getTooltipPosition()}
             >
               <div className="bg-gradient-to-br from-card via-card to-card/90 border border-primary/30 rounded-2xl shadow-2xl shadow-primary/20 overflow-hidden backdrop-blur-xl">
