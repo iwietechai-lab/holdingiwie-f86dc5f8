@@ -260,8 +260,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
               onChange={handleTextareaChange}
               onKeyDown={handleKeyPress}
               disabled={isSending}
-              className="flex-1 min-h-[40px] max-h-[120px] resize-none py-2"
+              className="flex-1 !min-h-[44px] max-h-[150px] resize-none py-3 overflow-y-auto"
               rows={1}
+              wrap="soft"
             />
             <Button
               onClick={handleSend}
