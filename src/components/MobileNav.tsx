@@ -10,7 +10,7 @@ import {
   FolderOpen,
   ShieldAlert,
   Menu,
-  X,
+  ChevronDown,
   Building2,
   ClipboardList,
   Bot,
@@ -18,11 +18,14 @@ import {
   Ticket,
   MessageSquare,
   Network,
+  DollarSign,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
@@ -33,6 +36,19 @@ interface MobileNavProps {
   onSelectCompany: (companyId: string | null) => void;
 }
 
+// Submenu items for each company
+const companyMenuItems = [
+  { icon: TrendingUp, label: 'Dashboard', path: '/empresa', queryParam: true },
+  { icon: DollarSign, label: 'Ventas', path: '/empresa', queryParam: true, section: 'ventas' },
+  { icon: Users, label: 'Usuarios', path: '/usuarios', queryParam: true },
+  { icon: FolderOpen, label: 'Documentos', path: '/gestor-documentos', queryParam: true },
+  { icon: MessageSquare, label: 'Chat Interno', path: '/mensajeria', queryParam: true },
+  { icon: ClipboardList, label: 'Tareas', path: '/tareas', queryParam: true },
+  { icon: Ticket, label: 'Tickets', path: '/tickets', queryParam: true },
+  { icon: Bot, label: 'Chatbot', path: '/ceo-chatbot', queryParam: true },
+  { icon: Calendar, label: 'Reuniones', path: '/reuniones', queryParam: true },
+];
+
 export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,6 +56,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
   const [isOpen, setIsOpen] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
+  const [expandedCompanies, setExpandedCompanies] = useState<string[]>([]);
 
   const isSuperadmin = user?.id === SUPERADMIN_USER_ID;
 
@@ -53,17 +70,32 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
     setShowDevModal(true);
   };
 
-  const menuItems = [
+  const toggleCompanyExpanded = (companyId: string) => {
+    setExpandedCompanies(prev => 
+      prev.includes(companyId) 
+        ? prev.filter(id => id !== companyId)
+        : [...prev, companyId]
+    );
+  };
+
+  const handleCompanyMenuClick = (companyId: string, menuItem: typeof companyMenuItems[0]) => {
+    onSelectCompany(companyId);
+    if (menuItem.queryParam) {
+      const params = new URLSearchParams();
+      params.set('empresa', companyId);
+      if (menuItem.section) {
+        params.set('section', menuItem.section);
+      }
+      navigate(`${menuItem.path}?${params.toString()}`);
+    } else {
+      navigate(menuItem.path);
+    }
+    setIsOpen(false);
+  };
+
+  const globalMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
-    { icon: Building2, label: 'Dashboard Empresa', action: 'navigate', path: '/empresa' },
-    { icon: ClipboardList, label: 'Tareas', action: 'navigate', path: '/tareas' },
-    { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
-    { icon: FolderOpen, label: 'Documentos', action: 'navigate', path: '/gestor-documentos' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
-    { icon: Bot, label: 'Chatbot CEO', action: 'navigate', path: '/ceo-chatbot' },
-    { icon: Calendar, label: 'Reuniones', action: 'navigate', path: '/reuniones' },
-    { icon: Ticket, label: 'Tickets', action: 'navigate', path: '/tickets' },
-    { icon: MessageSquare, label: 'Mensajería', action: 'navigate', path: '/mensajeria' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
     ...(isSuperadmin
@@ -71,7 +103,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
       : []),
   ];
 
-  const handleNavigation = (item: typeof menuItems[0]) => {
+  const handleNavigation = (item: typeof globalMenuItems[0]) => {
     if (item.action === 'dev') {
       handleDevClick(item.label);
     } else if (item.action === 'navigate' && item.path) {
@@ -105,13 +137,13 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
             </SheetTitle>
           </SheetHeader>
 
-          <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-            {/* Menu items */}
+          <nav className="flex-1 overflow-y-auto p-4 space-y-6 max-h-[calc(100vh-200px)]">
+            {/* Global menu items */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
                 Menú Principal
               </p>
-              {menuItems.map((item) => {
+              {globalMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.path ? location.pathname === item.path : false;
 
@@ -133,46 +165,69 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
               })}
             </div>
 
-            {/* Companies */}
+            {/* Companies with expandable submenus */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
                 Empresas
               </p>
 
-              <button
-                onClick={() => {
-                  onSelectCompany(null);
-                  setIsOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                  selectedCompany === null
-                    ? 'bg-primary/20 text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                )}
-              >
-                <Building2 className="w-5 h-5 shrink-0" />
-                <span className="truncate">Todas las empresas</span>
-              </button>
+              {companies.map((company) => {
+                const isExpanded = expandedCompanies.includes(company.id);
+                const isSelected = selectedCompany === company.id;
 
-              {companies.map((company) => (
-                <button
-                  key={company.id}
-                  onClick={() => {
-                    onSelectCompany(company.id);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group',
-                    selectedCompany === company.id
-                      ? 'bg-primary/20 text-primary'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                  )}
-                >
-                  <span className="text-xl shrink-0">{company.icon}</span>
-                  <span className="truncate text-sm">{company.name}</span>
-                </button>
-              ))}
+                return (
+                  <Collapsible 
+                    key={company.id} 
+                    open={isExpanded}
+                    onOpenChange={() => toggleCompanyExpanded(company.id)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <button
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                          isSelected 
+                            ? "bg-primary/20 text-primary" 
+                            : "text-sidebar-foreground hover:bg-sidebar-accent"
+                        )}
+                      >
+                        <span className="text-xl shrink-0">{company.icon}</span>
+                        <span className="truncate text-sm flex-1 text-left">{company.name}</span>
+                        <ChevronDown 
+                          className={cn(
+                            "w-4 h-4 transition-transform duration-200",
+                            isExpanded && "rotate-180"
+                          )} 
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-4 mt-1 space-y-1">
+                      {companyMenuItems.map((menuItem) => {
+                        const Icon = menuItem.icon;
+                        const currentParams = new URLSearchParams(location.search);
+                        const isMenuActive = location.pathname === menuItem.path && 
+                          currentParams.get('empresa') === company.id &&
+                          (!menuItem.section || currentParams.get('section') === menuItem.section);
+                        
+                        return (
+                          <button
+                            key={menuItem.label}
+                            onClick={() => handleCompanyMenuClick(company.id, menuItem)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm",
+                              isMenuActive
+                                ? "bg-primary/15 text-primary"
+                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                            )}
+                          >
+                            <Icon className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{menuItem.label}</span>
+                          </button>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
             </div>
           </nav>
 
