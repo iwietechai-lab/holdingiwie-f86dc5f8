@@ -85,6 +85,33 @@ export type Database = {
           },
         ]
       }
+      availability_slots: {
+        Row: {
+          available_date: string
+          created_at: string | null
+          end_time: string
+          id: string
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          available_date: string
+          created_at?: string | null
+          end_time: string
+          id?: string
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          available_date?: string
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ceo_availability: {
         Row: {
           created_at: string
@@ -410,53 +437,57 @@ export type Database = {
       }
       meeting_requests: {
         Row: {
-          created_at: string
-          duration_minutes: number | null
-          host_id: string
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          duration_minutes: number
           id: string
-          meeting_id: string | null
-          message: string | null
+          participants: Json
+          priority: Database["public"]["Enums"]["approval_priority"] | null
           requested_date: string
-          requested_time: string
-          requester_id: string
-          status: string | null
-          updated_at: string
+          requested_end_time: string
+          requested_start_time: string
+          room_id: string | null
+          status: Database["public"]["Enums"]["meeting_request_status"] | null
+          title: string
+          updated_at: string | null
+          video_url: string | null
         }
         Insert: {
-          created_at?: string
-          duration_minutes?: number | null
-          host_id: string
+          created_at?: string | null
+          creator_id: string
+          description?: string | null
+          duration_minutes?: number
           id?: string
-          meeting_id?: string | null
-          message?: string | null
+          participants?: Json
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
           requested_date: string
-          requested_time: string
-          requester_id: string
-          status?: string | null
-          updated_at?: string
+          requested_end_time: string
+          requested_start_time: string
+          room_id?: string | null
+          status?: Database["public"]["Enums"]["meeting_request_status"] | null
+          title: string
+          updated_at?: string | null
+          video_url?: string | null
         }
         Update: {
-          created_at?: string
-          duration_minutes?: number | null
-          host_id?: string
+          created_at?: string | null
+          creator_id?: string
+          description?: string | null
+          duration_minutes?: number
           id?: string
-          meeting_id?: string | null
-          message?: string | null
+          participants?: Json
+          priority?: Database["public"]["Enums"]["approval_priority"] | null
           requested_date?: string
-          requested_time?: string
-          requester_id?: string
-          status?: string | null
-          updated_at?: string
+          requested_end_time?: string
+          requested_start_time?: string
+          room_id?: string | null
+          status?: Database["public"]["Enums"]["meeting_request_status"] | null
+          title?: string
+          updated_at?: string | null
+          video_url?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "meeting_requests_meeting_id_fkey"
-            columns: ["meeting_id"]
-            isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       meetings: {
         Row: {
@@ -861,6 +892,36 @@ export type Database = {
         }
         Relationships: []
       }
+      video_call_signals: {
+        Row: {
+          created_at: string | null
+          id: string
+          room_id: string
+          signal_data: Json
+          signal_type: string
+          target_user_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          room_id: string
+          signal_data: Json
+          signal_type: string
+          target_user_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          room_id?: string
+          signal_data?: Json
+          signal_type?: string
+          target_user_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -919,6 +980,11 @@ export type Database = {
       app_role: "superadmin" | "admin" | "manager" | "employee" | "user"
       approval_priority: "baja" | "media" | "alta" | "urgente"
       approval_status: "pending" | "approved" | "rejected"
+      meeting_request_status:
+        | "pendiente"
+        | "aprobada"
+        | "rechazada"
+        | "completada"
       meeting_status: "scheduled" | "confirmed" | "cancelled" | "completed"
       ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
@@ -1051,6 +1117,12 @@ export const Constants = {
       app_role: ["superadmin", "admin", "manager", "employee", "user"],
       approval_priority: ["baja", "media", "alta", "urgente"],
       approval_status: ["pending", "approved", "rejected"],
+      meeting_request_status: [
+        "pendiente",
+        "aprobada",
+        "rechazada",
+        "completada",
+      ],
       meeting_status: ["scheduled", "confirmed", "cancelled", "completed"],
       ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
