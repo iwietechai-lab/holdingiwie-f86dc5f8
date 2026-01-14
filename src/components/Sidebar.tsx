@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies, getCompanyById } from '@/data/companies';
+import { CompanyIcon } from '@/components/CompanyIcon';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -156,7 +157,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center neon-glow shrink-0">
               {activeCompanyMode && activeCompany ? (
-                <span className="text-xl">{activeCompany.icon}</span>
+                <CompanyIcon companyId={activeCompany.id} icon={activeCompany.icon} size="lg" />
               ) : (
                 <Rocket className="w-6 h-6 text-primary" />
               )}
@@ -332,7 +333,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
                               : "text-sidebar-foreground hover:bg-sidebar-accent"
                           )}
                         >
-                          <span className="text-xl shrink-0">{company.icon}</span>
+                          <CompanyIcon companyId={company.id} icon={company.icon} size="lg" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="right">{company.name}</TooltipContent>
@@ -352,7 +353,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
                         : "text-sidebar-foreground hover:bg-sidebar-accent"
                     )}
                   >
-                    <span className="text-xl shrink-0">{company.icon}</span>
+                    <CompanyIcon companyId={company.id} icon={company.icon} size="lg" />
                     <span className="truncate text-sm flex-1 text-left">{company.name}</span>
                     <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                   </button>

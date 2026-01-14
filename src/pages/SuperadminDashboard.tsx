@@ -16,6 +16,7 @@ import {
   Brain
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import { CompanyIcon } from '@/components/CompanyIcon';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { SuperadminUserEditDialog } from '@/components/SuperadminUserEditDialog';
@@ -523,7 +524,7 @@ export default function SuperadminDashboard() {
                   <Card key={company.id} className="bg-card/50 backdrop-blur-sm border-border">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-3xl">{company.icon || '🏢'}</span>
+                        <CompanyIcon companyId={company.id} icon={company.icon} size="xl" />
                         <div>
                           <p className="font-medium text-foreground">{company.name}</p>
                           <p className="text-sm text-muted-foreground">{company.description}</p>

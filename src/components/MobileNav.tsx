@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
+import { CompanyIcon } from '@/components/CompanyIcon';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -190,7 +191,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
                             : "text-sidebar-foreground hover:bg-sidebar-accent"
                         )}
                       >
-                        <span className="text-xl shrink-0">{company.icon}</span>
+                        <CompanyIcon companyId={company.id} icon={company.icon} size="lg" />
                         <span className="truncate text-sm flex-1 text-left">{company.name}</span>
                         <ChevronDown 
                           className={cn(
