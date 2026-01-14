@@ -57,7 +57,8 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
+    { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
+    { icon: Building2, label: 'Dashboard Empresa', action: 'navigate', path: '/empresa' },
     { icon: ClipboardList, label: 'Tareas', action: 'navigate', path: '/tareas' },
     { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
     { icon: FolderOpen, label: 'Gestor de Documentos', action: 'navigate', path: '/gestor-documentos' },

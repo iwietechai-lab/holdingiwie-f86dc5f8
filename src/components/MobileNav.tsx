@@ -12,6 +12,12 @@ import {
   Menu,
   X,
   Building2,
+  ClipboardList,
+  Bot,
+  Calendar,
+  Ticket,
+  MessageSquare,
+  Network,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -48,10 +54,17 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', action: 'navigate', path: '/dashboard' },
+    { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
+    { icon: Building2, label: 'Dashboard Empresa', action: 'navigate', path: '/empresa' },
+    { icon: ClipboardList, label: 'Tareas', action: 'navigate', path: '/tareas' },
     { icon: Users, label: 'Usuarios', action: 'navigate', path: '/usuarios' },
-    { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: FolderOpen, label: 'Documentos', action: 'navigate', path: '/gestor-documentos' },
+    { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
+    { icon: Bot, label: 'Chatbot CEO', action: 'navigate', path: '/ceo-chatbot' },
+    { icon: Calendar, label: 'Reuniones', action: 'navigate', path: '/reuniones' },
+    { icon: Ticket, label: 'Tickets', action: 'navigate', path: '/tickets' },
+    { icon: MessageSquare, label: 'Mensajería', action: 'navigate', path: '/mensajeria' },
+    { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
     ...(isSuperadmin
       ? [{ icon: ShieldAlert, label: 'Super Admin', action: 'navigate' as const, path: '/superadmin' }]
