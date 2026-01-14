@@ -767,22 +767,62 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
   // Initialize
   useEffect(() => {
+    let mounted = true;
+    
     const init = async () => {
       getLocation();
       const modelsOk = await loadModels();
-      if (modelsOk) {
+      if (modelsOk && mounted) {
         await checkStoredEmbedding();
         await startCamera();
       }
     };
     init();
     
-    // Cleanup on unmount - ensure camera is always stopped
+    // Cleanup on unmount - ensure camera is always stopped with aggressive cleanup
     return () => {
-      console.log('🧹 Component unmounting, stopping camera...');
-      stopCamera();
+      mounted = false;
+      console.log('🧹 Component unmounting, stopping camera aggressively...');
+      
+      // Cancel animation frame first
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      
+      // Stop all media tracks from streamRef
+      if (streamRef.current) {
+        const tracks = streamRef.current.getTracks();
+        console.log('📹 Cleanup: Found', tracks.length, 'tracks to stop');
+        tracks.forEach(track => {
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch (e) {
+            console.warn('Cleanup: Error stopping track:', e);
+          }
+        });
+        streamRef.current = null;
+      }
+      
+      // Also stop tracks directly from video element
+      if (videoRef.current) {
+        const srcObj = videoRef.current.srcObject as MediaStream | null;
+        if (srcObj && srcObj.getTracks) {
+          srcObj.getTracks().forEach(track => {
+            try {
+              track.stop();
+              track.enabled = false;
+            } catch (e) {
+              console.warn('Cleanup: Error stopping video track:', e);
+            }
+          });
+        }
+        videoRef.current.srcObject = null;
+        videoRef.current.pause();
+      }
     };
-  }, [loadModels, checkStoredEmbedding, startCamera, stopCamera, getLocation]);
+  }, []); // Empty dependencies - only run on mount/unmount
 
   // Stop camera when status changes to success or failed
   useEffect(() => {

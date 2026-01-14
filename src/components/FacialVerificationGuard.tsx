@@ -41,9 +41,13 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
 
   const handleFaceSuccess = async () => {
     // RealFaceRecognition already saved the embedding and marked session as verified
+    // The camera should already be stopped by RealFaceRecognition component
     // Just update local state and hide the modal
     await recordVerification();
-    setShowFaceRecognition(false);
+    // Small delay to ensure camera is fully stopped before hiding component
+    setTimeout(() => {
+      setShowFaceRecognition(false);
+    }, 100);
   };
 
   const handleCancel = async () => {
