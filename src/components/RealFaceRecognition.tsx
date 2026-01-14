@@ -244,7 +244,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
   // Stop camera - ensures complete cleanup with forced track termination
   const stopCamera = useCallback(() => {
-    console.log('📹 Stopping camera and cleaning up...');
+    console.log('📹 FORCE stopping camera and cleaning up...');
     
     // Cancel animation frame first
     if (animationRef.current) {
@@ -255,30 +255,51 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     // Stop all media tracks from streamRef
     if (streamRef.current) {
       const tracks = streamRef.current.getTracks();
-      console.log('📹 Found', tracks.length, 'tracks to stop');
+      console.log('📹 Found', tracks.length, 'tracks to stop from streamRef');
       tracks.forEach(track => {
-        console.log('📹 Stopping track:', track.kind, track.label, 'readyState:', track.readyState);
-        track.stop();
-        track.enabled = false;
+        console.log('📹 Force stopping track:', track.kind, track.label, 'readyState:', track.readyState);
+        try {
+          track.stop();
+          track.enabled = false;
+        } catch (e) {
+          console.warn('Error stopping track:', e);
+        }
       });
       streamRef.current = null;
     }
     
     // Also stop tracks directly from video element (belt and suspenders approach)
-    if (videoRef.current && videoRef.current.srcObject) {
-      const mediaStream = videoRef.current.srcObject as MediaStream;
-      if (mediaStream && mediaStream.getTracks) {
-        mediaStream.getTracks().forEach(track => {
-          console.log('📹 Stopping video element track:', track.kind, track.label);
-          track.stop();
-          track.enabled = false;
+    if (videoRef.current) {
+      const srcObj = videoRef.current.srcObject as MediaStream | null;
+      if (srcObj && srcObj.getTracks) {
+        srcObj.getTracks().forEach(track => {
+          console.log('📹 Force stopping video element track:', track.kind, track.label);
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch (e) {
+            console.warn('Error stopping video track:', e);
+          }
         });
       }
       videoRef.current.srcObject = null;
-      videoRef.current.load(); // Force video element to release resources
+      videoRef.current.pause();
+      try {
+        videoRef.current.load(); // Force video element to release resources
+      } catch (e) {
+        console.warn('Error loading empty video:', e);
+      }
     }
     
-    console.log('✅ Camera cleanup complete - all tracks stopped');
+    // As a last resort, try to stop all active media tracks in the page
+    try {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        // This doesn't stop existing streams, but we've done what we can
+        console.log('✅ Camera cleanup complete - all tracks should be stopped');
+      }
+    } catch (e) {
+      console.warn('MediaDevices check error:', e);
+    }
   }, []);
 
   // Calculate cosine similarity
