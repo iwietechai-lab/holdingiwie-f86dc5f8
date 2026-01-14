@@ -1,129 +1,104 @@
-import { motion, Easing } from 'framer-motion';
+import { motion, Transition, TargetAndTransition } from 'framer-motion';
 
 interface TourAvatarProps {
-  mood: 'happy' | 'explaining' | 'pointing' | 'celebrating' | 'thinking';
+  mood: 'happy' | 'explaining' | 'pointing' | 'celebrating' | 'thinking' | 'waving';
+  action?: 'bounce' | 'spin' | 'wave' | 'fly' | 'dance';
   size?: 'sm' | 'md' | 'lg';
 }
 
-type EasingType = Easing;
-
-export const TourAvatar = ({ mood, size = 'md' }: TourAvatarProps) => {
+export const TourAvatar = ({ mood, action, size = 'md' }: TourAvatarProps) => {
   const sizeClasses = {
     sm: 'w-12 h-12',
     md: 'w-16 h-16',
-    lg: 'w-24 h-24'
+    lg: 'w-20 h-20'
   };
 
-  const getMoodAnimation = (): { animate?: Record<string, number[]>; transition?: { duration: number; repeat: number; ease: EasingType } } => {
-    switch (mood) {
-      case 'happy':
+  const getActionAnimation = (): TargetAndTransition => {
+    switch (action) {
+      case 'bounce':
         return {
-          animate: { 
-            scale: [1, 1.05, 1],
-            rotate: [0, 2, -2, 0]
-          },
-          transition: { 
-            duration: 2, 
-            repeat: Infinity,
-            ease: "easeInOut" as EasingType
-          }
+          y: [0, -15, 0],
+          transition: { duration: 0.6, repeat: Infinity, repeatDelay: 0.5 } as Transition
         };
-      case 'explaining':
+      case 'spin':
         return {
-          animate: { 
-            y: [0, -3, 0],
-          },
-          transition: { 
-            duration: 1.5, 
-            repeat: Infinity,
-            ease: "easeInOut" as EasingType
-          }
+          rotate: [0, 360],
+          transition: { duration: 1, repeat: Infinity, ease: "linear" as const } as Transition
         };
-      case 'pointing':
+      case 'wave':
         return {
-          animate: { 
-            x: [0, 5, 0],
-            rotate: [0, 5, 0]
-          },
-          transition: { 
-            duration: 0.8, 
-            repeat: Infinity,
-            ease: "easeInOut" as EasingType
-          }
+          rotate: [0, 15, -15, 15, -15, 0],
+          transition: { duration: 1, repeat: Infinity, repeatDelay: 1 } as Transition
         };
-      case 'celebrating':
+      case 'fly':
         return {
-          animate: { 
-            y: [0, -10, 0],
-            scale: [1, 1.1, 1],
-            rotate: [0, 10, -10, 0]
-          },
-          transition: { 
-            duration: 0.6, 
-            repeat: Infinity,
-            ease: "easeOut" as EasingType
-          }
+          y: [0, -8, 0],
+          x: [0, 3, -3, 0],
+          transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" as const } as Transition
         };
-      case 'thinking':
+      case 'dance':
         return {
-          animate: { 
-            rotate: [0, -5, 5, 0],
-          },
-          transition: { 
-            duration: 3, 
-            repeat: Infinity,
-            ease: "easeInOut" as EasingType
-          }
+          scale: [1, 1.1, 1, 1.1, 1],
+          rotate: [0, -10, 10, -10, 0],
+          y: [0, -10, 0, -10, 0],
+          transition: { duration: 1, repeat: Infinity } as Transition
         };
       default:
-        return {};
+        return {
+          scale: [1, 1.02, 1],
+          transition: { duration: 2, repeat: Infinity, ease: "easeInOut" as const } as Transition
+        };
     }
   };
 
-  const getEyesAnimation = () => {
-    if (mood === 'thinking') {
-      return {
-        animate: { x: [0, 3, -3, 0] },
-        transition: { duration: 2, repeat: Infinity }
-      };
-    }
-    if (mood === 'pointing') {
-      return {
-        animate: { x: [0, 2, 0] },
-        transition: { duration: 0.8, repeat: Infinity }
-      };
-    }
-    return {};
-  };
-
-  const getMouthPath = () => {
+  const getEyeExpression = () => {
     switch (mood) {
       case 'happy':
       case 'celebrating':
-        return "M 8 12 Q 12 16 16 12"; // Wide smile
-      case 'explaining':
-        return "M 9 12 Q 12 14 15 12"; // Slight smile
+        return { type: 'happy', blink: true };
+      case 'waving':
+        return { type: 'excited', blink: true };
       case 'pointing':
-        return "M 10 12 L 14 12"; // Neutral
+        return { type: 'focused', blink: false };
+      case 'explaining':
+        return { type: 'normal', blink: true };
       case 'thinking':
-        return "M 10 13 Q 12 11 14 13"; // Slight frown
+        return { type: 'thinking', blink: false };
       default:
-        return "M 9 12 Q 12 14 15 12";
+        return { type: 'normal', blink: true };
     }
   };
+
+  const eyeExpression = getEyeExpression();
 
   return (
     <motion.div
       className={`${sizeClasses[size]} relative`}
-      {...getMoodAnimation()}
+      animate={getActionAnimation()}
     >
       {/* Glow effect */}
-      <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
+      <motion.div 
+        className="absolute inset-0 bg-primary/40 rounded-full blur-xl"
+        animate={{
+          scale: [1, 1.3, 1],
+          opacity: [0.4, 0.7, 0.4]
+        }}
+        transition={{ duration: 2, repeat: Infinity }}
+      />
       
       {/* Main avatar container */}
-      <div className="relative w-full h-full rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent border-2 border-primary/50 shadow-lg overflow-hidden">
+      <div className="relative w-full h-full rounded-full bg-gradient-to-br from-primary via-primary/80 to-accent border-2 border-primary/50 shadow-2xl shadow-primary/50 overflow-visible">
+        {/* Shine effect */}
+        <motion.div
+          className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/30 via-transparent to-transparent"
+          animate={{
+            opacity: [0.3, 0.5, 0.3]
+          }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+        
         {/* Face */}
-        <svg viewBox="0 0 24 24" className="w-full h-full">
+        <svg viewBox="0 0 24 24" className="w-full h-full relative z-10">
           {/* Background gradient */}
           <defs>
             <radialGradient id="avatarGradient" cx="50%" cy="30%" r="70%">
@@ -134,111 +109,215 @@ export const TourAvatar = ({ mood, size = 'md' }: TourAvatarProps) => {
           <circle cx="12" cy="12" r="11" fill="url(#avatarGradient)" />
           
           {/* Eyes */}
-          <motion.g {...getEyesAnimation()}>
+          <motion.g
+            animate={eyeExpression.blink ? {
+              scaleY: [1, 0.1, 1],
+            } : {}}
+            transition={{
+              duration: 0.15,
+              repeat: Infinity,
+              repeatDelay: 3
+            }}
+            style={{ transformOrigin: 'center' }}
+          >
             {/* Left eye */}
-            <ellipse cx="8" cy="9" rx="1.5" ry="2" fill="white" />
-            <circle cx="8.3" cy="9" r="0.8" fill="hsl(var(--primary-foreground))" />
+            <ellipse cx="8" cy="9" rx="2" ry={eyeExpression.type === 'happy' ? 1.5 : 2.5} fill="white" />
+            <motion.circle 
+              cx="8" 
+              cy="9" 
+              r="1" 
+              fill="#1a1a2e"
+              animate={mood === 'pointing' ? { x: [0, 2, 0] } : mood === 'thinking' ? { x: [0, -1, 1, 0] } : {}}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
             
             {/* Right eye */}
-            <ellipse cx="16" cy="9" rx="1.5" ry="2" fill="white" />
-            <circle cx="16.3" cy="9" r="0.8" fill="hsl(var(--primary-foreground))" />
+            <ellipse cx="16" cy="9" rx="2" ry={eyeExpression.type === 'happy' ? 1.5 : 2.5} fill="white" />
+            <motion.circle 
+              cx="16" 
+              cy="9" 
+              r="1" 
+              fill="#1a1a2e"
+              animate={mood === 'pointing' ? { x: [0, 2, 0] } : mood === 'thinking' ? { x: [0, -1, 1, 0] } : {}}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
             
             {/* Eye shine */}
-            <circle cx="7.5" cy="8.3" r="0.4" fill="white" opacity="0.8" />
-            <circle cx="15.5" cy="8.3" r="0.4" fill="white" opacity="0.8" />
+            <circle cx="7.2" cy="8.2" r="0.5" fill="white" opacity="0.9" />
+            <circle cx="15.2" cy="8.2" r="0.5" fill="white" opacity="0.9" />
           </motion.g>
           
-          {/* Eyebrows */}
+          {/* Eyebrows based on mood */}
+          {mood === 'explaining' && (
+            <>
+              <path d="M 5 6.5 Q 8 5 10 6.5" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
+              <path d="M 14 6.5 Q 16 5 19 6.5" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
+            </>
+          )}
+          
           {mood === 'thinking' && (
             <>
-              <path d="M 6 7 Q 8 5.5 10 7" stroke="hsl(var(--primary-foreground))" strokeWidth="0.5" fill="none" />
-              <path d="M 14 7 Q 16 5.5 18 7" stroke="hsl(var(--primary-foreground))" strokeWidth="0.5" fill="none" />
+              <path d="M 5 7 L 10 6" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
+              <path d="M 14 6 L 19 7" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
             </>
           )}
           
-          {mood === 'celebrating' && (
+          {(mood === 'celebrating' || mood === 'waving') && (
             <>
-              <path d="M 6 6.5 L 10 7.5" stroke="hsl(var(--primary-foreground))" strokeWidth="0.5" fill="none" />
-              <path d="M 18 6.5 L 14 7.5" stroke="hsl(var(--primary-foreground))" strokeWidth="0.5" fill="none" />
+              <path d="M 5 7 Q 7.5 5 10 7" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
+              <path d="M 14 7 Q 16.5 5 19 7" stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" fill="none" />
             </>
           )}
           
-          {/* Mouth */}
-          <motion.path 
-            d={getMouthPath()} 
-            stroke="hsl(var(--primary-foreground))" 
-            strokeWidth="1" 
-            fill="none" 
-            strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 0.3 }}
-          />
+          {/* Mouth based on mood */}
+          {(mood === 'happy' || mood === 'celebrating' || mood === 'waving') && (
+            <motion.path 
+              d="M 7 14 Q 12 19 17 14" 
+              stroke="hsl(var(--primary-foreground))" 
+              strokeWidth="1.2" 
+              fill="none" 
+              strokeLinecap="round"
+              animate={{ d: ["M 7 14 Q 12 19 17 14", "M 7 14 Q 12 18 17 14", "M 7 14 Q 12 19 17 14"] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            />
+          )}
           
-          {/* Blush */}
-          {(mood === 'happy' || mood === 'celebrating') && (
+          {mood === 'explaining' && (
+            <motion.ellipse 
+              cx="12" 
+              cy="15" 
+              rx="2" 
+              ry="1.5" 
+              fill="hsl(var(--primary-foreground))"
+              animate={{ ry: [1.5, 2, 1.5, 1, 1.5] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+          )}
+          
+          {mood === 'pointing' && (
+            <path d="M 9 14 L 15 14" stroke="hsl(var(--primary-foreground))" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          )}
+          
+          {mood === 'thinking' && (
+            <path d="M 10 15 Q 12 13 14 15" stroke="hsl(var(--primary-foreground))" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          )}
+          
+          {/* Blush for happy moods */}
+          {(mood === 'happy' || mood === 'celebrating' || mood === 'waving') && (
             <>
-              <ellipse cx="5" cy="11" rx="1.5" ry="1" fill="hsl(var(--destructive))" opacity="0.3" />
-              <ellipse cx="19" cy="11" rx="1.5" ry="1" fill="hsl(var(--destructive))" opacity="0.3" />
+              <ellipse cx="5" cy="12" rx="1.5" ry="1" fill="hsl(var(--destructive))" opacity="0.3" />
+              <ellipse cx="19" cy="12" rx="1.5" ry="1" fill="hsl(var(--destructive))" opacity="0.3" />
             </>
           )}
         </svg>
         
-        {/* Antenna/hat for robot look */}
+        {/* Antenna */}
         <motion.div 
-          className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-3 bg-accent rounded-t-full"
-          animate={{ 
-            backgroundColor: ['hsl(var(--accent))', 'hsl(var(--primary))', 'hsl(var(--accent))']
+          className="absolute -top-3 left-1/2 -translate-x-1/2 flex flex-col items-center"
+          animate={{
+            y: [0, -2, 0]
           }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          transition={{ duration: 1, repeat: Infinity }}
         >
           <motion.div 
-            className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full"
+            className="w-4 h-4 rounded-full bg-gradient-to-br from-accent to-primary shadow-lg"
             animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [0.8, 1, 0.8]
+              boxShadow: ['0 0 10px hsl(var(--accent))', '0 0 20px hsl(var(--primary))', '0 0 10px hsl(var(--accent))']
             }}
             transition={{ duration: 1, repeat: Infinity }}
           />
+          <div className="w-1 h-3 bg-gradient-to-b from-accent to-primary rounded-b-full" />
         </motion.div>
       </div>
+      
+      {/* Waving hand for waving mood */}
+      {mood === 'waving' && (
+        <motion.div 
+          className="absolute -right-6 top-0 text-3xl"
+          animate={{ 
+            rotate: [0, 20, -10, 20, -10, 0],
+          }}
+          transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 0.5 }}
+          style={{ transformOrigin: 'bottom center' }}
+        >
+          👋
+        </motion.div>
+      )}
       
       {/* Pointing hand for pointing mood */}
       {mood === 'pointing' && (
         <motion.div 
-          className="absolute -right-4 top-1/2 -translate-y-1/2"
-          animate={{ x: [0, 5, 0] }}
-          transition={{ duration: 0.8, repeat: Infinity }}
+          className="absolute -right-8 top-1/2 -translate-y-1/2 text-3xl"
+          animate={{ x: [0, 8, 0] }}
+          transition={{ duration: 0.6, repeat: Infinity }}
         >
-          <span className="text-2xl">👉</span>
+          👉
         </motion.div>
       )}
       
-      {/* Celebration particles */}
+      {/* Celebration effects */}
       {mood === 'celebrating' && (
         <>
-          {[...Array(5)].map((_, i) => (
+          {[...Array(8)].map((_, i) => (
             <motion.div
               key={i}
               className="absolute w-2 h-2 rounded-full"
               style={{
-                backgroundColor: ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--secondary))'][i % 3],
+                backgroundColor: ['hsl(var(--primary))', 'hsl(var(--accent))', '#FFD700', '#FF6B6B'][i % 4],
                 left: '50%',
-                top: '0%'
+                top: '50%'
               }}
               animate={{
-                x: [0, (i - 2) * 20],
-                y: [0, -20, 10],
-                opacity: [1, 1, 0],
-                scale: [0, 1, 0]
+                x: Math.cos(i * 45 * Math.PI / 180) * 40,
+                y: Math.sin(i * 45 * Math.PI / 180) * 40,
+                opacity: [1, 0],
+                scale: [0.5, 1.5]
               }}
               transition={{
-                duration: 1,
+                duration: 0.8,
                 repeat: Infinity,
                 delay: i * 0.1
               }}
             />
           ))}
+          {/* Stars */}
+          <motion.span 
+            className="absolute -top-4 -right-2 text-xl"
+            animate={{ scale: [1, 1.3, 1], rotate: [0, 15, -15, 0] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+          >
+            ⭐
+          </motion.span>
+          <motion.span 
+            className="absolute -top-2 -left-4 text-lg"
+            animate={{ scale: [1, 1.3, 1], rotate: [0, -15, 15, 0] }}
+            transition={{ duration: 0.5, repeat: Infinity, delay: 0.2 }}
+          >
+            ✨
+          </motion.span>
+        </>
+      )}
+      
+      {/* Thinking bubbles */}
+      {mood === 'thinking' && (
+        <>
+          <motion.div
+            className="absolute -top-2 -right-2 w-2 h-2 bg-muted rounded-full"
+            animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          />
+          <motion.div
+            className="absolute -top-4 right-0 w-3 h-3 bg-muted rounded-full"
+            animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
+          />
+          <motion.div
+            className="absolute -top-7 right-2 w-4 h-4 bg-muted rounded-full flex items-center justify-center"
+            animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1, repeat: Infinity, delay: 0.6 }}
+          >
+            <span className="text-[8px]">💭</span>
+          </motion.div>
         </>
       )}
     </motion.div>
