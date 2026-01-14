@@ -181,7 +181,7 @@ export default function MeetingsPage() {
                 <CalendarPlus className="w-4 h-4" />
                 Nueva Solicitud
               </TabsTrigger>
-              {isSuperadmin && (
+              {isSuperadmin && !selectedCompany && (
                 <TabsTrigger value="availability" className="flex items-center gap-2">
                   <Settings className="w-4 h-4" />
                   Mi Disponibilidad (CEO)
@@ -197,7 +197,7 @@ export default function MeetingsPage() {
               <MeetingRequestForm currentUserId={user?.id || ''} />
             </TabsContent>
 
-            {isSuperadmin && (
+            {isSuperadmin && !selectedCompany && (
               <TabsContent value="availability">
                 <SuperadminAvailabilityManager userId={user?.id || ''} />
               </TabsContent>
