@@ -23,7 +23,7 @@ import CompanyChatbotPage from "./pages/CompanyChatbotPage";
 import BudgetPage from "./pages/BudgetPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
-
+// QueryClient for React Query data fetching
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => (
