@@ -4,6 +4,7 @@ import Peer, { MediaConnection } from 'peerjs';
 
 interface Participant {
   oderId: string;
+  peerId: string;
   userName: string;
   stream: MediaStream | null;
   audioEnabled: boolean;
@@ -38,6 +39,9 @@ export interface UseVideoCallReturn {
   sendChatMessage: (message: string) => void;
 }
 
+// Track active sessions globally to prevent duplicates
+const activeRoomSessions = new Map<string, Set<string>>();
+
 export function useVideoCall(): UseVideoCallReturn {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
@@ -60,20 +64,220 @@ export function useVideoCall(): UseVideoCallReturn {
   const peerIdRef = useRef<string>('');
   const localStreamRef = useRef<MediaStream | null>(null);
   const isLeavingRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const knownParticipantsRef = useRef<Set<string>>(new Set());
+  const connectionTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Generate unique peer ID to avoid "ID is taken" errors
+  // Generate unique peer ID - simpler format to avoid issues
   const generatePeerId = (userId: string, roomId: string) => {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `${userId.substring(0, 8)}-${roomId.substring(0, 8)}-${timestamp}-${random}`;
+    const random = Math.random().toString(36).substring(2, 6);
+    // Use shorter, cleaner format
+    return `p_${userId.substring(0, 6)}_${random}_${timestamp % 100000}`;
   };
 
   const stopAllTracks = useCallback((stream: MediaStream | null) => {
     if (stream) {
       stream.getTracks().forEach(track => {
-        track.stop();
-        track.enabled = false;
+        try {
+          track.stop();
+          track.enabled = false;
+        } catch (e) {
+          console.error('Error stopping track:', e);
+        }
       });
+    }
+  }, []);
+
+  const clearConnectionTimeout = useCallback((peerId: string) => {
+    const timeout = connectionTimeoutsRef.current.get(peerId);
+    if (timeout) {
+      clearTimeout(timeout);
+      connectionTimeoutsRef.current.delete(peerId);
+    }
+  }, []);
+
+  const removeParticipant = useCallback((oderId: string, peerId?: string) => {
+    console.log('Removing participant:', oderId, peerId);
+    
+    // Clean up connection
+    if (peerId) {
+      const connection = connectionsRef.current.get(peerId);
+      if (connection) {
+        try {
+          connection.close();
+        } catch (e) {
+          console.error('Error closing connection:', e);
+        }
+        connectionsRef.current.delete(peerId);
+      }
+      clearConnectionTimeout(peerId);
+    }
+    
+    // Remove from known participants
+    knownParticipantsRef.current.delete(oderId);
+    
+    // Update state
+    setParticipants(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(oderId);
+      return newMap;
+    });
+  }, [clearConnectionTimeout]);
+
+  const handleIncomingCall = useCallback((call: MediaConnection, peerName?: string, oderId?: string) => {
+    const odId = oderId || call.metadata?.oderId || call.peer;
+    const name = peerName || call.metadata?.userName || 'Participante';
+    const callPeerId = call.peer;
+    
+    console.log('Handling incoming call from:', callPeerId, 'oderId:', odId, 'name:', name);
+    
+    // Prevent duplicate participants - check by oderId
+    if (knownParticipantsRef.current.has(odId) && odId !== callPeerId) {
+      console.log('Participant already exists, ignoring duplicate:', odId);
+      return;
+    }
+
+    // Clear any existing timeout for this peer
+    clearConnectionTimeout(callPeerId);
+    
+    // Set timeout for stream reception
+    const timeout = setTimeout(() => {
+      console.log('Stream timeout for:', callPeerId);
+      // Keep participant but mark as no stream
+      setParticipants(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(odId);
+        if (existing && !existing.stream) {
+          console.log('Removing unconnected participant:', odId);
+          newMap.delete(odId);
+          knownParticipantsRef.current.delete(odId);
+        }
+        return newMap;
+      });
+    }, 15000);
+    
+    connectionTimeoutsRef.current.set(callPeerId, timeout);
+
+    call.on('stream', (remoteStream) => {
+      console.log('Received stream from:', callPeerId, 'for user:', odId);
+      clearConnectionTimeout(callPeerId);
+      
+      // Mark as known
+      knownParticipantsRef.current.add(odId);
+      
+      setParticipants(prev => {
+        const newMap = new Map(prev);
+        newMap.set(odId, {
+          oderId: odId,
+          peerId: callPeerId,
+          userName: name,
+          stream: remoteStream,
+          audioEnabled: true,
+          videoEnabled: true,
+        });
+        return newMap;
+      });
+    });
+
+    call.on('close', () => {
+      console.log('Call closed:', callPeerId);
+      removeParticipant(odId, callPeerId);
+    });
+
+    call.on('error', (err) => {
+      console.error('Call error:', err);
+      clearConnectionTimeout(callPeerId);
+    });
+
+    connectionsRef.current.set(callPeerId, call);
+  }, [clearConnectionTimeout, removeParticipant]);
+
+  const callPeer = useCallback((peerId: string, peerName: string, oderId: string) => {
+    if (!peerRef.current || !localStreamRef.current) {
+      console.log('Cannot call peer - missing peer or stream');
+      return;
+    }
+
+    // Prevent duplicate calls to the same user
+    if (knownParticipantsRef.current.has(oderId)) {
+      console.log('Already connected to this user, skipping call:', oderId);
+      return;
+    }
+
+    // Check if we already have a connection to this peer
+    if (connectionsRef.current.has(peerId)) {
+      console.log('Already have connection to peer:', peerId);
+      return;
+    }
+
+    console.log('Calling peer:', peerId, 'with name:', peerName, 'oderId:', oderId);
+    
+    try {
+      const call = peerRef.current.call(peerId, localStreamRef.current, {
+        metadata: {
+          userName: userNameRef.current,
+          oderId: userIdRef.current,
+        }
+      });
+      
+      if (call) {
+        handleIncomingCall(call, peerName, oderId);
+      }
+    } catch (err) {
+      console.error('Error calling peer:', err);
+    }
+  }, [handleIncomingCall]);
+
+  const broadcastPresence = useCallback((action: 'join' | 'leave' | 'heartbeat', peerId?: string) => {
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: action === 'join' ? 'presence' : action === 'leave' ? 'leave' : 'heartbeat',
+        payload: {
+          oderId: userIdRef.current,
+          peerId: peerId || peerIdRef.current,
+          userName: userNameRef.current,
+          action,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }, []);
+
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+    }
+    
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (!isLeavingRef.current && peerRef.current && !peerRef.current.disconnected) {
+        broadcastPresence('heartbeat');
+      }
+    }, 10000); // Every 10 seconds
+  }, [broadcastPresence]);
+
+  const attemptReconnect = useCallback(async () => {
+    if (isLeavingRef.current || reconnectAttemptRef.current >= maxReconnectAttempts) {
+      if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+        setError('No se pudo reconectar después de varios intentos');
+      }
+      return;
+    }
+
+    reconnectAttemptRef.current++;
+    console.log(`Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttempts}`);
+
+    if (peerRef.current && peerRef.current.disconnected && !peerRef.current.destroyed) {
+      try {
+        peerRef.current.reconnect();
+      } catch (e) {
+        console.error('Reconnect failed:', e);
+        // Try again after delay
+        setTimeout(() => attemptReconnect(), 2000 * reconnectAttemptRef.current);
+      }
     }
   }, []);
 
@@ -81,15 +285,25 @@ export function useVideoCall(): UseVideoCallReturn {
     try {
       setError(null);
       isLeavingRef.current = false;
+      reconnectAttemptRef.current = 0;
       roomIdRef.current = roomId;
       userIdRef.current = userId;
       userNameRef.current = userName;
+      
+      // Clear previous session
+      knownParticipantsRef.current.clear();
+      
+      // Track this session
+      if (!activeRoomSessions.has(roomId)) {
+        activeRoomSessions.set(roomId, new Set());
+      }
+      activeRoomSessions.get(roomId)?.add(userId);
       
       // Generate unique peer ID for this session
       const peerId = generatePeerId(userId, roomId);
       peerIdRef.current = peerId;
 
-      console.log('Joining room with peer ID:', peerId);
+      console.log('Joining room with peer ID:', peerId, 'user:', userId);
 
       // Get local media stream
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -108,7 +322,7 @@ export function useVideoCall(): UseVideoCallReturn {
       setLocalStream(stream);
       localStreamRef.current = stream;
 
-      // Initialize PeerJS with unique ID
+      // Initialize PeerJS with unique ID and better config
       const peer = new Peer(peerId, {
         debug: 1,
         config: {
@@ -118,56 +332,96 @@ export function useVideoCall(): UseVideoCallReturn {
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
             { urls: 'stun:stun4.l.google.com:19302' },
-          ]
+            { urls: 'stun:global.stun.twilio.com:3478' },
+          ],
+          iceCandidatePoolSize: 10,
         }
       });
 
       peer.on('open', (id) => {
         console.log('PeerJS connected with ID:', id);
         setIsConnected(true);
+        setError(null);
+        reconnectAttemptRef.current = 0;
 
         // Announce presence to room via Supabase Realtime
-        broadcastPresence('join', id);
+        setTimeout(() => {
+          broadcastPresence('join', id);
+          startHeartbeat();
+        }, 500);
       });
 
       peer.on('call', (call) => {
-        console.log('Receiving call from:', call.peer);
+        console.log('Receiving call from:', call.peer, 'metadata:', call.metadata);
         // Answer the call with our stream
         call.answer(localStreamRef.current!);
-        handleIncomingCall(call);
+        handleIncomingCall(call, call.metadata?.userName, call.metadata?.oderId);
       });
 
       peer.on('error', (err) => {
         console.error('PeerJS error:', err.type, err.message);
+        
         // Only show error if not leaving
         if (!isLeavingRef.current) {
-          setError(`Error de conexión: ${err.message}`);
+          // Handle specific errors
+          if (err.type === 'unavailable-id') {
+            // Generate new ID and try again
+            const newPeerId = generatePeerId(userIdRef.current, roomIdRef.current);
+            peerIdRef.current = newPeerId;
+            console.log('ID unavailable, generated new one:', newPeerId);
+          } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+            setError(`Error de conexión: ${err.message}`);
+            attemptReconnect();
+          } else if (err.type === 'peer-unavailable') {
+            // Peer not available, this is normal when someone leaves
+            console.log('Peer unavailable - may have left the call');
+          } else {
+            setError(`Error: ${err.message}`);
+          }
         }
       });
 
       peer.on('disconnected', () => {
         console.log('PeerJS disconnected');
-        // Try to reconnect if not intentionally leaving
-        if (!isLeavingRef.current && peer.disconnected) {
-          console.log('Attempting to reconnect...');
-          peer.reconnect();
+        setIsConnected(false);
+        
+        if (!isLeavingRef.current) {
+          setError('Conexión perdida. Reconectando...');
+          attemptReconnect();
         }
+      });
+
+      peer.on('close', () => {
+        console.log('PeerJS closed');
+        setIsConnected(false);
       });
 
       peerRef.current = peer;
 
       // Subscribe to Supabase Realtime for signaling
       const channel = supabase
-        .channel(`video-room-${roomId}`)
+        .channel(`video-room-${roomId}`, {
+          config: {
+            presence: {
+              key: peerId,
+            },
+          },
+        })
         .on('broadcast', { event: 'presence' }, ({ payload }) => {
           console.log('Received presence:', payload);
+          
+          // Ignore our own messages
+          if (payload.oderId === userIdRef.current) {
+            return;
+          }
+          
           // If someone else joined, call them
-          if (payload.oderId !== peerIdRef.current && payload.action === 'join') {
+          if (payload.action === 'join' && payload.peerId) {
             console.log('New participant joined, calling:', payload.peerId);
             // Small delay to ensure peer is ready
             setTimeout(() => {
               callPeer(payload.peerId, payload.userName, payload.oderId);
-            }, 500);
+            }, 800);
           }
         })
         .on('broadcast', { event: 'chat' }, ({ payload }) => {
@@ -181,20 +435,23 @@ export function useVideoCall(): UseVideoCallReturn {
         })
         .on('broadcast', { event: 'leave' }, ({ payload }) => {
           console.log('Participant leaving:', payload);
-          // Remove participant
-          const connection = connectionsRef.current.get(payload.peerId);
-          if (connection) {
-            connection.close();
-            connectionsRef.current.delete(payload.peerId);
+          removeParticipant(payload.oderId, payload.peerId);
+        })
+        .on('broadcast', { event: 'heartbeat' }, ({ payload }) => {
+          // Keep track of active participants
+          if (payload.oderId !== userIdRef.current) {
+            // Participant is still active
+            console.log('Heartbeat from:', payload.userName);
           }
-          setParticipants(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(payload.oderId);
-            return newMap;
-          });
         })
         .subscribe((status) => {
           console.log('Channel subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            // Re-announce presence after subscription
+            setTimeout(() => {
+              broadcastPresence('join', peerIdRef.current);
+            }, 300);
+          }
         });
 
       channelRef.current = channel;
@@ -203,79 +460,21 @@ export function useVideoCall(): UseVideoCallReturn {
       console.error('Error joining room:', err);
       setError(err.message);
     }
-  }, []);
-
-  const broadcastPresence = useCallback((action: 'join' | 'leave', peerId?: string) => {
-    if (channelRef.current) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: action === 'join' ? 'presence' : 'leave',
-        payload: {
-          oderId: userIdRef.current,
-          peerId: peerId || peerIdRef.current,
-          userName: userNameRef.current,
-          action,
-        },
-      });
-    }
-  }, []);
-
-  const callPeer = useCallback((peerId: string, peerName: string, oderId: string) => {
-    if (!peerRef.current || !localStreamRef.current) {
-      console.log('Cannot call peer - missing peer or stream');
-      return;
-    }
-
-    console.log('Calling peer:', peerId, 'with name:', peerName);
-    
-    try {
-      const call = peerRef.current.call(peerId, localStreamRef.current);
-      if (call) {
-        handleIncomingCall(call, peerName, oderId);
-      }
-    } catch (err) {
-      console.error('Error calling peer:', err);
-    }
-  }, []);
-
-  const handleIncomingCall = useCallback((call: MediaConnection, peerName?: string, oderId?: string) => {
-    const odId = oderId || call.peer;
-    
-    call.on('stream', (remoteStream) => {
-      console.log('Received stream from:', call.peer, 'userId:', odId);
-      setParticipants(prev => {
-        const newMap = new Map(prev);
-        newMap.set(odId, {
-          oderId: odId,
-          userName: peerName || 'Participante',
-          stream: remoteStream,
-          audioEnabled: true,
-          videoEnabled: true,
-        });
-        return newMap;
-      });
-    });
-
-    call.on('close', () => {
-      console.log('Call closed:', call.peer);
-      setParticipants(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(odId);
-        return newMap;
-      });
-      connectionsRef.current.delete(call.peer);
-    });
-
-    call.on('error', (err) => {
-      console.error('Call error:', err);
-    });
-
-    connectionsRef.current.set(call.peer, call);
-  }, []);
+  }, [broadcastPresence, callPeer, handleIncomingCall, attemptReconnect, startHeartbeat, removeParticipant]);
 
   const leaveRoom = useCallback(() => {
     console.log('Leaving room...');
     isLeavingRef.current = true;
+    
+    // Stop heartbeat
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    // Clear all connection timeouts
+    connectionTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+    connectionTimeoutsRef.current.clear();
     
     // Broadcast leave before disconnecting
     broadcastPresence('leave');
@@ -288,7 +487,7 @@ export function useVideoCall(): UseVideoCallReturn {
     localStreamRef.current = null;
 
     // Close all peer connections
-    connectionsRef.current.forEach(connection => {
+    connectionsRef.current.forEach((connection, key) => {
       try {
         connection.close();
       } catch (e) {
@@ -296,6 +495,14 @@ export function useVideoCall(): UseVideoCallReturn {
       }
     });
     connectionsRef.current.clear();
+    
+    // Clear known participants
+    knownParticipantsRef.current.clear();
+
+    // Remove from active sessions
+    if (roomIdRef.current && activeRoomSessions.has(roomIdRef.current)) {
+      activeRoomSessions.get(roomIdRef.current)?.delete(userIdRef.current);
+    }
 
     // Destroy peer
     if (peerRef.current) {
@@ -478,6 +685,14 @@ export function useVideoCall(): UseVideoCallReturn {
   useEffect(() => {
     return () => {
       if (!isLeavingRef.current) {
+        // Stop heartbeat
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+        
+        // Clear all connection timeouts
+        connectionTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+        
         // Stop all tracks on cleanup
         stopAllTracks(localStreamRef.current);
         
