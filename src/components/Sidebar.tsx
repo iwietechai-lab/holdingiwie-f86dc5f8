@@ -43,19 +43,20 @@ interface SidebarProps {
 }
 
 import { Package } from 'lucide-react';
+import { DashboardVisibility } from '@/types/superadmin';
 
-// Submenu items for each company
+// Submenu items for each company with permission mapping
 const companyMenuItems = [
-  { icon: TrendingUp, label: 'Dashboard', path: '/empresa', queryParam: true },
-  { icon: DollarSign, label: 'Ventas', path: '/empresa', queryParam: true, section: 'ventas' },
-  { icon: Users, label: 'Usuarios', path: '/usuarios', queryParam: true },
-  { icon: FolderOpen, label: 'Documentos', path: '/gestor-documentos', queryParam: true },
-  { icon: MessageSquare, label: 'Chat Interno', path: '/mensajeria', queryParam: true },
-  { icon: ClipboardList, label: 'Tareas', path: '/tareas', queryParam: true },
-  { icon: Package, label: 'Presupuestos', path: '/presupuestos', queryParam: true },
-  { icon: Ticket, label: 'Tickets', path: '/tickets', queryParam: true },
-  { icon: Bot, label: 'Chatbot Empresa', path: '/chatbot-empresa', queryParam: true },
-  { icon: Calendar, label: 'Reuniones', path: '/reuniones', queryParam: true },
+  { icon: TrendingUp, label: 'Dashboard', path: '/empresa', queryParam: true, permission: 'ver_dashboard' as keyof DashboardVisibility },
+  { icon: DollarSign, label: 'Ventas', path: '/empresa', queryParam: true, section: 'ventas', permission: 'ver_ventas' as keyof DashboardVisibility },
+  { icon: Users, label: 'Usuarios', path: '/usuarios', queryParam: true, permission: 'gestionar_usuarios' as keyof DashboardVisibility },
+  { icon: FolderOpen, label: 'Documentos', path: '/gestor-documentos', queryParam: true, permission: 'ver_documentos' as keyof DashboardVisibility },
+  { icon: MessageSquare, label: 'Chat Interno', path: '/mensajeria', queryParam: true, permission: 'ver_chat_interno' as keyof DashboardVisibility },
+  { icon: ClipboardList, label: 'Tareas', path: '/tareas', queryParam: true, permission: 'ver_tareas' as keyof DashboardVisibility },
+  { icon: Package, label: 'Presupuestos', path: '/presupuestos', queryParam: true, permission: 'ver_dashboard' as keyof DashboardVisibility },
+  { icon: Ticket, label: 'Tickets', path: '/tickets', queryParam: true, permission: 'ver_tickets' as keyof DashboardVisibility },
+  { icon: Bot, label: 'Chatbot Empresa', path: '/chatbot-empresa', queryParam: true, permission: 'acceso_chatbot_empresa' as keyof DashboardVisibility },
+  { icon: Calendar, label: 'Reuniones', path: '/reuniones', queryParam: true, permission: 'ver_reuniones' as keyof DashboardVisibility },
 ];
 
 export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
@@ -278,46 +279,55 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
             )}
             
             {activeCompanyMode && activeCompany ? (
-              // Active company mode - show only the menu items for this company
+              // Active company mode - show only the menu items for this company based on permissions
               <div className="space-y-1">
                 {!isCollapsed && (
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
                     {activeCompany.name}
                   </p>
                 )}
-                {companyMenuItems.map((menuItem) => {
-                  const Icon = menuItem.icon;
-                  const currentParams = new URLSearchParams(location.search);
-                  const isMenuActive = location.pathname === menuItem.path && 
-                    currentParams.get('empresa') === activeCompanyMode &&
-                    (!menuItem.section || currentParams.get('section') === menuItem.section);
-                  
-                  const button = (
-                    <button
-                      onClick={() => handleCompanyMenuClick(activeCompanyMode, menuItem)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                        isMenuActive
-                          ? "bg-primary/20 text-primary"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent"
-                      )}
-                    >
-                      <Icon className="w-5 h-5 shrink-0" />
-                      {!isCollapsed && <span className="truncate">{menuItem.label}</span>}
-                    </button>
-                  );
-
-                  if (isCollapsed) {
-                    return (
-                      <Tooltip key={menuItem.label}>
-                        <TooltipTrigger asChild>{button}</TooltipTrigger>
-                        <TooltipContent side="right">{menuItem.label}</TooltipContent>
-                      </Tooltip>
+                {companyMenuItems
+                  .filter((menuItem) => {
+                    // Superadmins see everything
+                    if (isSuperadmin) return true;
+                    // Check if user has permission for this menu item
+                    const visibility = profile?.dashboard_visibility;
+                    if (!visibility) return false;
+                    return visibility[menuItem.permission] === true;
+                  })
+                  .map((menuItem) => {
+                    const Icon = menuItem.icon;
+                    const currentParams = new URLSearchParams(location.search);
+                    const isMenuActive = location.pathname === menuItem.path && 
+                      currentParams.get('empresa') === activeCompanyMode &&
+                      (!menuItem.section || currentParams.get('section') === menuItem.section);
+                    
+                    const button = (
+                      <button
+                        onClick={() => handleCompanyMenuClick(activeCompanyMode, menuItem)}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          isMenuActive
+                            ? "bg-primary/20 text-primary"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent"
+                        )}
+                      >
+                        <Icon className="w-5 h-5 shrink-0" />
+                        {!isCollapsed && <span className="truncate">{menuItem.label}</span>}
+                      </button>
                     );
-                  }
 
-                  return <div key={menuItem.label}>{button}</div>;
-                })}
+                    if (isCollapsed) {
+                      return (
+                        <Tooltip key={menuItem.label}>
+                          <TooltipTrigger asChild>{button}</TooltipTrigger>
+                          <TooltipContent side="right">{menuItem.label}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+
+                    return <div key={menuItem.label}>{button}</div>;
+                  })}
               </div>
             ) : (
               // Normal mode - show all companies
