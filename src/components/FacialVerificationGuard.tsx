@@ -117,8 +117,8 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     }, 100);
   };
 
-  // Loading state
-  if (authLoading || verificationLoading) {
+  // Loading state - show spinner
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <SpaceBackground />
@@ -130,9 +130,30 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     );
   }
 
-  // Not authenticated
+  // Not authenticated - redirect handled by useEffect, but show loading briefly
   if (!isAuthenticated || !user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Redirigiendo al login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for verification loading
+  if (verificationLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Verificando identidad...</p>
+        </div>
+      </div>
+    );
   }
 
   // Show face recognition prompt
