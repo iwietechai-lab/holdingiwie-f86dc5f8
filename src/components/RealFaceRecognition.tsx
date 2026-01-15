@@ -930,10 +930,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   };
 
-  // If camera is not active OR status is success/failed, don't render video element at all
-  // This is the DEFINITIVE fix - no video element = no camera access
-  if (!isCameraActive || status === 'success') {
-    console.log('📹 NOT rendering video - isCameraActive:', isCameraActive, 'status:', status);
+  // ONLY show success screen when status is 'success'
+  // This removes the video element which stops the camera
+  if (status === 'success') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
         <div className="flex flex-col items-center gap-4 p-6 max-w-lg w-full">
