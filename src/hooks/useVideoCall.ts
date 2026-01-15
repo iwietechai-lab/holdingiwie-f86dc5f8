@@ -12,7 +12,7 @@ interface Participant {
 
 interface ChatMessage {
   id: string;
-  userId: string;
+  oderId: string;
   userName: string;
   message: string;
   timestamp: Date;
@@ -28,7 +28,7 @@ export interface UseVideoCallReturn {
   isScreenSharing: boolean;
   isRecording: boolean;
   error: string | null;
-  joinRoom: (roomId: string, userId: string, userName: string) => Promise<void>;
+  joinRoom: (roomId: string, oderId: string, userName: string) => Promise<void>;
   leaveRoom: () => void;
   toggleAudio: () => void;
   toggleVideo: () => void;
@@ -57,24 +57,69 @@ export function useVideoCall(): UseVideoCallReturn {
   const roomIdRef = useRef<string>('');
   const userIdRef = useRef<string>('');
   const userNameRef = useRef<string>('');
+  const peerIdRef = useRef<string>('');
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const isLeavingRef = useRef(false);
+
+  // Generate unique peer ID to avoid "ID is taken" errors
+  const generatePeerId = (userId: string, roomId: string) => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${userId.substring(0, 8)}-${roomId.substring(0, 8)}-${timestamp}-${random}`;
+  };
+
+  const stopAllTracks = useCallback((stream: MediaStream | null) => {
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+    }
+  }, []);
 
   const joinRoom = useCallback(async (roomId: string, userId: string, userName: string) => {
     try {
       setError(null);
+      isLeavingRef.current = false;
       roomIdRef.current = roomId;
       userIdRef.current = userId;
       userNameRef.current = userName;
+      
+      // Generate unique peer ID for this session
+      const peerId = generatePeerId(userId, roomId);
+      peerIdRef.current = peerId;
+
+      console.log('Joining room with peer ID:', peerId);
 
       // Get local media stream
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
       });
+      
       setLocalStream(stream);
+      localStreamRef.current = stream;
 
-      // Initialize PeerJS
-      const peer = new Peer(userId, {
-        debug: 2,
+      // Initialize PeerJS with unique ID
+      const peer = new Peer(peerId, {
+        debug: 1,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+          ]
+        }
       });
 
       peer.on('open', (id) => {
@@ -82,18 +127,31 @@ export function useVideoCall(): UseVideoCallReturn {
         setIsConnected(true);
 
         // Announce presence to room via Supabase Realtime
-        broadcastPresence('join');
+        broadcastPresence('join', id);
       });
 
       peer.on('call', (call) => {
         console.log('Receiving call from:', call.peer);
-        call.answer(stream);
+        // Answer the call with our stream
+        call.answer(localStreamRef.current!);
         handleIncomingCall(call);
       });
 
       peer.on('error', (err) => {
-        console.error('PeerJS error:', err);
-        setError(err.message);
+        console.error('PeerJS error:', err.type, err.message);
+        // Only show error if not leaving
+        if (!isLeavingRef.current) {
+          setError(`Error de conexión: ${err.message}`);
+        }
+      });
+
+      peer.on('disconnected', () => {
+        console.log('PeerJS disconnected');
+        // Try to reconnect if not intentionally leaving
+        if (!isLeavingRef.current && peer.disconnected) {
+          console.log('Attempting to reconnect...');
+          peer.reconnect();
+        }
       });
 
       peerRef.current = peer;
@@ -102,34 +160,42 @@ export function useVideoCall(): UseVideoCallReturn {
       const channel = supabase
         .channel(`video-room-${roomId}`)
         .on('broadcast', { event: 'presence' }, ({ payload }) => {
-          if (payload.userId !== userId && payload.action === 'join') {
-            // New participant joined, call them
-            callPeer(payload.userId, payload.userName, stream);
+          console.log('Received presence:', payload);
+          // If someone else joined, call them
+          if (payload.oderId !== peerIdRef.current && payload.action === 'join') {
+            console.log('New participant joined, calling:', payload.peerId);
+            // Small delay to ensure peer is ready
+            setTimeout(() => {
+              callPeer(payload.peerId, payload.userName, payload.oderId);
+            }, 500);
           }
         })
         .on('broadcast', { event: 'chat' }, ({ payload }) => {
           setChatMessages(prev => [...prev, {
             id: crypto.randomUUID(),
-            userId: payload.userId,
+            oderId: payload.oderId,
             userName: payload.userName,
             message: payload.message,
             timestamp: new Date(payload.timestamp),
           }]);
         })
         .on('broadcast', { event: 'leave' }, ({ payload }) => {
+          console.log('Participant leaving:', payload);
           // Remove participant
-          const connection = connectionsRef.current.get(payload.userId);
+          const connection = connectionsRef.current.get(payload.peerId);
           if (connection) {
             connection.close();
-            connectionsRef.current.delete(payload.userId);
+            connectionsRef.current.delete(payload.peerId);
           }
           setParticipants(prev => {
             const newMap = new Map(prev);
-            newMap.delete(payload.userId);
+            newMap.delete(payload.oderId);
             return newMap;
           });
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Channel subscription status:', status);
+        });
 
       channelRef.current = channel;
 
@@ -139,13 +205,14 @@ export function useVideoCall(): UseVideoCallReturn {
     }
   }, []);
 
-  const broadcastPresence = useCallback((action: 'join' | 'leave') => {
+  const broadcastPresence = useCallback((action: 'join' | 'leave', peerId?: string) => {
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
-        event: 'presence',
+        event: action === 'join' ? 'presence' : 'leave',
         payload: {
-          userId: userIdRef.current,
+          oderId: userIdRef.current,
+          peerId: peerId || peerIdRef.current,
           userName: userNameRef.current,
           action,
         },
@@ -153,21 +220,33 @@ export function useVideoCall(): UseVideoCallReturn {
     }
   }, []);
 
-  const callPeer = useCallback((peerId: string, peerName: string, stream: MediaStream) => {
-    if (!peerRef.current) return;
+  const callPeer = useCallback((peerId: string, peerName: string, oderId: string) => {
+    if (!peerRef.current || !localStreamRef.current) {
+      console.log('Cannot call peer - missing peer or stream');
+      return;
+    }
 
-    console.log('Calling peer:', peerId);
-    const call = peerRef.current.call(peerId, stream);
-    handleIncomingCall(call, peerName);
+    console.log('Calling peer:', peerId, 'with name:', peerName);
+    
+    try {
+      const call = peerRef.current.call(peerId, localStreamRef.current);
+      if (call) {
+        handleIncomingCall(call, peerName, oderId);
+      }
+    } catch (err) {
+      console.error('Error calling peer:', err);
+    }
   }, []);
 
-  const handleIncomingCall = useCallback((call: MediaConnection, peerName?: string) => {
+  const handleIncomingCall = useCallback((call: MediaConnection, peerName?: string, oderId?: string) => {
+    const odId = oderId || call.peer;
+    
     call.on('stream', (remoteStream) => {
-      console.log('Received stream from:', call.peer);
+      console.log('Received stream from:', call.peer, 'userId:', odId);
       setParticipants(prev => {
         const newMap = new Map(prev);
-        newMap.set(call.peer, {
-          oderId: call.peer,
+        newMap.set(odId, {
+          oderId: odId,
           userName: peerName || 'Participante',
           stream: remoteStream,
           audioEnabled: true,
@@ -178,32 +257,53 @@ export function useVideoCall(): UseVideoCallReturn {
     });
 
     call.on('close', () => {
+      console.log('Call closed:', call.peer);
       setParticipants(prev => {
         const newMap = new Map(prev);
-        newMap.delete(call.peer);
+        newMap.delete(odId);
         return newMap;
       });
+      connectionsRef.current.delete(call.peer);
+    });
+
+    call.on('error', (err) => {
+      console.error('Call error:', err);
     });
 
     connectionsRef.current.set(call.peer, call);
   }, []);
 
   const leaveRoom = useCallback(() => {
+    console.log('Leaving room...');
+    isLeavingRef.current = true;
+    
+    // Broadcast leave before disconnecting
     broadcastPresence('leave');
 
-    // Stop local stream
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      setLocalStream(null);
-    }
+    // Stop all tracks on local stream
+    stopAllTracks(localStreamRef.current);
+    stopAllTracks(localStream);
+    
+    setLocalStream(null);
+    localStreamRef.current = null;
 
     // Close all peer connections
-    connectionsRef.current.forEach(connection => connection.close());
+    connectionsRef.current.forEach(connection => {
+      try {
+        connection.close();
+      } catch (e) {
+        console.error('Error closing connection:', e);
+      }
+    });
     connectionsRef.current.clear();
 
     // Destroy peer
     if (peerRef.current) {
-      peerRef.current.destroy();
+      try {
+        peerRef.current.destroy();
+      } catch (e) {
+        console.error('Error destroying peer:', e);
+      }
       peerRef.current = null;
     }
 
@@ -216,27 +316,33 @@ export function useVideoCall(): UseVideoCallReturn {
     setParticipants(new Map());
     setIsConnected(false);
     setChatMessages([]);
-  }, [localStream, broadcastPresence]);
+    setError(null);
+    setIsAudioEnabled(true);
+    setIsVideoEnabled(true);
+    setIsScreenSharing(false);
+    
+    console.log('Left room successfully');
+  }, [localStream, broadcastPresence, stopAllTracks]);
 
   const toggleAudio = useCallback(() => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsAudioEnabled(audioTrack.enabled);
       }
     }
-  }, [localStream]);
+  }, []);
 
   const toggleVideo = useCallback(() => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoEnabled(videoTrack.enabled);
       }
     }
-  }, [localStream]);
+  }, []);
 
   const toggleScreenShare = useCallback(async () => {
     try {
@@ -259,11 +365,12 @@ export function useVideoCall(): UseVideoCallReturn {
         });
 
         // Stop old stream video track
-        if (localStream) {
-          localStream.getVideoTracks().forEach(track => track.stop());
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(track => track.stop());
         }
 
         setLocalStream(stream);
+        localStreamRef.current = stream;
         setIsScreenSharing(false);
       } else {
         // Start screen sharing
@@ -289,31 +396,32 @@ export function useVideoCall(): UseVideoCallReturn {
         };
 
         // Stop camera video track
-        if (localStream) {
-          localStream.getVideoTracks().forEach(track => track.stop());
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(track => track.stop());
         }
 
         // Create new stream with screen video and original audio
-        const audioTrack = localStream?.getAudioTracks()[0];
+        const audioTrack = localStreamRef.current?.getAudioTracks()[0];
         const newStream = new MediaStream([
           screenTrack,
           ...(audioTrack ? [audioTrack] : []),
         ]);
 
         setLocalStream(newStream);
+        localStreamRef.current = newStream;
         setIsScreenSharing(true);
       }
     } catch (err: any) {
       console.error('Error toggling screen share:', err);
       setError(err.message);
     }
-  }, [isScreenSharing, localStream]);
+  }, [isScreenSharing]);
 
   const startRecording = useCallback(() => {
-    if (!localStream) return;
+    if (!localStreamRef.current) return;
 
     recordedChunksRef.current = [];
-    const mediaRecorder = new MediaRecorder(localStream, {
+    const mediaRecorder = new MediaRecorder(localStreamRef.current, {
       mimeType: 'video/webm;codecs=vp9',
     });
 
@@ -326,7 +434,7 @@ export function useVideoCall(): UseVideoCallReturn {
     mediaRecorder.start(1000); // Collect data every second
     mediaRecorderRef.current = mediaRecorder;
     setIsRecording(true);
-  }, [localStream]);
+  }, []);
 
   const stopRecording = useCallback(() => {
     if (!mediaRecorderRef.current) return null;
@@ -349,7 +457,7 @@ export function useVideoCall(): UseVideoCallReturn {
       type: 'broadcast',
       event: 'chat',
       payload: {
-        userId: userIdRef.current,
+        oderId: userIdRef.current,
         userName: userNameRef.current,
         message,
         timestamp,
@@ -359,7 +467,7 @@ export function useVideoCall(): UseVideoCallReturn {
     // Add to local messages
     setChatMessages(prev => [...prev, {
       id: crypto.randomUUID(),
-      userId: userIdRef.current,
+      oderId: userIdRef.current,
       userName: userNameRef.current,
       message,
       timestamp: new Date(timestamp),
@@ -369,9 +477,24 @@ export function useVideoCall(): UseVideoCallReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      leaveRoom();
+      if (!isLeavingRef.current) {
+        // Stop all tracks on cleanup
+        stopAllTracks(localStreamRef.current);
+        
+        if (peerRef.current) {
+          try {
+            peerRef.current.destroy();
+          } catch (e) {
+            console.error('Error destroying peer on unmount:', e);
+          }
+        }
+        
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+        }
+      }
     };
-  }, []);
+  }, [stopAllTracks]);
 
   return {
     localStream,
