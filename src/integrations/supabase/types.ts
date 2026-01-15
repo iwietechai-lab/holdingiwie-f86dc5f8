@@ -930,6 +930,47 @@ export type Database = {
           },
         ]
       }
+      document_access_requests: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          id: string
+          message: string | null
+          owner_id: string
+          requester_id: string
+          resolved_at: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          message?: string | null
+          owner_id: string
+          requester_id: string
+          resolved_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          message?: string | null
+          owner_id?: string
+          requester_id?: string
+          resolved_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_access_requests_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_approvals: {
         Row: {
           approved_at: string | null
@@ -965,6 +1006,38 @@ export type Database = {
           status?: Database["public"]["Enums"]["approval_status"] | null
         }
         Relationships: []
+      }
+      document_permissions: {
+        Row: {
+          document_id: string
+          granted_at: string | null
+          granted_by: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          document_id: string
+          granted_at?: string | null
+          granted_by: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          document_id?: string
+          granted_at?: string | null
+          granted_by?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_permissions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_shares: {
         Row: {
@@ -1901,6 +1974,10 @@ export type Database = {
         Returns: {
           role: Database["public"]["Enums"]["app_role"]
         }[]
+      }
+      has_document_access: {
+        Args: { check_user_id: string; doc_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
