@@ -930,8 +930,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   };
 
-  // If camera is not active (success/cleanup state), return success UI without video element
-  if (!isCameraActive && status === 'success') {
+  // If camera is not active OR status is success/failed, don't render video element at all
+  // This is the DEFINITIVE fix - no video element = no camera access
+  if (!isCameraActive || status === 'success') {
+    console.log('📹 NOT rendering video - isCameraActive:', isCameraActive, 'status:', status);
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
         <div className="flex flex-col items-center gap-4 p-6 max-w-lg w-full">
@@ -981,11 +983,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
               </div>
             )}
             
-            {status === 'success' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-green-500/30">
-                <CheckCircle className="w-16 h-16 sm:w-20 sm:h-20 text-green-400" />
-              </div>
-            )}
+            {/* Success overlay removed - handled by early return above */}
             
             {status === 'failed' && attempts >= MAX_ATTEMPTS && (
               <div className="absolute inset-0 flex items-center justify-center bg-red-500/30">
@@ -1123,12 +1121,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             </p>
           )}
           
-          {status === 'success' && (
-            <p className="text-green-400 flex items-center gap-2 justify-center">
-              <CheckCircle className="w-5 h-5" />
-              {instruction}
-            </p>
-          )}
+          {/* Success instruction removed - handled by early return above */}
           
           {error && (
             <p className="text-destructive flex items-center gap-2 justify-center text-sm">
@@ -1153,7 +1146,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             </Button>
           )}
           
-          {status !== 'success' && status !== 'failed' && (
+          {status !== 'failed' && (
             <Button onClick={handleCancel} variant="ghost" className="text-muted-foreground">
               Cancelar
             </Button>
