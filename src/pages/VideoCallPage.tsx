@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, ChevronRight, MoreVertical, Settings, Grid, Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,6 +13,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export default function VideoCallPage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -50,23 +56,29 @@ export default function VideoCallPage() {
   const [chatInput, setChatInput] = useState('');
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null);
+  const [meetingRequestId, setMeetingRequestId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasJoinedRef = useRef(false);
 
   useEffect(() => {
-    if (!authLoading && user && roomId) {
+    if (!authLoading && user && roomId && !hasJoinedRef.current) {
+      hasJoinedRef.current = true;
       joinRoom(roomId, user.id, profile?.full_name || 'Participante');
       setMeetingStartTime(new Date());
       
-      // Fetch meeting title
+      // Fetch meeting title and ID
       supabase
         .from('meeting_requests')
-        .select('title')
+        .select('id, title')
         .eq('room_id', roomId)
         .maybeSingle()
         .then(({ data }) => {
-          if (data?.title) {
-            setMeetingTitle(data.title);
+          if (data) {
+            setMeetingTitle(data.title || '');
+            setMeetingRequestId(data.id);
           }
         });
     }
@@ -88,6 +100,19 @@ export default function VideoCallPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Handle beforeunload to cleanup
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isConnected) {
+        e.preventDefault();
+        e.returnValue = '¿Estás seguro de que deseas salir de la videollamada?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isConnected]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -151,6 +176,19 @@ export default function VideoCallPage() {
       }
     }
     
+    // Mark meeting as completed
+    if (meetingRequestId) {
+      try {
+        await supabase
+          .from('meeting_requests')
+          .update({ status: 'completada' })
+          .eq('id', meetingRequestId);
+        console.log('Meeting marked as completed');
+      } catch (err) {
+        console.error('Error marking meeting as completed:', err);
+      }
+    }
+    
     leaveRoom();
     navigate('/reuniones');
   };
@@ -162,13 +200,36 @@ export default function VideoCallPage() {
     }
   };
 
-  // Get all participants including self
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  // Get unique participants (deduplicated by oderId)
+  const uniqueParticipants = Array.from(participants.entries()).reduce((acc, [key, value]) => {
+    // Check if we already have this user
+    const exists = acc.some(([, p]) => p.oderId === value.oderId);
+    if (!exists) {
+      acc.push([key, value]);
+    }
+    return acc;
+  }, [] as [string, typeof participants extends Map<string, infer V> ? V : never][]);
+
+  // Get all participants including self (deduplicated)
   const allParticipants = [
-    { id: user?.id || '', name: profile?.full_name || 'Tú', isSelf: true },
-    ...Array.from(participants.entries()).map(([id, p]) => ({
-      id,
+    { id: user?.id || '', name: profile?.full_name || 'Tú', isSelf: true, hasStream: true },
+    ...uniqueParticipants.map(([id, p]) => ({
+      id: p.oderId,
       name: p.userName,
       isSelf: false,
+      hasStream: !!p.stream,
     })),
   ];
 
@@ -176,300 +237,427 @@ export default function VideoCallPage() {
 
   // Calculate grid layout based on participant count
   const getGridClass = () => {
-    if (participantCount === 1) return 'grid-cols-1';
-    if (participantCount === 2) return 'grid-cols-2';
-    if (participantCount <= 4) return 'grid-cols-2 grid-rows-2';
-    if (participantCount <= 6) return 'grid-cols-3 grid-rows-2';
-    if (participantCount <= 9) return 'grid-cols-3 grid-rows-3';
-    return 'grid-cols-4 grid-rows-3';
+    const videoCount = 1 + uniqueParticipants.length;
+    if (videoCount === 1) return 'grid-cols-1 max-w-3xl mx-auto';
+    if (videoCount === 2) return 'grid-cols-2 max-w-5xl mx-auto';
+    if (videoCount <= 4) return 'grid-cols-2';
+    if (videoCount <= 6) return 'grid-cols-3';
+    if (videoCount <= 9) return 'grid-cols-3';
+    return 'grid-cols-4';
+  };
+
+  // Get video aspect ratio class
+  const getAspectClass = () => {
+    const videoCount = 1 + uniqueParticipants.length;
+    if (videoCount <= 2) return 'aspect-video';
+    return 'aspect-video';
   };
 
   if (authLoading) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen bg-[#202124] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-white/70 text-sm">Conectando a la reunión...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-foreground truncate max-w-[200px] md:max-w-none text-sm">
-            {meetingTitle || 'Videollamada'}
-          </h1>
-          {isRecording && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/20 rounded-full">
-              <Circle className="w-2 h-2 fill-red-500 text-red-500 animate-pulse" />
-              <span className="text-xs text-red-400">
-                REC {formatDuration(recordingDuration)}
-              </span>
-            </div>
-          )}
-          {isProcessing && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-yellow-500/20 rounded-full">
-              <Loader2 className="w-2 h-2 text-yellow-400 animate-spin" />
-              <span className="text-xs text-yellow-400">Procesando...</span>
-            </div>
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground flex items-center gap-2">
-          <Users className="w-3.5 h-3.5" />
-          {participantCount} participante{participantCount !== 1 ? 's' : ''}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Participants sidebar */}
-        <div className={cn(
-          "bg-card border-r border-border flex flex-col transition-all duration-300 shrink-0",
-          showParticipants ? "w-56" : "w-0"
-        )}>
-          {showParticipants && (
-            <>
-              <div className="p-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-medium text-sm flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Participantes
-                </h3>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7"
-                  onClick={() => setShowParticipants(false)}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
+    <TooltipProvider>
+      <div ref={containerRef} className="h-screen bg-[#202124] flex flex-col overflow-hidden">
+        {/* Header - Google Meet style */}
+        <div className="h-14 bg-[#202124] flex items-center justify-between px-4 shrink-0 border-b border-white/10">
+          <div className="flex items-center gap-4">
+            <h1 className="font-medium text-white truncate max-w-[300px] text-base">
+              {meetingTitle || 'Videollamada'}
+            </h1>
+            {isRecording && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-red-600 rounded-full">
+                <Circle className="w-2 h-2 fill-white text-white animate-pulse" />
+                <span className="text-xs text-white font-medium">
+                  REC {formatDuration(recordingDuration)}
+                </span>
               </div>
-              <ScrollArea className="flex-1">
-                <div className="p-2 space-y-1">
-                  {allParticipants.map((participant) => (
-                    <div 
-                      key={participant.id}
-                      className={cn(
-                        "flex items-center gap-2 p-2 rounded-lg text-sm",
-                        participant.isSelf ? "bg-primary/10" : "hover:bg-muted/50"
-                      )}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs bg-primary/20">
-                          {participant.name[0]?.toUpperCase() || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate text-sm">
-                          {participant.name}
-                          {participant.isSelf && <span className="text-muted-foreground"> (Tú)</span>}
-                        </p>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {participant.isSelf ? (
-                          <>
-                            {!isAudioEnabled && <MicOff className="w-3 h-3 text-red-500" />}
-                            {!isVideoEnabled && <VideoOff className="w-3 h-3 text-red-500" />}
-                          </>
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-green-500" />
+            )}
+            {isProcessing && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-yellow-600 rounded-full">
+                <Loader2 className="w-3 h-3 text-white animate-spin" />
+                <span className="text-xs text-white">Procesando...</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {!isConnected && (
+              <span className="text-yellow-400 text-sm flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Conectando...
+              </span>
+            )}
+            <div className="text-sm text-white/70 flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              {participantCount}
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Participants sidebar - Google Meet style */}
+          <div className={cn(
+            "bg-[#202124] flex flex-col transition-all duration-300 shrink-0 z-10",
+            showParticipants ? "w-60 border-r border-white/10" : "w-0"
+          )}>
+            {showParticipants && (
+              <>
+                <div className="p-4 flex items-center justify-between">
+                  <h3 className="font-medium text-white text-sm flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Participantes ({participantCount})
+                  </h3>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                    onClick={() => setShowParticipants(false)}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="px-2 space-y-1">
+                    {allParticipants.map((participant) => (
+                      <div 
+                        key={participant.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg text-sm transition-colors",
+                          participant.isSelf ? "bg-white/5" : "hover:bg-white/5"
+                        )}
+                      >
+                        <div className="relative">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="text-sm bg-primary text-primary-foreground">
+                              {participant.name[0]?.toUpperCase() || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          {participant.hasStream && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#202124]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-white text-sm">
+                            {participant.name}
+                            {participant.isSelf && <span className="text-white/50 ml-1">(Tú)</span>}
+                          </p>
+                        </div>
+                        {participant.isSelf && (
+                          <div className="flex gap-1">
+                            {!isAudioEnabled && <MicOff className="w-4 h-4 text-red-400" />}
+                            {!isVideoEnabled && <VideoOff className="w-4 h-4 text-red-400" />}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </>
-          )}
-        </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </>
+            )}
+          </div>
 
-        {/* Toggle sidebar button when hidden */}
-        {!showParticipants && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-6 rounded-none rounded-r-lg bg-card border border-l-0 border-border"
-            onClick={() => setShowParticipants(true)}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        )}
-
-        {/* Video grid */}
-        <div className="flex-1 p-3 overflow-hidden">
-          <div className={cn(
-            "grid gap-2 h-full w-full",
-            getGridClass()
-          )}>
-            {/* Local video */}
-            <div className="relative bg-muted rounded-lg overflow-hidden">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              {!isVideoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                  <Avatar className="h-16 w-16">
-                    <AvatarFallback className="text-2xl bg-primary/20">
-                      {profile?.full_name?.[0] || 'T'}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              )}
-              <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-black/60 rounded text-xs text-white">
-                Tú {isScreenSharing && '(Pantalla)'}
-              </div>
-              <div className="absolute top-1.5 right-1.5 flex gap-1">
-                {!isAudioEnabled && <MicOff className="w-3.5 h-3.5 text-red-500" />}
-                {!isVideoEnabled && <VideoOff className="w-3.5 h-3.5 text-red-500" />}
-              </div>
-            </div>
-
-            {/* Remote participants */}
-            {Array.from(participants.entries()).map(([oderId, participant]) => (
-              <div key={oderId} className="relative bg-muted rounded-lg overflow-hidden">
-                {participant.stream ? (
-                  <VideoPlayer stream={participant.stream} />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                    <Avatar className="h-16 w-16">
-                      <AvatarFallback className="text-2xl bg-primary/20">
-                        {participant.userName[0]}
+          {/* Video grid - Google Meet style */}
+          <div className="flex-1 p-4 overflow-hidden bg-[#202124]">
+            <div className={cn(
+              "grid gap-3 h-full w-full auto-rows-fr",
+              getGridClass()
+            )}>
+              {/* Local video */}
+              <div className={cn(
+                "relative bg-[#3c4043] rounded-xl overflow-hidden",
+                getAspectClass()
+              )}>
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className={cn(
+                    "w-full h-full object-cover",
+                    !isVideoEnabled && "hidden"
+                  )}
+                />
+                {!isVideoEnabled && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#3c4043]">
+                    <Avatar className="h-20 w-20">
+                      <AvatarFallback className="text-3xl bg-primary text-primary-foreground">
+                        {profile?.full_name?.[0] || 'T'}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                 )}
-                <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-black/60 rounded text-xs text-white">
-                  {participant.userName}
+                <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/70 rounded-md">
+                  <span className="text-sm text-white font-medium">
+                    Tú {isScreenSharing && '(Compartiendo pantalla)'}
+                  </span>
+                </div>
+                <div className="absolute top-3 right-3 flex gap-1">
+                  {!isAudioEnabled && (
+                    <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                      <MicOff className="w-4 h-4 text-white" />
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+
+              {/* Remote participants - deduplicated */}
+              {uniqueParticipants.map(([key, participant]) => (
+                <div key={key} className={cn(
+                  "relative bg-[#3c4043] rounded-xl overflow-hidden",
+                  getAspectClass()
+                )}>
+                  {participant.stream ? (
+                    <VideoPlayer stream={participant.stream} />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#3c4043]">
+                      <Avatar className="h-20 w-20">
+                        <AvatarFallback className="text-3xl bg-primary text-primary-foreground">
+                          {participant.userName[0]?.toUpperCase() || 'P'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  )}
+                  <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/70 rounded-md">
+                    <span className="text-sm text-white font-medium">
+                      {participant.userName}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Chat sidebar - Google Meet style */}
+          {showChat && (
+            <div className="w-80 bg-white flex flex-col shrink-0 rounded-l-2xl shadow-2xl">
+              <div className="p-4 border-b flex items-center justify-between">
+                <h3 className="font-medium text-gray-900 text-base">
+                  Mensajes de la reunión
+                </h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowChat(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <ScrollArea className="flex-1 bg-gray-50">
+                <div className="p-4 space-y-4">
+                  {chatMessages.length === 0 && (
+                    <p className="text-center text-gray-500 text-sm py-8">
+                      Los mensajes se mostrarán aquí
+                    </p>
+                  )}
+                  {chatMessages.map(msg => (
+                    <div key={msg.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-gray-900">{msg.userName}</span>
+                        <span className="text-xs text-gray-500">
+                          {format(msg.timestamp, 'HH:mm')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 pl-0">{msg.message}</p>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              </ScrollArea>
+              
+              <div className="p-4 border-t bg-white">
+                <div className="flex gap-2">
+                  <Input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Enviar un mensaje..."
+                    className="text-sm h-10 bg-gray-100 border-0 focus-visible:ring-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                  />
+                  <Button size="icon" className="h-10 w-10" onClick={handleSendChat}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Chat sidebar */}
-        {showChat && (
-          <div className="w-72 bg-card border-l border-border flex flex-col shrink-0">
-            <div className="p-3 border-b border-border flex items-center justify-between">
-              <h3 className="font-medium text-sm flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Chat
-              </h3>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowChat(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+        {/* Controls bar - Google Meet style */}
+        <div className="h-20 bg-[#202124] flex items-center justify-center gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12 transition-all",
+                    isAudioEnabled 
+                      ? "bg-[#3c4043] hover:bg-[#4a4d51] text-white" 
+                      : "bg-red-500 hover:bg-red-600 text-white"
+                  )}
+                  onClick={toggleAudio}
+                >
+                  {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isAudioEnabled ? 'Silenciar micrófono' : 'Activar micrófono'}</p>
+              </TooltipContent>
+            </Tooltip>
             
-            <ScrollArea className="flex-1">
-              <div className="p-3 space-y-2">
-                {chatMessages.map(msg => (
-                  <div key={msg.id} className={cn(
-                    "p-2 rounded-lg text-sm",
-                    msg.oderId === user?.id ? "bg-primary/20 ml-4" : "bg-muted mr-4"
-                  )}>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-medium text-xs">{msg.userName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {format(msg.timestamp, 'HH:mm')}
-                      </span>
-                    </div>
-                    <p className="text-sm">{msg.message}</p>
-                  </div>
-                ))}
-                <div ref={chatEndRef} />
-              </div>
-            </ScrollArea>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12 transition-all",
+                    isVideoEnabled 
+                      ? "bg-[#3c4043] hover:bg-[#4a4d51] text-white" 
+                      : "bg-red-500 hover:bg-red-600 text-white"
+                  )}
+                  onClick={toggleVideo}
+                >
+                  {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isVideoEnabled ? 'Desactivar cámara' : 'Activar cámara'}</p>
+              </TooltipContent>
+            </Tooltip>
             
-            <div className="p-3 border-t border-border flex gap-2">
-              <Input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Mensaje..."
-                className="text-sm h-9"
-                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-              />
-              <Button size="icon" className="h-9 w-9" onClick={handleSendChat}>
-                <Send className="w-4 h-4" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12 transition-all",
+                    isScreenSharing 
+                      ? "bg-primary hover:bg-primary/90 text-white" 
+                      : "bg-[#3c4043] hover:bg-[#4a4d51] text-white"
+                  )}
+                  onClick={toggleScreenShare}
+                >
+                  <MonitorUp className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isScreenSharing ? 'Dejar de compartir' : 'Compartir pantalla'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="w-px h-8 bg-white/20 mx-2" />
+
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12",
+                    showParticipants 
+                      ? "bg-primary/20 text-primary" 
+                      : "bg-[#3c4043] hover:bg-[#4a4d51] text-white"
+                  )}
+                  onClick={() => setShowParticipants(!showParticipants)}
+                >
+                  <Users className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Participantes</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12",
+                    showChat 
+                      ? "bg-primary/20 text-primary" 
+                      : "bg-[#3c4043] hover:bg-[#4a4d51] text-white"
+                  )}
+                  onClick={() => setShowChat(!showChat)}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Chat</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="rounded-full w-12 h-12 bg-[#3c4043] hover:bg-[#4a4d51] text-white"
+                  onClick={toggleFullscreen}
+                >
+                  <Maximize2 className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Pantalla completa</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="w-px h-8 bg-white/20 mx-2" />
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="rounded-full w-14 h-14 bg-red-500 hover:bg-red-600 text-white"
+                onClick={handleLeave}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <Phone className="w-6 h-6 rotate-[135deg]" />
+                )}
               </Button>
-            </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Salir de la llamada</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        
+        {/* Error notification - Google Meet style */}
+        {error && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm shadow-lg flex items-center gap-2 z-50">
+            <span>{error}</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 text-white hover:bg-white/20"
+              onClick={() => {}}
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
         )}
       </div>
-
-      {/* Controls bar */}
-      <div className="h-16 bg-card border-t border-border flex items-center justify-center gap-3 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "rounded-full w-12 h-12",
-            showParticipants ? "bg-primary/20" : ""
-          )}
-          onClick={() => setShowParticipants(!showParticipants)}
-        >
-          <Users className="w-5 h-5" />
-        </Button>
-
-        <Button
-          variant={isAudioEnabled ? "secondary" : "destructive"}
-          size="sm"
-          className="rounded-full w-12 h-12"
-          onClick={toggleAudio}
-        >
-          {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-        </Button>
-        
-        <Button
-          variant={isVideoEnabled ? "secondary" : "destructive"}
-          size="sm"
-          className="rounded-full w-12 h-12"
-          onClick={toggleVideo}
-        >
-          {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-        </Button>
-        
-        <Button
-          variant={isScreenSharing ? "default" : "secondary"}
-          size="sm"
-          className="rounded-full w-12 h-12"
-          onClick={toggleScreenShare}
-        >
-          <MonitorUp className="w-5 h-5" />
-        </Button>
-        
-        <Button
-          variant={showChat ? "default" : "secondary"}
-          size="sm"
-          className="rounded-full w-12 h-12"
-          onClick={() => setShowChat(!showChat)}
-        >
-          <MessageSquare className="w-5 h-5" />
-        </Button>
-        
-        <Button
-          variant="destructive"
-          size="sm"
-          className="rounded-full w-12 h-12"
-          onClick={handleLeave}
-          disabled={isProcessing}
-        >
-          {isProcessing ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Phone className="w-5 h-5 rotate-[135deg]" />
-          )}
-        </Button>
-      </div>
-      
-      {error && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -482,5 +670,12 @@ function VideoPlayer({ stream }: { stream: MediaStream }) {
     }
   }, [stream]);
 
-  return <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />;
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="w-full h-full object-cover"
+    />
+  );
 }
