@@ -88,7 +88,7 @@ export function useDocumentPermissions() {
   }, [user]);
 
   // Grant permissions to multiple users at once
-  const grantPermissions = useCallback(async (documentId: string, userIds: string[]): Promise<boolean> => {
+  const grantPermissions = useCallback(async (documentId: string, userIds: string[], documentName?: string): Promise<boolean> => {
     if (!user || userIds.length === 0) return true;
     try {
       const permissions = userIds.map(userId => ({
@@ -102,6 +102,23 @@ export function useDocumentPermissions() {
         .insert(permissions);
 
       if (error) throw error;
+
+      // Create notifications for users who received access
+      for (const userId of userIds) {
+        if (userId !== user.id) {
+          await supabase.from('notifications').insert({
+            user_id: userId,
+            title: 'Acceso a documento otorgado',
+            message: documentName 
+              ? `Se te ha otorgado acceso al documento: "${documentName}"`
+              : 'Se te ha otorgado acceso a un nuevo documento',
+            type: 'document_access_granted',
+            document_id: documentId,
+            action_url: '/gestor-documentos',
+          });
+        }
+      }
+
       return true;
     } catch (err) {
       console.error('Error granting permissions:', err);
