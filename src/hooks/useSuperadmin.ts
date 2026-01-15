@@ -381,6 +381,20 @@ export function useSuperadmin(): UseSuperadminReturn {
     }
 
     try {
+      // Check if company with same ID already exists
+      const { data: existing } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('id', company.id)
+        .maybeSingle();
+
+      if (existing) {
+        return { 
+          success: false, 
+          error: `Ya existe una empresa con un ID similar: "${existing.name}". Por favor usa un nombre diferente.` 
+        };
+      }
+
       const { error } = await supabase
         .from('companies')
         .insert({
@@ -391,12 +405,19 @@ export function useSuperadmin(): UseSuperadminReturn {
           description: company.description,
         });
 
-      if (error) throw error;
+      if (error) {
+        // Handle duplicate key error specifically
+        if (error.code === '23505') {
+          return { success: false, error: 'Ya existe una empresa con este nombre o ID. Por favor usa un nombre diferente.' };
+        }
+        throw error;
+      }
+      
       await fetchCompanies();
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating company:', err);
-      return { success: false, error: err instanceof Error ? err.message : 'Error al crear empresa' };
+      return { success: false, error: err?.message || 'Error al crear empresa' };
     }
   }, [isSuperadmin, fetchCompanies]);
 
