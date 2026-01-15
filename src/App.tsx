@@ -21,6 +21,7 @@ import MessagingPage from "./pages/MessagingPage";
 import TasksPage from "./pages/TasksPage";
 import CompanyChatbotPage from "./pages/CompanyChatbotPage";
 import BudgetPage from "./pages/BudgetPage";
+import IwieChat from "./pages/IwieChat";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 import { IncomingCallAlert } from "./components/meetings/IncomingCallAlert";
@@ -59,6 +60,7 @@ function AppContent() {
         <Route path="/presupuestos" element={<ProtectedRoute><BudgetPage /></ProtectedRoute>} />
         <Route path="/mensajeria" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
         <Route path="/chatbot-empresa" element={<ProtectedRoute><CompanyChatbotPage /></ProtectedRoute>} />
+        <Route path="/iwiechat" element={<ProtectedRoute><IwieChat /></ProtectedRoute>} />
         <Route path="/admin/face-setup" element={<ProtectedRoute><AdminFaceSetup /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
         <Route path="/superadmin" element={<ProtectedRoute><SuperadminDashboard /></ProtectedRoute>} />
