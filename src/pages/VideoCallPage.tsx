@@ -368,7 +368,7 @@ export default function VideoCallPage() {
                 {chatMessages.map(msg => (
                   <div key={msg.id} className={cn(
                     "p-2 rounded-lg text-sm",
-                    msg.userId === user?.id ? "bg-primary/20 ml-4" : "bg-muted mr-4"
+                    msg.oderId === user?.id ? "bg-primary/20 ml-4" : "bg-muted mr-4"
                   )}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="font-medium text-xs">{msg.userName}</span>
