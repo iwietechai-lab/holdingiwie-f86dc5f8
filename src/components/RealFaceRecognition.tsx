@@ -73,6 +73,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const [isProcessing, setIsProcessing] = useState(false);
   const [livenessProgress, setLivenessProgress] = useState(0);
   const [currentChallenge, setCurrentChallenge] = useState<LivenessChallenge | null>(null);
+  const [shouldHideVideo, setShouldHideVideo] = useState(false); // NEW: Hide video immediately on success
 
   // Use refs to track state in detection loop (avoid stale closures)
   const statusRef = useRef<RecognitionStatus>('loading-models');
@@ -541,6 +542,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
           
+          // HIDE VIDEO IMMEDIATELY to stop visual camera indicator
+          setShouldHideVideo(true);
+          
           // STOP CAMERA FIRST before any async operations
           nuclearCameraStop();
           
@@ -614,6 +618,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
 
         console.log('✅ Embedding registrado!');
+        
+        // HIDE VIDEO IMMEDIATELY to stop visual camera indicator
+        setShouldHideVideo(true);
         
         // STOP CAMERA FIRST before any async operations
         nuclearCameraStop();
@@ -937,6 +944,23 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       default: return 'border-primary/50';
     }
   };
+
+  // If video should be hidden (success state), return success UI without video
+  if (shouldHideVideo) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
+        <div className="flex flex-col items-center gap-4 p-6 max-w-lg w-full">
+          <div className="w-56 h-56 sm:w-72 sm:h-72 rounded-full bg-green-500/20 border-4 border-green-500 flex items-center justify-center">
+            <CheckCircle className="w-20 h-20 sm:w-24 sm:h-24 text-green-400" />
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-green-400">¡Verificación Exitosa!</h2>
+            <p className="text-muted-foreground text-sm">Redirigiendo...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4 overflow-y-auto">
