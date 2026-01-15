@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, X } from 'lucide-react';
+import { Download, X, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -7,16 +7,61 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Detect if user is on a mobile device
+const isMobileDevice = (): boolean => {
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  // Check for mobile user agents
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+  // Also check screen width as fallback
+  const isSmallScreen = window.innerWidth <= 768;
+  return mobileRegex.test(userAgent) || isSmallScreen;
+};
+
+// Check if app is running in standalone mode (installed as PWA)
+const isRunningAsApp = (): boolean => {
+  // Check display-mode
+  if (window.matchMedia('(display-mode: standalone)').matches) return true;
+  // iOS Safari standalone mode
+  if ((navigator as any).standalone === true) return true;
+  // Check if running in TWA (Trusted Web Activity)
+  if (document.referrer.includes('android-app://')) return true;
+  return false;
+};
+
 export function IwieChatInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
+    // Check if on mobile device
+    const mobile = isMobileDevice();
+    setIsMobile(mobile);
+
+    // If not mobile, don't show install prompt
+    if (!mobile) {
       return;
+    }
+
+    // Check if already installed/running as app
+    if (isRunningAsApp()) {
+      setIsInstalled(true);
+      localStorage.setItem('iwiechat-installed', 'true');
+      return;
+    }
+
+    // Check localStorage for installation status
+    const installedFlag = localStorage.getItem('iwiechat-installed');
+    if (installedFlag === 'true') {
+      // Double check - if flag is set but not running as app, 
+      // user might have uninstalled, so we can show prompt again
+      if (!isRunningAsApp()) {
+        localStorage.removeItem('iwiechat-installed');
+      } else {
+        setIsInstalled(true);
+        return;
+      }
     }
 
     // Check if user dismissed the prompt before
@@ -40,6 +85,7 @@ export function IwieChatInstallPrompt() {
       setIsInstalled(true);
       setShowPrompt(false);
       setDeferredPrompt(null);
+      localStorage.setItem('iwiechat-installed', 'true');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -59,6 +105,7 @@ export function IwieChatInstallPrompt() {
     
     if (outcome === 'accepted') {
       setShowPrompt(false);
+      localStorage.setItem('iwiechat-installed', 'true');
     }
     setDeferredPrompt(null);
   };
