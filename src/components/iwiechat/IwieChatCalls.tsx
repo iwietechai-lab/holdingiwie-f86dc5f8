@@ -110,16 +110,16 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
     const isProcessing = processingId === request.id;
     
     return (
-      <Card key={request.id} className="bg-card/50 border-border/50">
+      <Card key={request.id} className="bg-white/5 border-white/10">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <Video className="w-4 h-4 text-primary shrink-0" />
-                <span className="font-medium truncate">{request.title}</span>
+                <Video className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span className="font-medium truncate text-white">{request.title}</span>
               </div>
               
-              <div className="space-y-1 text-xs text-muted-foreground">
+              <div className="space-y-1 text-xs text-gray-400">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-3 h-3" />
                   <span>{format(new Date(request.requested_date), "d MMM", { locale: es })}</span>
@@ -149,7 +149,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
                 <Button
                   size="sm"
                   onClick={() => handleJoin(request)}
-                  className="flex-1"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                 >
                   <PhoneCall className="w-4 h-4 mr-2" />
                   Unirse
@@ -159,6 +159,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
                   variant="outline"
                   onClick={() => handlePause(request.id)}
                   disabled={isProcessing}
+                  className="border-white/20 text-white hover:bg-white/10"
                 >
                   {isProcessing ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -174,7 +175,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
                 size="sm"
                 onClick={() => handleReactivate(request.id)}
                 disabled={isProcessing}
-                className="flex-1"
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
               >
                 {isProcessing ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -191,7 +192,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
                 variant="outline"
                 onClick={() => handleReactivate(request.id)}
                 disabled={isProcessing}
-                className="flex-1"
+                className="flex-1 border-white/20 text-white hover:bg-white/10"
               >
                 {isProcessing ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -227,25 +228,25 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
 
       {/* Stats */}
       <div className="px-4 pb-3 grid grid-cols-4 gap-2">
-        <div className="flex flex-col items-center p-2 rounded-lg bg-card/30">
+        <div className="flex flex-col items-center p-2 rounded-lg bg-white/5">
           <PhoneCall className="w-4 h-4 text-green-400 mb-1" />
-          <span className="text-lg font-bold text-foreground">{activeRequests.length}</span>
-          <span className="text-[10px] text-muted-foreground">Activas</span>
+          <span className="text-lg font-bold text-white">{activeRequests.length}</span>
+          <span className="text-[10px] text-gray-400">Activas</span>
         </div>
-        <div className="flex flex-col items-center p-2 rounded-lg bg-card/30">
+        <div className="flex flex-col items-center p-2 rounded-lg bg-white/5">
           <Pause className="w-4 h-4 text-amber-400 mb-1" />
-          <span className="text-lg font-bold text-foreground">{pausedRequests.length}</span>
-          <span className="text-[10px] text-muted-foreground">Pausadas</span>
+          <span className="text-lg font-bold text-white">{pausedRequests.length}</span>
+          <span className="text-[10px] text-gray-400">Pausadas</span>
         </div>
-        <div className="flex flex-col items-center p-2 rounded-lg bg-card/30">
+        <div className="flex flex-col items-center p-2 rounded-lg bg-white/5">
           <Clock className="w-4 h-4 text-orange-400 mb-1" />
-          <span className="text-lg font-bold text-foreground">{pendingRequests.length}</span>
-          <span className="text-[10px] text-muted-foreground">Pendientes</span>
+          <span className="text-lg font-bold text-white">{pendingRequests.length}</span>
+          <span className="text-[10px] text-gray-400">Pendientes</span>
         </div>
-        <div className="flex flex-col items-center p-2 rounded-lg bg-card/30">
+        <div className="flex flex-col items-center p-2 rounded-lg bg-white/5">
           <CheckCircle className="w-4 h-4 text-blue-400 mb-1" />
-          <span className="text-lg font-bold text-foreground">{completedRequests.length}</span>
-          <span className="text-[10px] text-muted-foreground">Finalizadas</span>
+          <span className="text-lg font-bold text-white">{completedRequests.length}</span>
+          <span className="text-[10px] text-gray-400">Finalizadas</span>
         </div>
       </div>
 
@@ -255,7 +256,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
           {/* Active Calls */}
           {activeRequests.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
                 <PhoneCall className="w-4 h-4 text-green-400" />
                 Llamadas Activas
               </h3>
@@ -268,7 +269,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
           {/* Paused Calls */}
           {pausedRequests.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
                 <Pause className="w-4 h-4 text-amber-400" />
                 Llamadas Pausadas
               </h3>
@@ -281,7 +282,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
           {/* Pending Calls */}
           {pendingRequests.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-orange-400" />
                 Pendientes de Aprobación
               </h3>
@@ -294,7 +295,7 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
           {/* Completed Calls */}
           {completedRequests.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-blue-400" />
                 Historial de Llamadas
               </h3>
@@ -306,10 +307,10 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
 
           {/* Empty State */}
           {requests.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <Video className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-sm mb-2">No tienes llamadas aún</p>
-              <p className="text-xs text-center">
+              <p className="text-xs text-center text-gray-500">
                 Usa el botón "Llamada Instantánea" para iniciar
               </p>
             </div>

@@ -105,17 +105,17 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
       {/* Search and New Chat */}
       <div className="px-4 py-3 space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             placeholder="Buscar chats..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-muted/50"
+            className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
           />
         </div>
         <Button 
           onClick={() => setShowCreateDialog(true)} 
-          className="w-full"
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
           size="lg"
         >
           <Plus className="w-5 h-5 mr-2" />
@@ -127,7 +127,7 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
       <ScrollArea className="flex-1">
         <div className="px-4 pb-4 space-y-2">
           {filteredChats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-sm">
                 {searchQuery ? 'No se encontraron chats' : 'No tienes chats aún'}
@@ -136,7 +136,7 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
                 <Button
                   variant="outline"
                   onClick={() => setShowCreateDialog(true)}
-                  className="mt-4"
+                  className="mt-4 border-white/20 text-white hover:bg-white/10"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Crear mi primer chat
@@ -151,8 +151,8 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
                 <button
                   key={chat.id}
                   onClick={() => handleSelectChat(chat)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl bg-card/50 hover:bg-card/80 transition-colors text-left ${
-                    unreadCount > 0 ? 'border border-primary/30' : ''
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left ${
+                    unreadCount > 0 ? 'border border-indigo-500/30' : 'border border-transparent'
                   }`}
                 >
                   <div className="relative">
@@ -162,7 +162,7 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
                       </AvatarFallback>
                     </Avatar>
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground animate-pulse">
+                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-bold text-white animate-pulse">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
@@ -170,17 +170,17 @@ export function IwieChatChats({ onSelectChat }: IwieChatChatsProps) {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`font-medium truncate ${unreadCount > 0 ? 'text-foreground' : 'text-foreground/80'}`}>
+                      <span className={`font-medium truncate ${unreadCount > 0 ? 'text-white' : 'text-gray-200'}`}>
                         {chat.title}
                       </span>
                       <Badge 
                         variant="outline" 
-                        className={`text-[10px] px-1.5 ${getChatTypeBadgeColor(chat.type)}`}
+                        className={`text-[10px] px-1.5 border-0 ${getChatTypeBadgeColor(chat.type)}`}
                       >
                         {getChatTypeLabel(chat.type)}
                       </Badge>
                     </div>
-                    <p className={`text-xs truncate ${unreadCount > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                    <p className={`text-xs truncate ${unreadCount > 0 ? 'text-indigo-400 font-medium' : 'text-gray-500'}`}>
                       {unreadCount > 0 
                         ? `${unreadCount} mensaje${unreadCount > 1 ? 's' : ''} nuevo${unreadCount > 1 ? 's' : ''}`
                         : chat.last_message_at 

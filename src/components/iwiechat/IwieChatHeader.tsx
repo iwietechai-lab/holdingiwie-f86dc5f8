@@ -12,14 +12,14 @@ export function IwieChatHeader() {
   const totalUnread = getTotalUnread();
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 bg-card/80 backdrop-blur-lg border-b border-border safe-area-top">
+    <header className="flex items-center justify-between px-4 py-3 bg-[#111118]/90 backdrop-blur-lg border-b border-white/10 safe-area-top">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-          <MessageSquare className="w-5 h-5 text-primary-foreground" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <MessageSquare className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-foreground">IwieChat</h1>
-          <p className="text-xs text-muted-foreground">Mensajería Empresarial</p>
+          <h1 className="text-lg font-bold text-white">IwieChat</h1>
+          <p className="text-xs text-gray-400">Mensajería Empresarial</p>
         </div>
       </div>
       
