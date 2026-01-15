@@ -245,21 +245,41 @@ export default function VideoCallPage() {
   const participantCount = allParticipants.length;
 
   // Calculate grid layout based on participant count
-  const getGridClass = () => {
+  // Calculate optimal grid layout for better participant distribution
+  const getGridLayout = () => {
     const videoCount = 1 + uniqueParticipants.length;
-    if (videoCount === 1) return 'grid-cols-1 max-w-3xl mx-auto';
-    if (videoCount === 2) return 'grid-cols-2 max-w-5xl mx-auto';
-    if (videoCount <= 4) return 'grid-cols-2';
-    if (videoCount <= 6) return 'grid-cols-3';
-    if (videoCount <= 9) return 'grid-cols-3';
-    return 'grid-cols-4';
+    
+    if (videoCount === 1) {
+      return { cols: 1, maxWidth: 'max-w-3xl mx-auto', aspect: 'aspect-video' };
+    }
+    if (videoCount === 2) {
+      return { cols: 2, maxWidth: 'max-w-5xl mx-auto', aspect: 'aspect-video' };
+    }
+    if (videoCount === 3) {
+      // 3 videos: 2 on top row, 1 centered below
+      return { cols: 2, maxWidth: 'max-w-5xl mx-auto', aspect: 'aspect-[4/3]' };
+    }
+    if (videoCount === 4) {
+      return { cols: 2, maxWidth: 'max-w-6xl mx-auto', aspect: 'aspect-[4/3]' };
+    }
+    if (videoCount <= 6) {
+      return { cols: 3, maxWidth: 'max-w-7xl mx-auto', aspect: 'aspect-[4/3]' };
+    }
+    if (videoCount <= 9) {
+      return { cols: 3, maxWidth: '', aspect: 'aspect-[4/3]' };
+    }
+    return { cols: 4, maxWidth: '', aspect: 'aspect-[4/3]' };
+  };
+
+  const gridLayout = getGridLayout();
+  
+  const getGridClass = () => {
+    return `grid-cols-${gridLayout.cols} ${gridLayout.maxWidth}`;
   };
 
   // Get video aspect ratio class
   const getAspectClass = () => {
-    const videoCount = 1 + uniqueParticipants.length;
-    if (videoCount <= 2) return 'aspect-video';
-    return 'aspect-video';
+    return gridLayout.aspect;
   };
 
   if (authLoading) {
@@ -375,16 +395,21 @@ export default function VideoCallPage() {
             )}
           </div>
 
-          {/* Video grid - Google Meet style */}
-          <div className="flex-1 p-4 overflow-hidden bg-[#202124]">
+          {/* Video grid - Google Meet style with improved distribution */}
+          <div className="flex-1 p-4 overflow-hidden bg-[#202124] flex items-center justify-center">
             <div className={cn(
-              "grid gap-3 h-full w-full auto-rows-fr",
-              getGridClass()
+              "grid gap-4 w-full h-full max-h-full",
+              gridLayout.cols === 1 && "grid-cols-1",
+              gridLayout.cols === 2 && "grid-cols-2",
+              gridLayout.cols === 3 && "grid-cols-3",
+              gridLayout.cols === 4 && "grid-cols-4",
+              gridLayout.maxWidth,
+              "auto-rows-fr place-content-center"
             )}>
               {/* Local video */}
               <div className={cn(
-                "relative bg-[#3c4043] rounded-xl overflow-hidden",
-                getAspectClass()
+                "relative bg-[#3c4043] rounded-xl overflow-hidden w-full h-full min-h-0",
+                gridLayout.aspect
               )}>
                 <video
                   ref={localVideoRef}
@@ -422,8 +447,8 @@ export default function VideoCallPage() {
               {/* Remote participants - deduplicated */}
               {uniqueParticipants.map(([key, participant]) => (
                 <div key={key} className={cn(
-                  "relative bg-[#3c4043] rounded-xl overflow-hidden",
-                  getAspectClass()
+                  "relative bg-[#3c4043] rounded-xl overflow-hidden w-full h-full min-h-0",
+                  gridLayout.aspect
                 )}>
                   {participant.stream ? (
                     <VideoPlayer stream={participant.stream} />

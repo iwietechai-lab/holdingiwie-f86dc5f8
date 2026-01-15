@@ -1074,10 +1074,13 @@ export type Database = {
           is_development: boolean | null
           mime_type: string
           nombre: string
+          shared_areas: Json | null
+          shared_companies: Json | null
           tipo: string
           updated_at: string | null
           user_id: string | null
           version: number | null
+          visibility_scope: string | null
         }
         Insert: {
           area_id: string
@@ -1089,10 +1092,13 @@ export type Database = {
           is_development?: boolean | null
           mime_type: string
           nombre: string
+          shared_areas?: Json | null
+          shared_companies?: Json | null
           tipo: string
           updated_at?: string | null
           user_id?: string | null
           version?: number | null
+          visibility_scope?: string | null
         }
         Update: {
           area_id?: string
@@ -1104,10 +1110,13 @@ export type Database = {
           is_development?: boolean | null
           mime_type?: string
           nombre?: string
+          shared_areas?: Json | null
+          shared_companies?: Json | null
           tipo?: string
           updated_at?: string | null
           user_id?: string | null
           version?: number | null
+          visibility_scope?: string | null
         }
         Relationships: []
       }
@@ -1693,12 +1702,19 @@ export type Database = {
       tickets: {
         Row: {
           assigned_to: string | null
+          category: string | null
           company_id: string | null
           created_at: string | null
           created_by: string
+          deleted_at: string | null
+          deleted_by: string | null
+          deletion_reason: string | null
           description: string | null
           due_date: string | null
           id: string
+          is_deleted: boolean | null
+          participant_scope: string | null
+          participants: Json | null
           points: number | null
           priority: Database["public"]["Enums"]["approval_priority"] | null
           resolved_at: string | null
@@ -1709,12 +1725,19 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          category?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
+          is_deleted?: boolean | null
+          participant_scope?: string | null
+          participants?: Json | null
           points?: number | null
           priority?: Database["public"]["Enums"]["approval_priority"] | null
           resolved_at?: string | null
@@ -1725,12 +1748,19 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          category?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
+          is_deleted?: boolean | null
+          participant_scope?: string | null
+          participants?: Json | null
           points?: number | null
           priority?: Database["public"]["Enums"]["approval_priority"] | null
           resolved_at?: string | null
@@ -1764,6 +1794,8 @@ export type Database = {
           position_id: string | null
           proposed_role: string
           requested_by: string
+          responsible_email: string | null
+          responsible_name: string | null
           review_notes: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -1784,6 +1816,8 @@ export type Database = {
           position_id?: string | null
           proposed_role: string
           requested_by: string
+          responsible_email?: string | null
+          responsible_name?: string | null
           review_notes?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -1804,6 +1838,8 @@ export type Database = {
           position_id?: string | null
           proposed_role?: string
           requested_by?: string
+          responsible_email?: string | null
+          responsible_name?: string | null
           review_notes?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null

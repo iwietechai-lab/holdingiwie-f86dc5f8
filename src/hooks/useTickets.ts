@@ -7,11 +7,11 @@ interface UseTicketsReturn {
   tickets: Ticket[];
   isLoading: boolean;
   error: string | null;
-  fetchTickets: () => Promise<void>;
+  fetchTickets: (includeDeleted?: boolean) => Promise<void>;
   createTicket: (ticket: Omit<Ticket, 'id' | 'created_at' | 'updated_at'>) => Promise<{ success: boolean; data?: Ticket; error?: string }>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<{ success: boolean; error?: string }>;
   assignTicket: (id: string, userId: string) => Promise<{ success: boolean; error?: string }>;
-  deleteTicket: (id: string) => Promise<{ success: boolean; error?: string }>;
+  softDeleteTicket: (id: string, reason: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useTickets(): UseTicketsReturn {
@@ -20,17 +20,24 @@ export function useTickets(): UseTicketsReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTickets = useCallback(async () => {
+  const fetchTickets = useCallback(async (includeDeleted: boolean = false) => {
     if (!user) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('tickets')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Only show non-deleted tickets unless includeDeleted is true (for CEO)
+      if (!includeDeleted) {
+        query = query.or('is_deleted.is.null,is_deleted.eq.false');
+      }
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
       setTickets((data || []) as unknown as Ticket[]);
@@ -97,23 +104,31 @@ export function useTickets(): UseTicketsReturn {
     return updateTicket(id, { assigned_to: userId, status: 'in_progress' });
   }, [updateTicket]);
 
-  const deleteTicket = useCallback(async (
-    id: string
+  const softDeleteTicket = useCallback(async (
+    id: string,
+    reason: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { error: deleteError } = await supabase
+      const { error: updateError } = await supabase
         .from('tickets')
-        .delete()
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+          deletion_reason: reason,
+          status: 'closed',
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id);
 
-      if (deleteError) throw deleteError;
+      if (updateError) throw updateError;
       await fetchTickets();
       return { success: true };
     } catch (err) {
-      console.error('Error deleting ticket:', err);
+      console.error('Error soft deleting ticket:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error deleting ticket' };
     }
-  }, [fetchTickets]);
+  }, [user, fetchTickets]);
 
   useEffect(() => {
     fetchTickets();
@@ -127,6 +142,6 @@ export function useTickets(): UseTicketsReturn {
     createTicket,
     updateTicket,
     assignTicket,
-    deleteTicket,
+    softDeleteTicket,
   };
 }
