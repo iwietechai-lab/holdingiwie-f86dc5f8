@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Fingerprint, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,40 +10,19 @@ import { useFacialVerification } from '@/hooks/useFacialVerification';
 
 // Robust function to stop all camera streams - used as safety net
 const stopAllCameraStreams = () => {
-  console.log('📹 FacialVerificationGuard: ===== STOPPING ALL CAMERA STREAMS =====');
-  
-  // Method 1: Stop all video elements
-  const allVideos = document.querySelectorAll('video');
-  console.log('📹 FacialVerificationGuard: Found', allVideos.length, 'video elements');
-  
-  allVideos.forEach((video, i) => {
-    const stream = video.srcObject as MediaStream | null;
-    if (stream?.getTracks) {
-      const tracks = stream.getTracks();
-      console.log(`📹 FacialVerificationGuard: Video[${i}] has`, tracks.length, 'tracks');
-      tracks.forEach((track, idx) => {
-        console.log(`📹 FacialVerificationGuard: Video[${i}].Track[${idx}]:`, track.kind, 'readyState:', track.readyState);
-        track.stop();
-        console.log(`📹 FacialVerificationGuard: Video[${i}].Track[${idx}] stopped, readyState now:`, track.readyState);
-      });
-    }
-    video.srcObject = null;
-    video.pause();
-    video.src = '';
-    video.load();
-  });
-  
-  // Method 2: Try to enumerate and stop all media devices
-  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-    navigator.mediaDevices.enumerateDevices()
-      .then(devices => {
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        console.log('📹 FacialVerificationGuard: Found', videoDevices.length, 'video input devices');
-      })
-      .catch(err => console.log('📹 FacialVerificationGuard: Error enumerating devices:', err));
+  try {
+    const allVideos = document.querySelectorAll('video');
+    allVideos.forEach((video) => {
+      const stream = video.srcObject as MediaStream | null;
+      if (stream?.getTracks) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      video.srcObject = null;
+      video.pause();
+    });
+  } catch (e) {
+    console.warn('Error stopping camera streams:', e);
   }
-  
-  console.log('📹 FacialVerificationGuard: ===== CAMERA STREAMS STOPPED =====');
 };
 
 interface FacialVerificationGuardProps {
@@ -62,54 +41,64 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   } = useFacialVerification(user?.id);
 
   const [showFaceRecognition, setShowFaceRecognition] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const initRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Safety timeout - if loading takes too long, show error state
+  // Clear timeout on unmount
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (authLoading || verificationLoading) {
-        console.warn('FacialVerificationGuard: Loading timeout reached');
-        setLoadingTimeout(true);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-    }, 10000); // 10 second timeout
+      stopAllCameraStreams();
+    };
+  }, []);
 
-    return () => clearTimeout(timeout);
-  }, [authLoading, verificationLoading]);
-
-  // Reset timeout flag when loading completes
+  // Safety timeout - if total loading exceeds 8 seconds, show error
   useEffect(() => {
-    if (!authLoading && !verificationLoading) {
-      setLoadingTimeout(false);
+    if (authLoading || verificationLoading) {
+      timeoutRef.current = setTimeout(() => {
+        console.warn('FacialVerificationGuard: Loading timeout reached');
+        setHasError(true);
+      }, 8000);
+    } else {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     }
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [authLoading, verificationLoading]);
 
-  // If not authenticated, redirect to login
+  // Redirect to login if not authenticated (ONLY when auth is done loading)
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
   }, [authLoading, isAuthenticated, navigate]);
 
-  // Show face recognition if not verified
+  // Show face recognition when needed
   useEffect(() => {
-    if (!authLoading && !verificationLoading && isAuthenticated && !isVerified) {
+    if (initRef.current) return;
+    
+    if (!authLoading && !verificationLoading && isAuthenticated && user && !isVerified) {
+      initRef.current = true;
       setShowFaceRecognition(true);
     }
-  }, [authLoading, verificationLoading, isAuthenticated, isVerified]);
+  }, [authLoading, verificationLoading, isAuthenticated, user, isVerified]);
 
-  // Cleanup camera when face recognition component hides
+  // Cleanup camera when hiding face recognition
   useEffect(() => {
     if (!showFaceRecognition) {
       stopAllCameraStreams();
     }
   }, [showFaceRecognition]);
-
-  // Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      stopAllCameraStreams();
-    };
-  }, []);
 
   const handleFaceSuccess = useCallback(async () => {
     console.log('🎉 FacialVerificationGuard: ===== FACE SUCCESS =====');
@@ -160,11 +149,11 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
       stopAllCameraStreams(); // Final cleanup before logout
       await logout();
       navigate('/login');
-    }, 200);
+    }, 150);
   };
 
-  // Handle loading timeout - offer retry or logout
-  if (loadingTimeout) {
+  // Handle error state
+  if (hasError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <SpaceBackground />
@@ -187,17 +176,14 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
                 className="flex-1"
                 onClick={async () => {
                   await logout();
-                  navigate('/login');
+                  navigate('/login', { replace: true });
                 }}
               >
                 Cerrar Sesión
               </Button>
               <Button
                 className="flex-1"
-                onClick={() => {
-                  setLoadingTimeout(false);
-                  window.location.reload();
-                }}
+                onClick={() => window.location.reload()}
               >
                 Reintentar
               </Button>
@@ -208,7 +194,7 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     );
   }
 
-  // Loading state - show spinner
+  // Auth loading - brief state
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -221,20 +207,20 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     );
   }
 
-  // Not authenticated - redirect handled by useEffect, but show loading briefly
+  // Not authenticated - redirect handled by useEffect
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <SpaceBackground />
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Redirigiendo al login...</p>
+          <p className="text-muted-foreground">Redirigiendo...</p>
         </div>
       </div>
     );
   }
 
-  // Wait for verification loading
+  // Verification loading
   if (verificationLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
