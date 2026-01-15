@@ -72,24 +72,24 @@ export function IwieChatInstallPrompt() {
 
   return (
     <div className="fixed bottom-20 left-4 right-4 z-50 animate-slide-up">
-      <div className="bg-card/95 backdrop-blur-lg border border-border rounded-xl p-4 shadow-2xl">
+      <div className="bg-[#1f2c34] border border-white/10 rounded-xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shrink-0">
-            <Download className="w-6 h-6 text-primary-foreground" />
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shrink-0">
+            <Download className="w-6 h-6 text-white" />
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground mb-1">Instalar IwieChat</h3>
-            <p className="text-xs text-muted-foreground mb-3">
+            <h3 className="font-semibold text-white mb-1">Instalar IwieChat</h3>
+            <p className="text-xs text-gray-400 mb-3">
               Instala la app en tu dispositivo para acceso rápido y notificaciones
             </p>
             
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleInstall} className="flex-1">
+              <Button size="sm" onClick={handleInstall} className="flex-1 bg-purple-600 hover:bg-purple-700">
                 <Download className="w-4 h-4 mr-2" />
                 Instalar
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleDismiss}>
+              <Button size="sm" variant="ghost" onClick={handleDismiss} className="text-gray-400 hover:text-white hover:bg-white/10">
                 Ahora no
               </Button>
             </div>
@@ -98,7 +98,7 @@ export function IwieChatInstallPrompt() {
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0 h-6 w-6"
+            className="shrink-0 h-6 w-6 text-gray-400 hover:text-white hover:bg-white/10"
             onClick={handleDismiss}
           >
             <X className="w-4 h-4" />

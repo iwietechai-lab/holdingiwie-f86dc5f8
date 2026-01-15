@@ -3,3 +3,8 @@ export { IwieChatTabs } from './IwieChatTabs';
 export { IwieChatChats } from './IwieChatChats';
 export { IwieChatCalls } from './IwieChatCalls';
 export { IwieChatInstallPrompt } from './IwieChatInstallPrompt';
+export { IwieChatSplash } from './IwieChatSplash';
+export { IwieChatWindow } from './IwieChatWindow';
+export { IwieChatList } from './IwieChatList';
+export { IwieChatCallsList } from './IwieChatCallsList';
+export { IwieChatNav } from './IwieChatNav';

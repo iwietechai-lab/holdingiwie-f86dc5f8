@@ -1,29 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { SpaceBackground } from '@/components/SpaceBackground';
-import { IwieChatHeader } from '@/components/iwiechat/IwieChatHeader';
-import { IwieChatTabs } from '@/components/iwiechat/IwieChatTabs';
-import { IwieChatChats } from '@/components/iwiechat/IwieChatChats';
-import { IwieChatCalls } from '@/components/iwiechat/IwieChatCalls';
-import { IwieChatInstallPrompt } from '@/components/iwiechat/IwieChatInstallPrompt';
 import { Chat } from '@/hooks/useChats';
-import { ChatWindow } from '@/components/ChatWindow';
+import { 
+  IwieChatSplash,
+  IwieChatList,
+  IwieChatCallsList,
+  IwieChatWindow,
+  IwieChatNav,
+  IwieChatInstallPrompt
+} from '@/components/iwiechat';
 
 export default function IwieChat() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, isLoading: authLoading, user } = useSupabaseAuth();
+  const { isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
   
   const initialTab = searchParams.get('tab') || 'chats';
   const [activeTab, setActiveTab] = useState<'chats' | 'calls'>(initialTab as 'chats' | 'calls');
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
 
   // Force dark mode for IwieChat
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    // Set specific background color for IwieChat
+    document.body.style.backgroundColor = '#0b141a';
+    
     return () => {
-      // Don't remove dark class on unmount to prevent flashing
+      document.body.style.backgroundColor = '';
     };
   }, []);
 
@@ -33,11 +38,20 @@ export default function IwieChat() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
+  // Show splash screen on first load
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+  };
+
+  // Show splash screen
+  if (showSplash) {
+    return <IwieChatSplash onComplete={handleSplashComplete} />;
+  }
+
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f]">
-        <SpaceBackground />
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0b141a]">
+        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -45,35 +59,29 @@ export default function IwieChat() {
   // Show chat window when a chat is selected
   if (selectedChat) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#0a0a0f]">
-        <SpaceBackground />
-        <div className="flex-1 relative z-10 flex flex-col">
-          <ChatWindow
-            chat={selectedChat}
-            onBack={() => setSelectedChat(null)}
-          />
-        </div>
+      <div className="min-h-screen flex flex-col bg-[#0b141a] safe-area-inset">
+        <IwieChatWindow
+          chat={selectedChat}
+          onBack={() => setSelectedChat(null)}
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0f] safe-area-inset">
-      <SpaceBackground />
+    <div className="min-h-screen flex flex-col bg-[#0b141a] safe-area-inset">
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {activeTab === 'chats' ? (
+          <IwieChatList onSelectChat={setSelectedChat} />
+        ) : (
+          <IwieChatCallsList 
+            userId={user?.id || ''} 
+            userName={profile?.full_name || 'Usuario'}
+          />
+        )}
+      </main>
       
-      <div className="flex-1 relative z-10 flex flex-col">
-        <IwieChatHeader />
-        
-        <main className="flex-1 overflow-hidden flex flex-col">
-          {activeTab === 'chats' ? (
-            <IwieChatChats onSelectChat={setSelectedChat} />
-          ) : (
-            <IwieChatCalls userId={user?.id || ''} />
-          )}
-        </main>
-        
-        <IwieChatTabs activeTab={activeTab} onTabChange={setActiveTab} />
-      </div>
+      <IwieChatNav activeTab={activeTab} onTabChange={setActiveTab} />
       
       <IwieChatInstallPrompt />
     </div>
