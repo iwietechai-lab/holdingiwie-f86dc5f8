@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,11 +32,14 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, Mail, User, Briefcase, FileText, Shield, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UserPlus, Mail, User, Briefcase, FileText, Shield, Loader2, Lock, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserCreationRequests } from '@/hooks/useUserCreationRequests';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { APP_ROLE_LABELS, AppRole, DashboardVisibility, DEFAULT_DASHBOARD_VISIBILITY } from '@/types/superadmin';
 import { getCompanyById } from '@/data/companies';
+import { canAssignRole, canModifyPermission, getAssignableRoles } from '@/utils/roleHierarchy';
 
 const formSchema = z.object({
   full_name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -76,10 +79,14 @@ export function CreateUserRequestDialog({
   companyId,
 }: CreateUserRequestDialogProps) {
   const { createRequest } = useUserCreationRequests(companyId);
+  const { profile: currentUserProfile } = useSupabaseAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [permissions, setPermissions] = useState<DashboardVisibility>(DEFAULT_DASHBOARD_VISIBILITY);
   
   const company = getCompanyById(companyId);
+  
+  // Check if current user is superadmin via RPC (simplified check based on role)
+  const isSuperadmin = currentUserProfile?.role === 'superadmin' || currentUserProfile?.role === 'ceo';
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -91,11 +98,31 @@ export function CreateUserRequestDialog({
     },
   });
 
+  // Get roles this user can assign based on their own role
+  const availableRoles = useMemo(() => {
+    const assignable = getAssignableRoles(currentUserProfile?.role, isSuperadmin);
+    // Filter to only show roles lower than current user's role
+    return assignable.filter(role => 
+      role !== 'superadmin' && role !== 'ceo' // Never allow requesting CEO or superadmin
+    );
+  }, [currentUserProfile?.role, isSuperadmin]);
+
   const handlePermissionChange = (key: keyof DashboardVisibility, value: boolean) => {
+    // Check if user can modify this permission
+    if (!canModifyPermission(key, currentUserProfile?.role, isSuperadmin)) {
+      toast.error('No tienes permisos para asignar este acceso');
+      return;
+    }
     setPermissions(prev => ({ ...prev, [key]: value }));
   };
 
   const onSubmit = async (values: FormValues) => {
+    // Validate that the user can assign this role
+    if (!canAssignRole(currentUserProfile?.role, values.proposed_role as AppRole, isSuperadmin)) {
+      toast.error('No tienes permisos para asignar este rol');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -126,16 +153,6 @@ export function CreateUserRequestDialog({
       setIsSubmitting(false);
     }
   };
-
-  const availableRoles: AppRole[] = [
-    'gerente_area',
-    'lider_area',
-    'jefe_area',
-    'jefe_seccion',
-    'colaborador',
-    'investigador',
-    'asesor',
-  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -251,22 +268,41 @@ export function CreateUserRequestDialog({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground mb-4">
-                  Selecciona los permisos que necesitará este usuario. El CEO aprobará el nivel de acceso final.
-                </p>
+                <Alert className="mb-4">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Solo puedes solicitar permisos de nivel igual o inferior al tuyo. 
+                    Los permisos bloqueados requieren aprobación del CEO.
+                  </AlertDescription>
+                </Alert>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(Object.keys(permissions) as (keyof DashboardVisibility)[]).map(key => (
-                    <div key={key} className="flex items-center justify-between space-x-2 p-2 rounded-lg bg-muted/30">
-                      <Label htmlFor={key} className="text-xs font-normal cursor-pointer flex-1">
-                        {PERMISSION_LABELS[key]}
-                      </Label>
-                      <Switch
-                        id={key}
-                        checked={permissions[key]}
-                        onCheckedChange={(checked) => handlePermissionChange(key, checked)}
-                      />
-                    </div>
-                  ))}
+                  {(Object.keys(permissions) as (keyof DashboardVisibility)[]).map(key => {
+                    const canModify = canModifyPermission(key, currentUserProfile?.role, isSuperadmin);
+                    return (
+                      <div 
+                        key={key} 
+                        className={`flex items-center justify-between space-x-2 p-2 rounded-lg ${
+                          canModify ? 'bg-muted/30' : 'bg-muted/10 opacity-60'
+                        }`}
+                      >
+                        <Label 
+                          htmlFor={key} 
+                          className={`text-xs font-normal flex-1 flex items-center gap-1 ${
+                            canModify ? 'cursor-pointer' : 'cursor-not-allowed'
+                          }`}
+                        >
+                          {!canModify && <Lock className="w-3 h-3 text-muted-foreground" />}
+                          {PERMISSION_LABELS[key]}
+                        </Label>
+                        <Switch
+                          id={key}
+                          checked={permissions[key]}
+                          disabled={!canModify}
+                          onCheckedChange={(checked) => handlePermissionChange(key, checked)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
