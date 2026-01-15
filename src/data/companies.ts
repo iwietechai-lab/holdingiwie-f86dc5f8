@@ -78,6 +78,13 @@ export const companies: Company[] = [
     color: 'hsl(190, 90%, 50%)',
     description: 'Viajes inteligentes con IA',
   },
+  {
+    id: 'iwie-link',
+    name: 'Iwie Link',
+    icon: '🌐',
+    color: 'hsl(170, 80%, 45%)',
+    description: 'Conectividad y comunicaciones corporativas',
+  },
 ];
 
 export const getCompanyById = (id: string): Company | undefined => {
