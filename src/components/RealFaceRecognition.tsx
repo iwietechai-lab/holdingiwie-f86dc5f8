@@ -497,9 +497,10 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           statusRef.current = 'success';
           setInstruction('¡Verificación completada!');
           
-          // IMMEDIATELY stop camera before anything else
-          console.log('📹 Stopping camera IMMEDIATELY after success');
+          // IMMEDIATELY stop camera before anything else - triple call for certainty
+          console.log('📹 FORCE stopping camera IMMEDIATELY after verification success');
           stopCamera();
+          stopAllCameraStreamsGlobally();
           
           await logAccessWithLocation(true, locationData || {});
           
@@ -519,11 +520,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Mark session as verified in sessionStorage
           markSessionVerified();
           
-          // Ensure camera is fully stopped before calling onSuccess
-          setTimeout(() => {
-            stopCamera(); // Call again just in case
-            onSuccess();
-          }, 1500);
+          // Call onSuccess immediately - parent will handle hiding component
+          // which will trigger unmount cleanup
+          console.log('📹 Calling onSuccess immediately');
+          stopCamera();
+          stopAllCameraStreamsGlobally();
+          onSuccess();
         } else {
           console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
           setError(`Rostro no coincide (similitud: ${(similarity * 100).toFixed(1)}%). Intenta de nuevo.`);
@@ -573,20 +575,22 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
         
-        // IMMEDIATELY stop camera before anything else
-        console.log('📹 Stopping camera IMMEDIATELY after registration success');
+        // IMMEDIATELY stop camera before anything else - triple call for certainty
+        console.log('📹 FORCE stopping camera IMMEDIATELY after registration success');
         stopCamera();
+        stopAllCameraStreamsGlobally();
 
         // Mark session as verified in sessionStorage
         markSessionVerified();
 
         await logAccessWithLocation(true, locationData || {});
         
-        // Ensure camera is fully stopped before calling onSuccess
-        setTimeout(() => {
-          stopCamera(); // Call again just in case
-          onSuccess();
-        }, 1500);
+        // Call onSuccess immediately - parent will handle hiding component
+        // which will trigger unmount cleanup
+        console.log('📹 Calling onSuccess immediately');
+        stopCamera();
+        stopAllCameraStreamsGlobally();
+        onSuccess();
       } catch (err) {
         console.error('❌ Registration error:', err);
         setError('Error al registrar rostro. Intenta de nuevo.');
@@ -598,7 +602,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
     setIsProcessing(false);
     isProcessingRef.current = false;
-  }, [hasStoredEmbedding, userId, stopCamera, logAccessWithLocation, locationData, onSuccess, isProcessing]);
+  }, [hasStoredEmbedding, userId, stopCamera, stopAllCameraStreamsGlobally, logAccessWithLocation, locationData, onSuccess, isProcessing]);
 
   // Draw landmarks
   const drawLandmarks = useCallback((detection: faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>) => {
