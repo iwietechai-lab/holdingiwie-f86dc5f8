@@ -6,6 +6,7 @@ import {
   Download,
   Trash2,
   Eye,
+  EyeOff,
   Filter,
   Search,
   FileText,
@@ -16,16 +17,21 @@ import {
   AlertCircle,
   LogOut,
   ExternalLink,
+  Lock,
+  Users,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useDocumentPermissions } from '@/hooks/useDocumentPermissions';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -51,6 +57,8 @@ import {
 import { companies } from '@/data/companies';
 import { documentService } from '@/services/documentService';
 import { DocumentViewer } from '@/components/DocumentViewer';
+import { UserPermissionSelector } from '@/components/documents/UserPermissionSelector';
+import { RequestAccessDialog } from '@/components/documents/RequestAccessDialog';
 import {
   Document as DocType,
   AREAS,
@@ -59,18 +67,35 @@ import {
   formatFileSize,
 } from '@/types/documents';
 
+// Extended document type with permission info
+interface DocumentWithAccess extends DocType {
+  hasAccess: boolean;
+  isOwner: boolean;
+}
+
 export const GestorDocumentos = () => {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, isLoading, logout } = useSupabaseAuth();
   const { toast } = useToast();
+  const { 
+    users, 
+    isLoadingUsers, 
+    grantPermissions, 
+    getDocumentPermissions,
+    requestAccess,
+  } = useDocumentPermissions();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<DocType[]>([]);
+  const [documents, setDocuments] = useState<DocumentWithAccess[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<DocType | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<DocumentWithAccess | null>(null);
+
+  // Access request dialog
+  const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
+  const [accessRequestDoc, setAccessRequestDoc] = useState<DocumentWithAccess | null>(null);
 
   // Filters
   const [filterEmpresa, setFilterEmpresa] = useState<string>('all');
@@ -86,6 +111,7 @@ export const GestorDocumentos = () => {
   const [uploadIsDevelopment, setUploadIsDevelopment] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedUserPermissions, setSelectedUserPermissions] = useState<string[]>([]);
 
   // Auth check
   useEffect(() => {
@@ -94,8 +120,10 @@ export const GestorDocumentos = () => {
     }
   }, [isLoading, isAuthenticated, navigate]);
 
-  // Load documents
+  // Load documents with permission info
   const loadDocuments = useCallback(async () => {
+    if (!user) return;
+    
     setIsLoadingDocs(true);
     try {
       const filters: any = {};
@@ -111,15 +139,34 @@ export const GestorDocumentos = () => {
           description: 'No se pudieron cargar los documentos',
           variant: 'destructive',
         });
-      } else {
-        setDocuments(data);
+        return;
       }
+
+      // Get permissions for all documents and determine access
+      const docsWithAccess: DocumentWithAccess[] = await Promise.all(
+        data.map(async (doc) => {
+          const isOwner = doc.user_id === user.id;
+          
+          // If user is owner, they have access
+          if (isOwner) {
+            return { ...doc, hasAccess: true, isOwner: true };
+          }
+
+          // Check if user has explicit permission
+          const permissions = await getDocumentPermissions(doc.id);
+          const hasPermission = permissions.some(p => p.user_id === user.id);
+          
+          return { ...doc, hasAccess: hasPermission, isOwner: false };
+        })
+      );
+
+      setDocuments(docsWithAccess);
     } catch (error) {
       console.error('Load documents error:', error);
     } finally {
       setIsLoadingDocs(false);
     }
-  }, [filterEmpresa, filterArea, filterTipo, toast]);
+  }, [user, filterEmpresa, filterArea, filterTipo, toast, getDocumentPermissions]);
 
   useEffect(() => {
     if (isAuthenticated && profile) {
@@ -167,7 +214,7 @@ export const GestorDocumentos = () => {
       if (uploadError) throw uploadError;
 
       // Create document record
-      const { error: docError } = await documentService.createDocument(
+      const { data: newDoc, error: docError } = await documentService.createDocument(
         {
           file: uploadFile,
           nombre: uploadNombre || uploadFile.name,
@@ -181,6 +228,11 @@ export const GestorDocumentos = () => {
 
       if (docError) throw docError;
 
+      // Grant permissions to selected users
+      if (newDoc && selectedUserPermissions.length > 0) {
+        await grantPermissions(newDoc.id, selectedUserPermissions);
+      }
+
       toast({
         title: '¡Éxito!',
         description: 'Documento subido correctamente',
@@ -193,6 +245,7 @@ export const GestorDocumentos = () => {
       setUploadArea('');
       setUploadIsDevelopment(false);
       setUploadProgress(0);
+      setSelectedUserPermissions([]);
       setShowUploadModal(false);
 
       // Reload documents
@@ -209,7 +262,13 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handlePreview = async (doc: DocType) => {
+  const handlePreview = async (doc: DocumentWithAccess) => {
+    if (!doc.hasAccess) {
+      setAccessRequestDoc(doc);
+      setShowAccessRequestDialog(true);
+      return;
+    }
+
     const url = await documentService.getDownloadUrl(doc.file_path);
     if (url) {
       setPreviewUrl(url);
@@ -224,7 +283,16 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handleDownload = async (doc: DocType) => {
+  const handleDownload = async (doc: DocumentWithAccess) => {
+    if (!doc.hasAccess) {
+      toast({
+        title: 'Sin acceso',
+        description: 'No tienes permiso para descargar este documento',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const url = await documentService.getDownloadUrl(doc.file_path);
     if (url) {
       window.open(url, '_blank');
@@ -237,7 +305,35 @@ export const GestorDocumentos = () => {
     }
   };
 
-  const handleDelete = async (doc: DocType) => {
+  const handleRequestAccess = async (message?: string): Promise<boolean> => {
+    if (!accessRequestDoc) return false;
+
+    const success = await requestAccess(accessRequestDoc.id, accessRequestDoc.user_id, message);
+    if (success) {
+      toast({
+        title: 'Solicitud enviada',
+        description: 'Se ha enviado la solicitud de acceso al propietario del documento',
+      });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Ya tienes una solicitud pendiente para este documento',
+        variant: 'destructive',
+      });
+    }
+    return success;
+  };
+
+  const handleDelete = async (doc: DocumentWithAccess) => {
+    if (!doc.isOwner) {
+      toast({
+        title: 'Sin permiso',
+        description: 'Solo el propietario puede eliminar este documento',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!confirm('¿Estás seguro de eliminar este documento?')) return;
 
     const { error } = await documentService.deleteDocument(doc.id, doc.file_path);
@@ -439,19 +535,34 @@ export const GestorDocumentos = () => {
                       filteredDocuments.map((doc) => (
                         <TableRow 
                           key={doc.id} 
-                          className="border-border hover:bg-muted/20 cursor-pointer group"
+                          className={`border-border hover:bg-muted/20 cursor-pointer group ${!doc.hasAccess ? 'opacity-60' : ''}`}
                           onClick={() => handlePreview(doc)}
                         >
                           <TableCell>
-                            <span className="text-2xl">{getDocumentIcon(doc.tipo)}</span>
+                            <div className="relative">
+                              <span className="text-2xl">{getDocumentIcon(doc.tipo)}</span>
+                              {!doc.hasAccess && (
+                                <Lock className="w-3 h-3 text-amber-500 absolute -top-1 -right-1" />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="font-medium text-foreground">
                             <div className="flex items-center gap-2">
                               <span>{doc.nombre}</span>
                               {doc.is_development && (
-                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                  Dev
-                                </span>
+                                <Badge variant="outline" className="text-xs">Dev</Badge>
+                              )}
+                              {doc.isOwner && (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <Users className="w-3 h-3" />
+                                  Tuyo
+                                </Badge>
+                              )}
+                              {!doc.hasAccess && (
+                                <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/50">
+                                  <Lock className="w-3 h-3 mr-1" />
+                                  Restringido
+                                </Badge>
                               )}
                             </div>
                           </TableCell>
@@ -472,33 +583,52 @@ export const GestorDocumentos = () => {
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handlePreview(doc)}
-                                className="h-8 w-8 hover:bg-primary/20"
-                                title="Ver documento"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDownload(doc)}
-                                className="h-8 w-8 hover:bg-secondary/20"
-                                title="Descargar"
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(doc)}
-                                className="h-8 w-8 hover:bg-destructive/20 text-destructive"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {doc.hasAccess ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handlePreview(doc)}
+                                    className="h-8 w-8 hover:bg-primary/20"
+                                    title="Ver documento"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDownload(doc)}
+                                    className="h-8 w-8 hover:bg-secondary/20"
+                                    title="Descargar"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setAccessRequestDoc(doc);
+                                    setShowAccessRequestDialog(true);
+                                  }}
+                                  className="h-8 w-8 hover:bg-amber-500/20 text-amber-500"
+                                  title="Solicitar acceso"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {doc.isOwner && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(doc)}
+                                  className="h-8 w-8 hover:bg-destructive/20 text-destructive"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -621,6 +751,15 @@ export const GestorDocumentos = () => {
               </Label>
             </div>
 
+            {/* User Permissions Selector */}
+            <UserPermissionSelector
+              users={users}
+              selectedUsers={selectedUserPermissions}
+              onSelectionChange={setSelectedUserPermissions}
+              currentUserId={user?.id}
+              isLoading={isLoadingUsers}
+            />
+
             {/* Upload Progress Bar */}
             {isUploading && (
               <div className="space-y-2 pt-2">
@@ -721,6 +860,14 @@ export const GestorDocumentos = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Request Access Dialog */}
+      <RequestAccessDialog
+        open={showAccessRequestDialog}
+        onOpenChange={setShowAccessRequestDialog}
+        documentName={accessRequestDoc?.nombre || ''}
+        onRequestAccess={handleRequestAccess}
+      />
     </div>
   );
 };
