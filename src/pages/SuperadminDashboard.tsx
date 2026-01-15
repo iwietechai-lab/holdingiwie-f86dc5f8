@@ -568,6 +568,7 @@ export default function SuperadminDashboard() {
         onSaveProfile={handleSaveProfile}
         onSaveRole={handleSaveRole}
         onSaveVisibility={handleSaveVisibility}
+        currentUserIsSuperadmin={isSuperadmin}
       />
 
       {/* Create Company Dialog */}
