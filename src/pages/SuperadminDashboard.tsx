@@ -318,7 +318,7 @@ export default function SuperadminDashboard() {
                       <Crown className="w-8 h-8 text-yellow-500" />
                       <div>
                         <p className="text-2xl font-bold text-foreground">
-                          {users.filter(u => u.roles.some(r => ['superadmin', 'ceo', 'gerente_area'].includes(r.role))).length}
+                          {users.filter(u => u.roles.some(r => ['superadmin', 'admin', 'manager'].includes(r.role))).length}
                         </p>
                         <p className="text-xs text-muted-foreground">Líderes</p>
                       </div>
