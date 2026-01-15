@@ -38,51 +38,23 @@ export function useFacialVerification(userId: string | undefined) {
     timeRemaining: null,
   });
   
-  const initializedRef = useRef<boolean>(false);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const checkStartedRef = useRef(false);
   
-  // Safety timeout - prevent infinite loading state
+  // Initialize session tracking
   useEffect(() => {
-    if (state.isLoading) {
-      loadingTimeoutRef.current = setTimeout(() => {
-        console.warn('useFacialVerification: Loading timeout reached, forcing state update');
-        setState(prev => {
-          if (prev.isLoading) {
-            return { ...prev, isLoading: false };
-          }
-          return prev;
-        });
-      }, 5000); // 5 second timeout
-    }
-    
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-    };
-  }, [state.isLoading]);
-  
-  // Initialize session tracking on mount
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-    
     try {
-      // Check if this is a new session
       const existingSession = sessionStorage.getItem(SESSION_KEY);
       if (!existingSession) {
         const newSessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
         sessionStorage.setItem(SESSION_KEY, newSessionId);
-        // New session, clear verification status
         sessionStorage.removeItem(SESSION_VERIFIED_KEY);
       }
     } catch {
-      // sessionStorage might not be available
-      console.warn('sessionStorage not available');
+      // sessionStorage not available
     }
   }, []);
 
-  // Check if verification is still valid (must be recent AND in same session)
+  // Check verification status
   const checkVerificationStatus = useCallback(async () => {
     if (!userId) {
       setState(prev => ({ ...prev, isLoading: false, isVerified: false }));
@@ -90,21 +62,18 @@ export function useFacialVerification(userId: string | undefined) {
     }
 
     try {
-      // Use RPC to get facial data (bypasses RLS)
       const { data, error } = await supabase.rpc('get_user_facial_embedding', {
         target_user_id: userId
       });
 
       if (error) {
-        console.error('Error checking facial verification:', error);
+        console.error('Facial verification RPC error:', error);
         setState(prev => ({ ...prev, isLoading: false, isVerified: false }));
         return;
       }
 
-      // RPC returns array, get first element
       const profile = data?.[0];
       if (!profile?.last_facial_verification) {
-        // No verification recorded
         setState({
           isVerified: false,
           lastVerification: null,
@@ -143,12 +112,11 @@ export function useFacialVerification(userId: string | undefined) {
     }
   }, [userId]);
 
-  // Update verification timestamp in database using RPC (SECURITY DEFINER)
+  // Update verification timestamp using RPC
   const recordVerification = useCallback(async () => {
     if (!userId) return false;
 
     try {
-      // Use RPC to save timestamp (SECURITY DEFINER - bypasses RLS)
       const { error } = await supabase.rpc('save_facial_embedding', {
         target_user_id: userId,
         new_embedding: null,
@@ -214,10 +182,18 @@ export function useFacialVerification(userId: string | undefined) {
     return `hace ${diffDays} días`;
   }, [state.lastVerification]);
 
-  // Initial check on mount
+  // Initial check - run only once when userId becomes available
   useEffect(() => {
+    if (!userId) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+    
+    if (checkStartedRef.current) return;
+    checkStartedRef.current = true;
+    
     checkVerificationStatus();
-  }, [checkVerificationStatus]);
+  }, [userId, checkVerificationStatus]);
 
   // Periodic check every minute to update time remaining
   useEffect(() => {
