@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, ChevronRight, MoreVertical, Settings, Grid, Maximize2, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, Maximize2, CircleDot, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -84,12 +84,20 @@ export default function VideoCallPage() {
     }
   }, [authLoading, user, roomId, joinRoom, profile?.full_name]);
 
-  // Auto-start recording when connected
-  useEffect(() => {
-    if (isConnected && localStream && !isRecording && !isProcessing) {
+  // Manual recording toggle function
+  const handleToggleRecording = useCallback(() => {
+    if (isRecording) {
+      // Stop recording but don't process yet - will process on leave
+      toast.info('Grabación detenida');
+      // Note: We don't call stopRecording here to avoid processing mid-call
+      // The stopRecording will be called in handleLeave
+    } else if (localStream) {
       startRecording(localStream);
+      toast.success('Grabación iniciada');
+    } else {
+      toast.error('No hay stream de audio disponible');
     }
-  }, [isConnected, localStream, isRecording, isProcessing, startRecording]);
+  }, [isRecording, localStream, startRecording]);
 
   useEffect(() => {
     if (localStream && localVideoRef.current) {
@@ -552,6 +560,35 @@ export default function VideoCallPage() {
               </TooltipTrigger>
               <TooltipContent>
                 <p>{isScreenSharing ? 'Dejar de compartir' : 'Compartir pantalla'}</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Recording button - Manual control */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-12 h-12 transition-all",
+                    isRecording 
+                      ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" 
+                      : "bg-[#3c4043] hover:bg-[#4a4d51] text-white"
+                  )}
+                  onClick={handleToggleRecording}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : isRecording ? (
+                    <Square className="w-5 h-5" />
+                  ) : (
+                    <CircleDot className="w-5 h-5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isRecording ? 'Detener grabación' : 'Iniciar grabación'}</p>
               </TooltipContent>
             </Tooltip>
           </div>
