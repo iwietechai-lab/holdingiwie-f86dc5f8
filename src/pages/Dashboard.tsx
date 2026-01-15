@@ -65,22 +65,27 @@ export const Dashboard = () => {
     }
   }, [isLoading, isAuthenticated, navigate]);
 
-  // Check if user has full access (CEO or has_full_access flag or special access list)
+  // Check if user has access to dashboard based on dashboard_visibility permissions
   useEffect(() => {
     if (!isLoading && isAuthenticated && profile) {
-      const isCEO = profile.role === 'CEO Global';
-      // Use profile.has_full_access first, then fallback to email check
-      const userEmail = user?.email || '';
-      const hasAccess = (profile as any).has_full_access || hasFullAccess(userEmail);
+      const hasAccess = profile.dashboard_visibility?.ver_dashboard || 
+                        profile.has_full_access || 
+                        profile.role === 'CEO Global' ||
+                        profile.role === 'superadmin';
       
-      console.log('Dashboard access check:', { userEmail, isCEO, hasAccess, profileRole: profile.role, profileHasFullAccess: (profile as any).has_full_access });
+      console.log('Dashboard access check:', { 
+        profileRole: profile.role, 
+        hasAccess, 
+        ver_dashboard: profile.dashboard_visibility?.ver_dashboard,
+        has_full_access: profile.has_full_access 
+      });
       
-      if (!isCEO && !hasAccess) {
-        // Users without full access: redirect to chatbot only
+      if (!hasAccess) {
+        // Users without dashboard access: redirect to chatbot
         navigate('/chatbot');
       }
     }
-  }, [isLoading, isAuthenticated, profile, user, navigate]);
+  }, [isLoading, isAuthenticated, profile, navigate]);
 
   const handleLogout = async () => {
     await logout();
@@ -103,10 +108,8 @@ export const Dashboard = () => {
     return null;
   }
 
-  // If profile not loaded yet or no access, show loading
-  const userEmail = user?.email || '';
-  const userHasAccess = profile?.role === 'CEO Global' || (profile as any)?.has_full_access || hasFullAccess(userEmail);
-  if (!profile || !userHasAccess) {
+  // If profile not loaded yet, show loading
+  if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <SpaceBackground />

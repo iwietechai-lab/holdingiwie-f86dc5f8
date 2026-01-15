@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { SUPERADMIN_USER_ID } from '@/types/superadmin';
+import { SUPERADMIN_USER_ID, DashboardVisibility, DEFAULT_DASHBOARD_VISIBILITY } from '@/types/superadmin';
 
 interface UserProfile {
   id: string;
@@ -10,6 +10,7 @@ interface UserProfile {
   company_id: string | null;
   has_full_access: boolean;
   avatar_url?: string | null;
+  dashboard_visibility: DashboardVisibility;
 }
 
 interface AuthState {
@@ -38,16 +39,16 @@ export const useSupabaseAuth = () => {
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      // Direct query for user profile
+      // Direct query for user profile including dashboard_visibility
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, full_name, role, company_id')
+        .select('id, full_name, role, company_id, dashboard_visibility')
         .eq('id', userId)
         .maybeSingle();
 
       if (error) {
         console.error('Error fetching user profile:', error);
-        // For superadmin, return default profile
+        // For superadmin, return default profile with full access
         if (userId === SUPERADMIN_USER_ID) {
           return {
             id: userId,
@@ -55,9 +56,60 @@ export const useSupabaseAuth = () => {
             role: 'superadmin',
             company_id: null,
             has_full_access: true,
+            dashboard_visibility: {
+              ...DEFAULT_DASHBOARD_VISIBILITY,
+              ver_dashboard: true,
+              ver_ventas: true,
+              ver_documentos: true,
+              ver_chat_interno: true,
+              ver_tareas: true,
+              ver_tickets: true,
+              ver_reuniones: true,
+              ver_estructura_org: true,
+              acceso_chatbot_empresa: true,
+              acceso_chatbot_ceo: true,
+              gestionar_usuarios: true,
+              gestionar_conocimiento: true,
+              ver_reportes: true,
+              ver_logs: true,
+            },
           };
         }
         return null;
+      }
+
+      // Parse dashboard_visibility from JSON, with defaults
+      const rawVisibility = data?.dashboard_visibility;
+      const dashboardVisibility: DashboardVisibility = rawVisibility && typeof rawVisibility === 'object' && !Array.isArray(rawVisibility)
+        ? { ...DEFAULT_DASHBOARD_VISIBILITY, ...(rawVisibility as unknown as Partial<DashboardVisibility>) }
+        : DEFAULT_DASHBOARD_VISIBILITY;
+
+      // For superadmin, grant all permissions
+      if (userId === SUPERADMIN_USER_ID) {
+        return {
+          id: data?.id || userId,
+          full_name: data?.full_name || 'Mauricio Ortiz Tamayo',
+          role: data?.role || 'superadmin',
+          company_id: data?.company_id || null,
+          has_full_access: true,
+          dashboard_visibility: {
+            ...dashboardVisibility,
+            ver_dashboard: true,
+            ver_ventas: true,
+            ver_documentos: true,
+            ver_chat_interno: true,
+            ver_tareas: true,
+            ver_tickets: true,
+            ver_reuniones: true,
+            ver_estructura_org: true,
+            acceso_chatbot_empresa: true,
+            acceso_chatbot_ceo: true,
+            gestionar_usuarios: true,
+            gestionar_conocimiento: true,
+            ver_reportes: true,
+            ver_logs: true,
+          },
+        };
       }
 
       return {
@@ -65,7 +117,8 @@ export const useSupabaseAuth = () => {
         full_name: data?.full_name || null,
         role: data?.role || 'user',
         company_id: data?.company_id || null,
-        has_full_access: userId === SUPERADMIN_USER_ID,
+        has_full_access: false,
+        dashboard_visibility: dashboardVisibility,
       };
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -77,6 +130,23 @@ export const useSupabaseAuth = () => {
           role: 'superadmin',
           company_id: null,
           has_full_access: true,
+          dashboard_visibility: {
+            ...DEFAULT_DASHBOARD_VISIBILITY,
+            ver_dashboard: true,
+            ver_ventas: true,
+            ver_documentos: true,
+            ver_chat_interno: true,
+            ver_tareas: true,
+            ver_tickets: true,
+            ver_reuniones: true,
+            ver_estructura_org: true,
+            acceso_chatbot_empresa: true,
+            acceso_chatbot_ceo: true,
+            gestionar_usuarios: true,
+            gestionar_conocimiento: true,
+            ver_reportes: true,
+            ver_logs: true,
+          },
         };
       }
       return null;
