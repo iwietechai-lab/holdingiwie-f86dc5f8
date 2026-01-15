@@ -1,95 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Settings, CalendarPlus, Video, Clock, CheckCircle, XCircle, Plus, Trash2, MapPin } from 'lucide-react';
+import { Calendar, Settings, CalendarPlus, Video, Clock, CheckCircle, FileText } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { useMeetingRequests } from '@/hooks/useMeetingRequests';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MEETING_STATUS_LABELS } from '@/types/organization';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
 import { SuperadminAvailabilityManager } from '@/components/SuperadminAvailabilityManager';
 import { MeetingRequestForm } from '@/components/MeetingRequestForm';
 import { MeetingRequestsDashboard } from '@/components/MeetingRequestsDashboard';
-
-const STATUS_COLORS = {
-  scheduled: 'bg-blue-500/20 text-blue-400 border-blue-500',
-  confirmed: 'bg-green-500/20 text-green-400 border-green-500',
-  cancelled: 'bg-red-500/20 text-red-400 border-red-500',
-  completed: 'bg-gray-500/20 text-gray-400 border-gray-500',
-};
+import { StartInstantCallDialog } from '@/components/meetings/StartInstantCallDialog';
+import { MeetingSummariesList } from '@/components/meetings/MeetingSummariesList';
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
-  const { meetings, isLoading, createMeeting, updateMeeting, deleteMeeting } = useMeetings();
+  const { meetings } = useMeetings();
   const { isSuperadmin } = useSuperadmin();
   const { requests } = useMeetingRequests();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newMeeting, setNewMeeting] = useState({
-    title: '',
-    description: '',
-    scheduled_at: '',
-    duration_minutes: 60,
-    location: '',
-    meeting_url: '',
-  });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/login');
     }
   }, [authLoading, isAuthenticated, navigate]);
-
-  const handleCreateMeeting = async () => {
-    if (!newMeeting.title || !newMeeting.scheduled_at) {
-      toast.error('Por favor completa los campos requeridos');
-      return;
-    }
-
-    const result = await createMeeting({
-      ...newMeeting,
-      status: 'scheduled',
-      attendees: [],
-      company_id: profile?.company_id || '',
-      created_by: user?.id || '',
-    });
-
-    if (result.success) {
-      toast.success('Reunión creada exitosamente');
-      setShowCreateDialog(false);
-      setNewMeeting({ title: '', description: '', scheduled_at: '', duration_minutes: 60, location: '', meeting_url: '' });
-    } else {
-      toast.error(result.error || 'Error al crear reunión');
-    }
-  };
-
-  const handleStatusChange = async (meetingId: string, status: string) => {
-    const result = await updateMeeting(meetingId, { status: status as any });
-    if (result.success) toast.success('Estado actualizado');
-    else toast.error(result.error || 'Error al actualizar estado');
-  };
-
-  const handleDelete = async (meetingId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta reunión?')) return;
-    const result = await deleteMeeting(meetingId);
-    if (result.success) toast.success('Reunión eliminada');
-    else toast.error(result.error || 'Error al eliminar reunión');
-  };
 
   if (authLoading) {
     return (
@@ -110,7 +50,7 @@ export default function MeetingsPage() {
 
       <main className="flex-1 overflow-auto">
         <div className="p-8 space-y-6">
-          <header className="flex items-center justify-between">
+          <header className="flex items-center justify-between flex-wrap gap-4">
             <div className="space-y-1">
               <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                 <Calendar className="w-8 h-8 text-primary" />
@@ -118,6 +58,11 @@ export default function MeetingsPage() {
               </h1>
               <p className="text-muted-foreground">Gestiona tu disponibilidad y reuniones</p>
             </div>
+            
+            <StartInstantCallDialog 
+              currentUserId={user?.id || ''} 
+              currentUserName={profile?.full_name || 'Usuario'}
+            />
           </header>
 
           {/* Stats */}
@@ -169,13 +114,17 @@ export default function MeetingsPage() {
           </div>
 
           <Tabs defaultValue="requests" className="space-y-4">
-            <TabsList className="bg-muted/50">
+            <TabsList className="bg-muted/50 flex-wrap h-auto">
               <TabsTrigger value="requests" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Solicitudes
                 {pendingRequests.length > 0 && (
                   <Badge variant="destructive" className="ml-1 text-xs px-1.5">{pendingRequests.length}</Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="summaries" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Resúmenes
               </TabsTrigger>
               <TabsTrigger value="schedule" className="flex items-center gap-2">
                 <CalendarPlus className="w-4 h-4" />
@@ -191,6 +140,10 @@ export default function MeetingsPage() {
 
             <TabsContent value="requests">
               <MeetingRequestsDashboard currentUserId={user?.id || ''} isSuperadmin={isSuperadmin} />
+            </TabsContent>
+
+            <TabsContent value="summaries">
+              <MeetingSummariesList currentUserId={user?.id || ''} />
             </TabsContent>
 
             <TabsContent value="schedule">

@@ -1203,6 +1203,51 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_summaries: {
+        Row: {
+          created_at: string
+          created_by: string
+          duration_seconds: number | null
+          ended_at: string | null
+          file_url: string | null
+          id: string
+          participants: Json | null
+          room_id: string
+          started_at: string | null
+          summary: string | null
+          title: string
+          transcription: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          file_url?: string | null
+          id?: string
+          participants?: Json | null
+          room_id: string
+          started_at?: string | null
+          summary?: string | null
+          title: string
+          transcription?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          file_url?: string | null
+          id?: string
+          participants?: Json | null
+          room_id?: string
+          started_at?: string | null
+          summary?: string | null
+          title?: string
+          transcription?: string | null
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           attendees: Json | null
