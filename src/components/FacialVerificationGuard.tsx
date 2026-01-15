@@ -8,31 +8,23 @@ import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
 
-// NUCLEAR function to stop all active camera streams - SYNCHRONOUS version
-const nuclearStopAllCameras = () => {
-  console.log('☢️ FacialVerificationGuard: NUCLEAR camera stop (SYNC)...');
+// Simple function to stop all camera streams - used as safety net
+const stopAllCameraStreams = () => {
+  console.log('📹 FacialVerificationGuard: Stopping all camera streams...');
   
-  // Stop all video elements and their streams
-  const allVideos = document.querySelectorAll('video');
-  console.log('☢️ Found', allVideos.length, 'video elements');
-  
-  allVideos.forEach((video, index) => {
+  document.querySelectorAll('video').forEach((video) => {
     const stream = video.srcObject as MediaStream | null;
     if (stream?.getTracks) {
-      const tracks = stream.getTracks();
-      tracks.forEach(track => {
-        console.log('☢️ NUCLEAR[' + index + ']: Stopping track:', track.kind, 'readyState:', track.readyState);
+      stream.getTracks().forEach(track => {
+        console.log('📹 Stopping track:', track.kind);
         track.stop();
-        track.enabled = false;
       });
     }
     video.srcObject = null;
     video.pause();
-    video.src = '';
-    try { video.load(); } catch {}
   });
   
-  console.log('☢️ NUCLEAR camera stop complete');
+  console.log('📹 Camera streams stopped');
 };
 
 interface FacialVerificationGuardProps {
@@ -66,42 +58,38 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     }
   }, [authLoading, verificationLoading, isAuthenticated, isVerified]);
 
-  // Cleanup camera when component unmounts or face recognition hides
+  // Cleanup camera when face recognition component hides
   useEffect(() => {
     if (!showFaceRecognition) {
-      // When face recognition is hidden, ensure all cameras are stopped
-      nuclearStopAllCameras();
+      stopAllCameraStreams();
     }
   }, [showFaceRecognition]);
 
   // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      nuclearStopAllCameras();
+      stopAllCameraStreams();
     };
   }, []);
 
   const handleFaceSuccess = useCallback(async () => {
-    console.log('🎉 FacialVerificationGuard: Face success callback triggered');
+    console.log('🎉 FacialVerificationGuard: Face success - hiding component');
     
-    // FIRST: Stop camera BEFORE doing anything else
-    nuclearStopAllCameras();
-    
-    // SECOND: Hide component to trigger unmount IMMEDIATELY
+    // Hide component FIRST (this unmounts RealFaceRecognition which cleans up its camera)
     setShowFaceRecognition(false);
     
-    // THIRD: Update verification record (can happen after UI update)
-    await recordVerification();
+    // Extra cleanup as safety net
+    stopAllCameraStreams();
     
-    // FOURTH: Extra cleanup after component should be unmounted
-    nuclearStopAllCameras();
+    // Update verification record
+    await recordVerification();
     
     console.log('✅ FacialVerificationGuard: Success handling complete');
   }, [recordVerification]);
 
   const handleCancel = async () => {
-    // Stop camera FIRST
-    nuclearStopAllCameras();
+    console.log('📹 FacialVerificationGuard: Cancel - stopping camera');
+    stopAllCameraStreams();
     await logout();
     navigate('/login');
   };
