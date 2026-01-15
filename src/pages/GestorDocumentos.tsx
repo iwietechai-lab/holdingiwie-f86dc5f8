@@ -665,8 +665,8 @@ export const GestorDocumentos = () => {
 
       {/* Upload Modal */}
       <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-        <DialogContent className="sm:max-w-lg bg-card border-border">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg bg-card border-border max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5 text-primary" />
               Subir Documento
@@ -676,7 +676,7 @@ export const GestorDocumentos = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-2">
             {/* File Input */}
             <div className="space-y-2">
               <Label>Archivo *</Label>
