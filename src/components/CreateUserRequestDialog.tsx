@@ -32,6 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus, Mail, User, Briefcase, FileText, Shield, Loader2, Lock, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -206,6 +207,31 @@ export function CreateUserRequestDialog({
                 )}
               />
             </div>
+
+            {/* Responsible Info - Who is requesting */}
+            <Card className="bg-muted/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  Responsable de la Solicitud
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm text-foreground font-medium">
+                    {currentUserProfile?.full_name || 'Usuario Actual'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(currentUserProfile as any)?.email || ''}
+                  </p>
+                  {currentUserProfile?.role && (
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {APP_ROLE_LABELS[currentUserProfile.role as AppRole] || currentUserProfile.role}
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             <FormField
               control={form.control}

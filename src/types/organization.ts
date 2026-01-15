@@ -135,6 +135,13 @@ export interface Ticket {
   due_date?: string;
   resolved_at?: string;
   tags: string[];
+  category?: string;
+  participant_scope?: 'single' | 'multi_user' | 'multi_company';
+  participants?: string[];
+  is_deleted?: boolean;
+  deleted_at?: string;
+  deleted_by?: string;
+  deletion_reason?: string;
   created_at: string;
   updated_at: string;
 }

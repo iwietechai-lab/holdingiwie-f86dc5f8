@@ -12,6 +12,7 @@ import {
   Search,
   Filter,
   Trash2,
+  Eye,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -22,15 +23,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -38,7 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { PRIORITY_COLORS, PRIORITY_LABELS, TICKET_STATUS_LABELS } from '@/types/organization';
+import { CreateTicketDialog, TICKET_CATEGORIES_LIST } from '@/components/tickets/CreateTicketDialog';
+import { DeleteTicketDialog } from '@/components/tickets/DeleteTicketDialog';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -53,21 +49,18 @@ const STATUS_ICONS = {
 export default function TicketsPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, user, profile } = useSupabaseAuth();
-  const { tickets, isLoading, createTicket, updateTicket, assignTicket, deleteTicket, fetchTickets } = useTickets();
+  const { tickets, isLoading, updateTicket, fetchTickets, softDeleteTicket } = useTickets();
   const { users, isSuperadmin } = useSuperadmin();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<{ id: string; title: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [newTicket, setNewTicket] = useState({
-    title: '',
-    description: '',
-    priority: 'media' as const,
-    points: 0,
-    assigned_to: '',
-  });
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [showDeletedTickets, setShowDeletedTickets] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -75,38 +68,12 @@ export default function TicketsPage() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
-  const handleCreateTicket = async () => {
-    if (!newTicket.title) {
-      toast.error('Por favor ingresa un título');
-      return;
+  // Refetch tickets when showDeletedTickets changes (only for CEO)
+  useEffect(() => {
+    if (isSuperadmin) {
+      fetchTickets(showDeletedTickets);
     }
-
-    const result = await createTicket({
-      title: newTicket.title,
-      description: newTicket.description,
-      priority: newTicket.priority,
-      status: 'open',
-      points: newTicket.points,
-      assigned_to: newTicket.assigned_to || undefined,
-      tags: [],
-      company_id: profile?.company_id || '',
-      created_by: user?.id || '',
-    });
-
-    if (result.success) {
-      toast.success('Ticket creado exitosamente');
-      setShowCreateDialog(false);
-      setNewTicket({
-        title: '',
-        description: '',
-        priority: 'media',
-        points: 0,
-        assigned_to: '',
-      });
-    } else {
-      toast.error(result.error || 'Error al crear ticket');
-    }
-  };
+  }, [showDeletedTickets, isSuperadmin, fetchTickets]);
 
   const handleStatusChange = async (ticketId: string, status: string) => {
     const result = await updateTicket(ticketId, { status: status as any });
@@ -117,25 +84,9 @@ export default function TicketsPage() {
     }
   };
 
-  const handleAssign = async (ticketId: string, userId: string) => {
-    const result = await assignTicket(ticketId, userId);
-    if (result.success) {
-      toast.success('Ticket asignado');
-    } else {
-      toast.error(result.error || 'Error al asignar ticket');
-    }
-  };
-
-  const handleDeleteTicket = async (ticketId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este ticket? Esta acción no se puede deshacer.')) {
-      return;
-    }
-    const result = await deleteTicket(ticketId);
-    if (result.success) {
-      toast.success('Ticket eliminado');
-    } else {
-      toast.error(result.error || 'Error al eliminar ticket');
-    }
+  const handleDeleteClick = (ticketId: string, ticketTitle: string) => {
+    setTicketToDelete({ id: ticketId, title: ticketTitle });
+    setShowDeleteDialog(true);
   };
 
   // Filter tickets
@@ -144,7 +95,8 @@ export default function TicketsPage() {
                          ticket.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+    const matchesCategory = categoryFilter === 'all' || (ticket as any).category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
 
   if (authLoading) {
@@ -161,6 +113,11 @@ export default function TicketsPage() {
     in_progress: filteredTickets.filter(t => t.status === 'in_progress'),
     resolved: filteredTickets.filter(t => t.status === 'resolved'),
     closed: filteredTickets.filter(t => t.status === 'closed'),
+  };
+
+  const getCategoryInfo = (categoryValue: string | null | undefined) => {
+    if (!categoryValue) return null;
+    return TICKET_CATEGORIES_LIST.find(c => c.value === categoryValue);
   };
 
   return (
@@ -182,94 +139,19 @@ export default function TicketsPage() {
               </p>
             </div>
 
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-primary to-secondary">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nuevo Ticket
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Crear Nuevo Ticket</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Título *</Label>
-                    <Input
-                      value={newTicket.title}
-                      onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })}
-                      placeholder="Título del ticket"
-                    />
-                  </div>
-                  <div>
-                    <Label>Descripción</Label>
-                    <Textarea
-                      value={newTicket.description}
-                      onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                      placeholder="Descripción detallada"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Prioridad</Label>
-                      <Select
-                        value={newTicket.priority}
-                        onValueChange={(value: any) => setNewTicket({ ...newTicket, priority: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover">
-                          {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Puntos</Label>
-                      <Input
-                        type="number"
-                        value={newTicket.points}
-                        onChange={(e) => setNewTicket({ ...newTicket, points: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                  </div>
-                  {isSuperadmin && users.length > 0 && (
-                    <div>
-                      <Label>Asignar a</Label>
-                      <Select
-                        value={newTicket.assigned_to}
-                        onValueChange={(value) => setNewTicket({ ...newTicket, assigned_to: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sin asignar" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover">
-                          {users.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.full_name || u.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <Button onClick={handleCreateTicket} className="w-full">
-                    Crear Ticket
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-gradient-to-r from-primary to-secondary"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Ticket
+            </Button>
           </header>
 
           {/* Filters */}
           <Card className="bg-card/50 backdrop-blur-sm border-border">
             <CardContent className="p-4">
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[200px]">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -309,6 +191,38 @@ export default function TicketsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-44">
+                    <Tag className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Categoría" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="all">Todas las categorías</SelectItem>
+                    {TICKET_CATEGORIES_LIST.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        <span className="flex items-center gap-2">
+                          <span>{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* CEO: Toggle to view deleted tickets */}
+                {isSuperadmin && (
+                  <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="show-deleted" className="text-sm text-muted-foreground cursor-pointer">
+                      Ver eliminados
+                    </Label>
+                    <Switch
+                      id="show-deleted"
+                      checked={showDeletedTickets}
+                      onCheckedChange={setShowDeletedTickets}
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -361,19 +275,31 @@ export default function TicketsPage() {
                   {filteredTickets.map((ticket) => {
                     const StatusIcon = STATUS_ICONS[ticket.status];
                     const assignedUser = users.find(u => u.id === ticket.assigned_to);
+                    const categoryInfo = getCategoryInfo((ticket as any).category);
+                    const isDeleted = (ticket as any).is_deleted;
                     
                     return (
                       <div
                         key={ticket.id}
-                        className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
+                        className={`p-4 bg-muted/30 rounded-lg border transition-colors ${
+                          isDeleted 
+                            ? 'border-destructive/50 bg-destructive/5 opacity-60' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <StatusIcon className="w-4 h-4 text-muted-foreground" />
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <StatusIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                               <h3 className="font-semibold text-foreground truncate">
                                 {ticket.title}
                               </h3>
+                              {categoryInfo && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <span>{categoryInfo.icon}</span>
+                                  {categoryInfo.label}
+                                </Badge>
+                              )}
                               <Badge
                                 variant="outline"
                                 className={PRIORITY_COLORS[ticket.priority]}
@@ -385,10 +311,20 @@ export default function TicketsPage() {
                                   {ticket.points} pts
                                 </Badge>
                               )}
+                              {isDeleted && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Eliminado
+                                </Badge>
+                              )}
                             </div>
                             {ticket.description && (
                               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                                 {ticket.description}
+                              </p>
+                            )}
+                            {isDeleted && (ticket as any).deletion_reason && (
+                              <p className="text-xs text-destructive italic mb-2">
+                                Razón: {(ticket as any).deletion_reason}
                               </p>
                             )}
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -407,31 +343,33 @@ export default function TicketsPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={ticket.status}
-                              onValueChange={(value) => handleStatusChange(ticket.id, value)}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-popover">
-                                {Object.entries(TICKET_STATUS_LABELS).map(([value, label]) => (
-                                  <SelectItem key={value} value={value}>
-                                    {label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDeleteTicket(ticket.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          {!isDeleted && (
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={ticket.status}
+                                onValueChange={(value) => handleStatusChange(ticket.id, value)}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover">
+                                  {Object.entries(TICKET_STATUS_LABELS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                      {label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteClick(ticket.id, ticket.title)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -442,6 +380,27 @@ export default function TicketsPage() {
           </Card>
         </div>
       </main>
+
+      {/* Create Ticket Dialog */}
+      <CreateTicketDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onTicketCreated={() => fetchTickets()}
+      />
+
+      {/* Delete Ticket Dialog */}
+      {ticketToDelete && (
+        <DeleteTicketDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          ticketId={ticketToDelete.id}
+          ticketTitle={ticketToDelete.title}
+          onDeleted={() => {
+            fetchTickets();
+            setTicketToDelete(null);
+          }}
+        />
+      )}
     </div>
   );
 }
