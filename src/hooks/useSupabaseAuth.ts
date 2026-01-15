@@ -157,6 +157,8 @@ export const useSupabaseAuth = () => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, session ? 'has session' : 'no session');
+        
         setAuthState(prev => ({
           ...prev,
           user: session?.user ?? null,
@@ -185,7 +187,21 @@ export const useSupabaseAuth = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // Handle session errors (like invalid refresh token)
+      if (error) {
+        console.error('Error getting session:', error);
+        // Clear any invalid session state and redirect to login
+        setAuthState({
+          user: null,
+          session: null,
+          profile: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        return;
+      }
+      
       setAuthState(prev => ({
         ...prev,
         user: session?.user ?? null,
@@ -202,6 +218,16 @@ export const useSupabaseAuth = () => {
           }));
         });
       }
+    }).catch(err => {
+      // Catch any unhandled errors
+      console.error('Unhandled session error:', err);
+      setAuthState({
+        user: null,
+        session: null,
+        profile: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
     });
 
     return () => subscription.unsubscribe();
