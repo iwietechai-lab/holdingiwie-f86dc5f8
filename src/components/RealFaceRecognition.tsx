@@ -59,6 +59,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
+  const cleanedUpRef = useRef(false); // Track if cleanup has already happened
   
   const [status, setStatus] = useState<RecognitionStatus>('loading-models');
   const [attempts, setAttempts] = useState(0);
@@ -73,7 +74,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const [isProcessing, setIsProcessing] = useState(false);
   const [livenessProgress, setLivenessProgress] = useState(0);
   const [currentChallenge, setCurrentChallenge] = useState<LivenessChallenge | null>(null);
-  const [shouldHideVideo, setShouldHideVideo] = useState(false); // NEW: Hide video immediately on success
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
   // Use refs to track state in detection loop (avoid stale closures)
   const statusRef = useRef<RecognitionStatus>('loading-models');
@@ -212,12 +213,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, [userId]);
 
-  // Start camera
+  // Start camera - uses getUserMedia WebRTC API
   const startCamera = useCallback(async () => {
     try {
+      console.log('📹 Stream iniciado - requesting camera access...');
       setStatus('initializing');
       setError(null);
       setInstruction('Solicitando acceso a la cámara...');
+      cleanedUpRef.current = false; // Reset cleanup flag
       
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -227,12 +230,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         },
       });
       
+      // Store stream reference
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        console.log('📹 Camera started successfully');
+        console.log('📹 Stream iniciado - Camera ready, tracks:', stream.getTracks().length);
+        setIsCameraActive(true);
         setStatus('ready');
         setInstruction('Posiciona tu rostro dentro del círculo');
       }
@@ -240,132 +245,73 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       console.error('❌ Camera error:', err);
       setError('No se pudo acceder a la cámara. Permite el acceso e intenta de nuevo.');
       setStatus('failed');
+      setIsCameraActive(false);
     }
   }, []);
 
-  // NUCLEAR CLEANUP: Ultimate camera stopper - kills ALL media streams synchronously
-  const nuclearCameraStop = useCallback(() => {
-    console.log('☢️ NUCLEAR CAMERA STOP - Killing ALL camera streams SYNC...');
+  // ===== DEFINITIVE CAMERA CLEANUP FUNCTION =====
+  // This is the ONLY function that should be used to stop the camera
+  const stopCameraStream = useCallback(() => {
+    // Prevent multiple cleanup calls
+    if (cleanedUpRef.current) {
+      console.log('📹 Stream already cleaned up, skipping...');
+      return;
+    }
+    cleanedUpRef.current = true;
     
-    // Cancel animation frame FIRST to stop detection loop
+    console.log('📹 Stream detenido al éxito/cancelación - stopping camera...');
+    
+    // Step 1: Cancel animation frame to stop detection loop
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
+      console.log('📹 Animation frame cancelled');
     }
     
-    // Step 1: Stop all tracks from our streamRef
+    // Step 2: Stop all tracks from streamRef (our main reference)
     if (streamRef.current) {
       const tracks = streamRef.current.getTracks();
-      console.log('☢️ Found', tracks.length, 'tracks in streamRef');
+      console.log('📹 Stopping', tracks.length, 'tracks from streamRef');
       tracks.forEach(track => {
-        console.log('☢️ Stopping streamRef track:', track.kind, track.label, 'readyState:', track.readyState);
+        console.log('📹 track.stop():', track.kind, 'readyState before:', track.readyState);
         track.stop();
-        track.enabled = false;
       });
       streamRef.current = null;
     }
     
-    // Step 2: Stop all tracks from video element and REMOVE srcObject completely
+    // Step 3: Clear video element completely
     if (videoRef.current) {
-      const stream = videoRef.current.srcObject as MediaStream | null;
-      if (stream) {
-        const tracks = stream.getTracks();
-        console.log('☢️ Found', tracks.length, 'tracks in videoRef');
-        tracks.forEach(track => {
-          console.log('☢️ Stopping videoRef track:', track.kind, track.label, 'readyState:', track.readyState);
+      // First stop any tracks attached to the video
+      const videoStream = videoRef.current.srcObject as MediaStream | null;
+      if (videoStream?.getTracks) {
+        videoStream.getTracks().forEach(track => {
+          console.log('📹 Stopping video srcObject track:', track.kind);
           track.stop();
-          track.enabled = false;
         });
       }
-      // CRITICAL: Remove srcObject before anything else
+      // Then clear the video element
       videoRef.current.srcObject = null;
       videoRef.current.pause();
       videoRef.current.src = '';
       videoRef.current.load();
+      console.log('📹 Video element cleared');
     }
     
-    // Step 3: Stop ALL video elements in the entire document
-    const allVideos = document.querySelectorAll('video');
-    console.log('☢️ Found', allVideos.length, 'video elements in document');
-    allVideos.forEach((video, index) => {
-      const stream = video.srcObject as MediaStream | null;
-      if (stream?.getTracks) {
-        const tracks = stream.getTracks();
-        tracks.forEach(track => {
-          console.log('☢️ Stopping global video[' + index + '] track:', track.kind, 'readyState:', track.readyState);
-          track.stop();
-          track.enabled = false;
-        });
-      }
-      video.srcObject = null;
-      video.pause();
-      video.src = '';
-      try { video.load(); } catch {}
-    });
-    
-    console.log('☢️ NUCLEAR CAMERA STOP complete');
-  }, []);
-
-  // Global cleanup: stop ALL video elements and their streams
-  const stopAllCameraStreamsGlobally = useCallback(() => {
-    console.log('🛑 Stopping ALL camera streams globally...');
-    document.querySelectorAll('video').forEach(video => {
+    // Step 4: Global cleanup - stop ALL video elements in document (safety net)
+    document.querySelectorAll('video').forEach((video, i) => {
       const stream = video.srcObject as MediaStream | null;
       if (stream?.getTracks) {
         stream.getTracks().forEach(track => {
-          console.log('🛑 Global cleanup: stopping track:', track.kind, track.label);
+          console.log('📹 Global cleanup video[' + i + ']:', track.kind, 'stopping...');
           track.stop();
-          track.enabled = false;
         });
       }
       video.srcObject = null;
       video.pause();
-      video.src = '';
-      try { video.load(); } catch {}
     });
+    
+    console.log('📹 Stream detenido - camera cleanup complete!');
   }, []);
-
-  // Stop camera - ensures complete cleanup with forced track termination
-  const stopCamera = useCallback(() => {
-    console.log('📹 FORCE stopping camera and cleaning up...');
-    
-    // Cancel animation frame first
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
-    
-    // Stop all media tracks from streamRef
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        console.log('📹 Force stopping track:', track.kind, track.label, 'readyState:', track.readyState);
-        track.stop();
-        track.enabled = false;
-      });
-      streamRef.current = null;
-    }
-    
-    // Also stop tracks directly from video element
-    if (videoRef.current) {
-      const srcObj = videoRef.current.srcObject as MediaStream | null;
-      if (srcObj?.getTracks) {
-        srcObj.getTracks().forEach(track => {
-          console.log('📹 Force stopping video element track:', track.kind, track.label);
-          track.stop();
-          track.enabled = false;
-        });
-      }
-      videoRef.current.srcObject = null;
-      videoRef.current.pause();
-      videoRef.current.src = '';
-      try { videoRef.current.load(); } catch {}
-    }
-    
-    // Stop all active video elements globally
-    stopAllCameraStreamsGlobally();
-    
-    console.log('✅ Camera cleanup complete');
-  }, [stopAllCameraStreamsGlobally]);
 
   // Calculate cosine similarity
   const cosineSimilarity = (a: number[], b: number[]): number => {
@@ -542,11 +488,9 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
           
-          // HIDE VIDEO IMMEDIATELY to stop visual camera indicator
-          setShouldHideVideo(true);
-          
-          // STOP CAMERA FIRST before any async operations
-          nuclearCameraStop();
+          // STOP CAMERA IMMEDIATELY
+          setIsCameraActive(false);
+          stopCameraStream();
           
           setStatus('success');
           statusRef.current = 'success';
@@ -580,7 +524,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           setAttempts(prev => prev + 1);
           setStatus('failed');
           statusRef.current = 'failed';
-          stopCamera();
+          stopCameraStream();
         }
       } catch (err) {
         console.error('❌ Comparison error:', err);
@@ -588,7 +532,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setAttempts(prev => prev + 1);
         setStatus('failed');
         statusRef.current = 'failed';
-        stopCamera();
+        stopCameraStream();
       }
     } else {
       console.log('📝 Registrando nuevo embedding facial...');
@@ -613,17 +557,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           statusRef.current = 'failed';
           setIsProcessing(false);
           isProcessingRef.current = false;
-          stopCamera();
+          stopCameraStream();
           return;
         }
-
         console.log('✅ Embedding registrado!');
         
-        // HIDE VIDEO IMMEDIATELY to stop visual camera indicator
-        setShouldHideVideo(true);
-        
-        // STOP CAMERA FIRST before any async operations
-        nuclearCameraStop();
+        // STOP CAMERA IMMEDIATELY
+        setIsCameraActive(false);
+        stopCameraStream();
         
         setStatus('success');
         statusRef.current = 'success';
@@ -645,12 +586,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         setAttempts(prev => prev + 1);
         setStatus('failed');
         statusRef.current = 'failed';
-        stopCamera();
+        stopCameraStream();
       }
     }
     setIsProcessing(false);
     isProcessingRef.current = false;
-  }, [hasStoredEmbedding, userId, nuclearCameraStop, logAccessWithLocation, locationData, onSuccess, isProcessing]);
+  }, [hasStoredEmbedding, userId, stopCameraStream, logAccessWithLocation, locationData, onSuccess, isProcessing]);
 
   // Draw landmarks
   const drawLandmarks = useCallback((detection: faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>) => {
@@ -772,7 +713,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
               setAttempts(prev => prev + 1);
               setStatus('failed');
               statusRef.current = 'failed';
-              stopCamera();
+              stopCameraStream();
               return; // Exit loop
             }
           }
@@ -795,7 +736,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     };
 
     detect();
-  }, [modelsLoaded, checkLiveness, drawLandmarks, processEmbedding, stopCamera]);
+  }, [modelsLoaded, checkLiveness, drawLandmarks, processEmbedding, stopCameraStream]);
 
   // Handle retry
   const handleRetry = useCallback(async () => {
@@ -828,15 +769,18 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, [attempts, startCamera]);
 
-  // Handle cancel
+  // Handle cancel - stops camera and calls onCancel
   const handleCancel = useCallback(() => {
-    stopCamera();
+    console.log('📹 Cancel button pressed - stopping camera...');
+    setIsCameraActive(false);
+    stopCameraStream();
     onCancel();
-  }, [stopCamera, onCancel]);
+  }, [stopCameraStream, onCancel]);
 
-  // Initialize
+  // Initialize on mount
   useEffect(() => {
     let mounted = true;
+    console.log('📹 Component mounted - initializing...');
     
     const init = async () => {
       getLocation();
@@ -848,85 +792,57 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     };
     init();
     
-    // Cleanup on unmount - NUCLEAR cleanup to ensure camera is absolutely stopped
+    // CLEANUP ON UNMOUNT - This is the DEFINITIVE cleanup
     return () => {
       mounted = false;
-      console.log('☢️ Component unmounting - NUCLEAR cleanup...');
+      console.log('📹 Component unmounting - running cleanup...');
       
-      // Cancel animation frame first
+      // Cancel animation frame
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
       
-      // Stop all media tracks from streamRef
+      // Stop stream tracks
       if (streamRef.current) {
+        console.log('📹 Unmount: stopping', streamRef.current.getTracks().length, 'tracks');
         streamRef.current.getTracks().forEach(track => {
-          console.log('☢️ Unmount: stopping streamRef track:', track.kind);
           track.stop();
-          track.enabled = false;
         });
         streamRef.current = null;
       }
       
-      // Stop tracks from video element
+      // Clear video element
       if (videoRef.current) {
-        const srcObj = videoRef.current.srcObject as MediaStream | null;
-        if (srcObj?.getTracks) {
-          srcObj.getTracks().forEach(track => {
-            console.log('☢️ Unmount: stopping videoRef track:', track.kind);
-            track.stop();
-            track.enabled = false;
-          });
+        const stream = videoRef.current.srcObject as MediaStream | null;
+        if (stream?.getTracks) {
+          stream.getTracks().forEach(track => track.stop());
         }
         videoRef.current.srcObject = null;
         videoRef.current.pause();
-        videoRef.current.src = '';
-        try { videoRef.current.load(); } catch {}
       }
       
-      // NUCLEAR: Stop ALL video elements in the entire document
+      // Global cleanup
       document.querySelectorAll('video').forEach(video => {
         const stream = video.srcObject as MediaStream | null;
         if (stream?.getTracks) {
-          stream.getTracks().forEach(track => {
-            console.log('☢️ Unmount: stopping global video track:', track.kind);
-            track.stop();
-            track.enabled = false;
-          });
+          stream.getTracks().forEach(track => track.stop());
         }
         video.srcObject = null;
         video.pause();
-        video.src = '';
-        try { video.load(); } catch {}
       });
       
-      // Schedule additional cleanup after a delay (belt and suspenders)
-      setTimeout(() => {
-        console.log('☢️ Delayed cleanup - checking for any remaining streams...');
-        document.querySelectorAll('video').forEach(video => {
-          const stream = video.srcObject as MediaStream | null;
-          if (stream?.getTracks) {
-            stream.getTracks().forEach(track => {
-              console.log('☢️ Delayed: found remaining track, stopping:', track.kind);
-              track.stop();
-            });
-          }
-          video.srcObject = null;
-        });
-      }, 500);
-      
-      console.log('☢️ NUCLEAR cleanup complete on unmount');
+      console.log('📹 Unmount cleanup complete');
     };
-  }, []); // Empty dependencies - only run on mount/unmount
+  }, [getLocation, loadModels, checkStoredEmbedding, startCamera]);
 
-  // Stop camera when status changes to success or failed
+  // Stop camera when status changes to failed (success already handled in processEmbedding)
   useEffect(() => {
-    if (status === 'success' || status === 'failed') {
-      console.log('📹 Status changed to', status, '- ensuring camera is stopped');
-      stopCamera();
+    if (status === 'failed') {
+      console.log('📹 Status changed to failed - ensuring camera is stopped');
+      stopCameraStream();
     }
-  }, [status, stopCamera]);
+  }, [status, stopCameraStream]);
 
   // Start detection when ready
   useEffect(() => {
@@ -945,8 +861,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   };
 
-  // If video should be hidden (success state), return success UI without video
-  if (shouldHideVideo) {
+  // If camera is not active (success/cleanup state), return success UI without video element
+  if (!isCameraActive && status === 'success') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
         <div className="flex flex-col items-center gap-4 p-6 max-w-lg w-full">
