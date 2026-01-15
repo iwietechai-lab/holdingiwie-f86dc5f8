@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Lock,
   Users,
+  Shield,
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -59,6 +60,7 @@ import { documentService } from '@/services/documentService';
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { UserPermissionSelector } from '@/components/documents/UserPermissionSelector';
 import { RequestAccessDialog } from '@/components/documents/RequestAccessDialog';
+import { EditPermissionsDialog } from '@/components/documents/EditPermissionsDialog';
 import {
   Document as DocType,
   AREAS,
@@ -96,6 +98,10 @@ export const GestorDocumentos = () => {
   // Access request dialog
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   const [accessRequestDoc, setAccessRequestDoc] = useState<DocumentWithAccess | null>(null);
+
+  // Edit permissions dialog
+  const [showEditPermissionsDialog, setShowEditPermissionsDialog] = useState(false);
+  const [editPermissionsDoc, setEditPermissionsDoc] = useState<DocumentWithAccess | null>(null);
 
   // Filters
   const [filterEmpresa, setFilterEmpresa] = useState<string>('all');
@@ -619,15 +625,29 @@ export const GestorDocumentos = () => {
                                 </Button>
                               )}
                               {doc.isOwner && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(doc)}
-                                  className="h-8 w-8 hover:bg-destructive/20 text-destructive"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setEditPermissionsDoc(doc);
+                                      setShowEditPermissionsDialog(true);
+                                    }}
+                                    className="h-8 w-8 hover:bg-primary/20 text-primary"
+                                    title="Editar permisos"
+                                  >
+                                    <Shield className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDelete(doc)}
+                                    className="h-8 w-8 hover:bg-destructive/20 text-destructive"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </TableCell>
@@ -868,6 +888,18 @@ export const GestorDocumentos = () => {
         documentName={accessRequestDoc?.nombre || ''}
         onRequestAccess={handleRequestAccess}
       />
+
+      {/* Edit Permissions Dialog */}
+      {editPermissionsDoc && user && (
+        <EditPermissionsDialog
+          open={showEditPermissionsDialog}
+          onOpenChange={setShowEditPermissionsDialog}
+          documentId={editPermissionsDoc.id}
+          documentName={editPermissionsDoc.nombre}
+          currentUserId={user.id}
+          onPermissionsUpdated={loadDocuments}
+        />
+      )}
     </div>
   );
 };
