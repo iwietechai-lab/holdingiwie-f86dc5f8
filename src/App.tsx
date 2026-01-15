@@ -25,13 +25,17 @@ import IwieChat from "./pages/IwieChat";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 import { IncomingCallAlert } from "./components/meetings/IncomingCallAlert";
+import { MobileBlocker } from "./components/MobileBlocker";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
 // QueryClient for React Query data fetching
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => (
-  <FacialVerificationGuard>{children}</FacialVerificationGuard>
+// Protected route with facial verification and mobile blocking for dashboard pages
+const ProtectedRoute = ({ children, blockMobile = false }: { children: React.ReactNode; blockMobile?: boolean }) => (
+  <FacialVerificationGuard>
+    {blockMobile ? <MobileBlocker>{children}</MobileBlocker> : children}
+  </FacialVerificationGuard>
 );
 
 function AppContent() {
@@ -46,24 +50,27 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/empresa" element={<ProtectedRoute><CompanyDashboard /></ProtectedRoute>} />
-        <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
-        <Route path="/ceo-chatbot" element={<ProtectedRoute><CEOChatbotPage /></ProtectedRoute>} />
-        <Route path="/ceo-knowledge" element={<ProtectedRoute><CEOKnowledgeManager /></ProtectedRoute>} />
-        <Route path="/gestor-documentos" element={<ProtectedRoute><GestorDocumentos /></ProtectedRoute>} />
-        <Route path="/organizacion" element={<ProtectedRoute><OrganizationStructure /></ProtectedRoute>} />
-        <Route path="/reuniones" element={<ProtectedRoute><MeetingsPage /></ProtectedRoute>} />
-        <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
-        <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
-        <Route path="/tareas" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
-        <Route path="/presupuestos" element={<ProtectedRoute><BudgetPage /></ProtectedRoute>} />
-        <Route path="/mensajeria" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
-        <Route path="/chatbot-empresa" element={<ProtectedRoute><CompanyChatbotPage /></ProtectedRoute>} />
+        {/* Dashboard pages blocked on mobile */}
+        <Route path="/dashboard" element={<ProtectedRoute blockMobile><Dashboard /></ProtectedRoute>} />
+        <Route path="/empresa" element={<ProtectedRoute blockMobile><CompanyDashboard /></ProtectedRoute>} />
+        <Route path="/chatbot" element={<ProtectedRoute blockMobile><Chatbot /></ProtectedRoute>} />
+        <Route path="/ceo-chatbot" element={<ProtectedRoute blockMobile><CEOChatbotPage /></ProtectedRoute>} />
+        <Route path="/ceo-knowledge" element={<ProtectedRoute blockMobile><CEOKnowledgeManager /></ProtectedRoute>} />
+        <Route path="/gestor-documentos" element={<ProtectedRoute blockMobile><GestorDocumentos /></ProtectedRoute>} />
+        <Route path="/organizacion" element={<ProtectedRoute blockMobile><OrganizationStructure /></ProtectedRoute>} />
+        <Route path="/reuniones" element={<ProtectedRoute blockMobile><MeetingsPage /></ProtectedRoute>} />
+        <Route path="/tickets" element={<ProtectedRoute blockMobile><TicketsPage /></ProtectedRoute>} />
+        <Route path="/tareas" element={<ProtectedRoute blockMobile><TasksPage /></ProtectedRoute>} />
+        <Route path="/presupuestos" element={<ProtectedRoute blockMobile><BudgetPage /></ProtectedRoute>} />
+        <Route path="/mensajeria" element={<ProtectedRoute blockMobile><MessagingPage /></ProtectedRoute>} />
+        <Route path="/chatbot-empresa" element={<ProtectedRoute blockMobile><CompanyChatbotPage /></ProtectedRoute>} />
+        <Route path="/admin/face-setup" element={<ProtectedRoute blockMobile><AdminFaceSetup /></ProtectedRoute>} />
+        <Route path="/usuarios" element={<ProtectedRoute blockMobile><UserManagement /></ProtectedRoute>} />
+        <Route path="/superadmin" element={<ProtectedRoute blockMobile><SuperadminDashboard /></ProtectedRoute>} />
+        
+        {/* Mobile-friendly pages - no mobile blocking */}
         <Route path="/iwiechat" element={<ProtectedRoute><IwieChat /></ProtectedRoute>} />
-        <Route path="/admin/face-setup" element={<ProtectedRoute><AdminFaceSetup /></ProtectedRoute>} />
-        <Route path="/usuarios" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-        <Route path="/superadmin" element={<ProtectedRoute><SuperadminDashboard /></ProtectedRoute>} />
+        <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>

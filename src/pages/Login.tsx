@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
+import { isMobileDevice, isRunningAsApp } from '@/utils/deviceDetection';
 
 type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition';
 
@@ -55,7 +56,12 @@ export const Login = () => {
   // Redirect if already authenticated and has profile
   useEffect(() => {
     if (isAuthenticated && !authLoading && profile) {
-      navigate('/dashboard');
+      // If on mobile and not running as app, redirect to IwieChat
+      if (isMobileDevice() && !isRunningAsApp()) {
+        navigate('/iwiechat');
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [isAuthenticated, authLoading, profile, navigate]);
 
@@ -189,7 +195,13 @@ export const Login = () => {
       title: '¡Bienvenido!',
       description: 'Acceso concedido al sistema IWIE',
     });
-    navigate('/dashboard');
+    
+    // If on mobile and not running as app, redirect to IwieChat
+    if (isMobileDevice() && !isRunningAsApp()) {
+      navigate('/iwiechat');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   const handleFaceRecognitionCancel = () => {
