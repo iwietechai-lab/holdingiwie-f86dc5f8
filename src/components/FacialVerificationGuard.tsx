@@ -8,16 +8,20 @@ import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
 
-// NUCLEAR function to stop all active camera streams - most aggressive approach
-const nuclearStopAllCameras = async () => {
-  console.log('☢️ FacialVerificationGuard: NUCLEAR camera stop...');
+// NUCLEAR function to stop all active camera streams - SYNCHRONOUS version
+const nuclearStopAllCameras = () => {
+  console.log('☢️ FacialVerificationGuard: NUCLEAR camera stop (SYNC)...');
   
-  // Method 1: Stop all video elements
-  document.querySelectorAll('video').forEach(video => {
+  // Stop all video elements and their streams
+  const allVideos = document.querySelectorAll('video');
+  console.log('☢️ Found', allVideos.length, 'video elements');
+  
+  allVideos.forEach((video, index) => {
     const stream = video.srcObject as MediaStream | null;
     if (stream?.getTracks) {
-      stream.getTracks().forEach(track => {
-        console.log('☢️ NUCLEAR: Stopping track:', track.kind, track.label, 'state:', track.readyState);
+      const tracks = stream.getTracks();
+      tracks.forEach(track => {
+        console.log('☢️ NUCLEAR[' + index + ']: Stopping track:', track.kind, 'readyState:', track.readyState);
         track.stop();
         track.enabled = false;
       });
@@ -26,21 +30,6 @@ const nuclearStopAllCameras = async () => {
     video.pause();
     video.src = '';
     try { video.load(); } catch {}
-  });
-  
-  // Method 2: Small delay then check again
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  // Method 3: Stop any remaining tracks
-  document.querySelectorAll('video').forEach(video => {
-    const stream = video.srcObject as MediaStream | null;
-    if (stream?.getTracks) {
-      stream.getTracks().forEach(track => {
-        console.log('☢️ NUCLEAR (2nd pass): Found remaining track, stopping:', track.kind);
-        track.stop();
-      });
-    }
-    video.srcObject = null;
   });
   
   console.log('☢️ NUCLEAR camera stop complete');
@@ -95,33 +84,24 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   const handleFaceSuccess = useCallback(async () => {
     console.log('🎉 FacialVerificationGuard: Face success callback triggered');
     
-    // NUCLEAR stop camera - first call
-    await nuclearStopAllCameras();
+    // FIRST: Stop camera BEFORE doing anything else
+    nuclearStopAllCameras();
     
-    // Update verification record
-    await recordVerification();
-    
-    // Hide the component to trigger unmount
+    // SECOND: Hide component to trigger unmount IMMEDIATELY
     setShowFaceRecognition(false);
     
-    // Wait for component to unmount
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // THIRD: Update verification record (can happen after UI update)
+    await recordVerification();
     
-    // NUCLEAR cleanup after unmount
-    await nuclearStopAllCameras();
+    // FOURTH: Extra cleanup after component should be unmounted
+    nuclearStopAllCameras();
     
-    // Schedule additional cleanup
-    setTimeout(() => {
-      nuclearStopAllCameras();
-      console.log('✅ FacialVerificationGuard: Final delayed cleanup complete');
-    }, 500);
-    
-    console.log('✅ FacialVerificationGuard: All cleanup done');
+    console.log('✅ FacialVerificationGuard: Success handling complete');
   }, [recordVerification]);
 
   const handleCancel = async () => {
-    // Nuclear stop camera before logging out
-    await nuclearStopAllCameras();
+    // Stop camera FIRST
+    nuclearStopAllCameras();
     await logout();
     navigate('/login');
   };

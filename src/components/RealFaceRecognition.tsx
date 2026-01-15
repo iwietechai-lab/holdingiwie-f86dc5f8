@@ -242,42 +242,56 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     }
   }, []);
 
-  // NUCLEAR CLEANUP: Ultimate camera stopper - kills ALL media streams
-  const nuclearCameraStop = useCallback(async () => {
-    console.log('☢️ NUCLEAR CAMERA STOP - Killing ALL camera streams...');
+  // NUCLEAR CLEANUP: Ultimate camera stopper - kills ALL media streams synchronously
+  const nuclearCameraStop = useCallback(() => {
+    console.log('☢️ NUCLEAR CAMERA STOP - Killing ALL camera streams SYNC...');
+    
+    // Cancel animation frame FIRST to stop detection loop
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
     
     // Step 1: Stop all tracks from our streamRef
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        console.log('☢️ Stopping streamRef track:', track.kind, track.label);
+      const tracks = streamRef.current.getTracks();
+      console.log('☢️ Found', tracks.length, 'tracks in streamRef');
+      tracks.forEach(track => {
+        console.log('☢️ Stopping streamRef track:', track.kind, track.label, 'readyState:', track.readyState);
         track.stop();
         track.enabled = false;
       });
       streamRef.current = null;
     }
     
-    // Step 2: Stop all tracks from video element
+    // Step 2: Stop all tracks from video element and REMOVE srcObject completely
     if (videoRef.current) {
       const stream = videoRef.current.srcObject as MediaStream | null;
       if (stream) {
-        stream.getTracks().forEach(track => {
-          console.log('☢️ Stopping videoRef track:', track.kind, track.label);
+        const tracks = stream.getTracks();
+        console.log('☢️ Found', tracks.length, 'tracks in videoRef');
+        tracks.forEach(track => {
+          console.log('☢️ Stopping videoRef track:', track.kind, track.label, 'readyState:', track.readyState);
           track.stop();
           track.enabled = false;
         });
       }
+      // CRITICAL: Remove srcObject before anything else
       videoRef.current.srcObject = null;
       videoRef.current.pause();
       videoRef.current.src = '';
-      try { videoRef.current.load(); } catch {}
+      videoRef.current.load();
     }
     
     // Step 3: Stop ALL video elements in the entire document
-    document.querySelectorAll('video').forEach(video => {
+    const allVideos = document.querySelectorAll('video');
+    console.log('☢️ Found', allVideos.length, 'video elements in document');
+    allVideos.forEach((video, index) => {
       const stream = video.srcObject as MediaStream | null;
       if (stream?.getTracks) {
-        stream.getTracks().forEach(track => {
-          console.log('☢️ Stopping global video track:', track.kind, track.label);
+        const tracks = stream.getTracks();
+        tracks.forEach(track => {
+          console.log('☢️ Stopping global video[' + index + '] track:', track.kind, 'readyState:', track.readyState);
           track.stop();
           track.enabled = false;
         });
@@ -287,17 +301,6 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       video.src = '';
       try { video.load(); } catch {}
     });
-    
-    // Step 4: Enumerate ALL devices and try to release camera resources
-    try {
-      // Request a tiny stream just to get a handle, then immediately stop it
-      // This can help "reset" the camera state on some browsers
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      console.log('☢️ Found', videoDevices.length, 'video input devices');
-    } catch (e) {
-      console.warn('☢️ Could not enumerate devices:', e);
-    }
     
     console.log('☢️ NUCLEAR CAMERA STOP complete');
   }, []);
@@ -537,38 +540,36 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
+          
+          // STOP CAMERA FIRST before any async operations
+          nuclearCameraStop();
+          
           setStatus('success');
           statusRef.current = 'success';
           setInstruction('¡Verificación completada!');
           
-          // NUCLEAR STOP - absolutely kill all camera streams
-          console.log('☢️ NUCLEAR STOP after verification success');
-          await nuclearCameraStop();
+          // Mark session as verified immediately
+          markSessionVerified();
           
-          await logAccessWithLocation(true, locationData || {});
+          // Do async operations without await to not block
+          logAccessWithLocation(true, locationData || {}).catch(console.error);
           
-          // Use RPC to update timestamp (bypasses RLS issues - SECURITY DEFINER)
-          const { error: updateError } = await supabase.rpc('save_facial_embedding', {
+          supabase.rpc('save_facial_embedding', {
             target_user_id: userId,
             new_embedding: null,
             update_timestamp: true
+          }).then(({ error: updateError }) => {
+            if (updateError) {
+              console.error('❌ Error updating timestamp via RPC:', updateError);
+            } else {
+              console.log('✅ Timestamp actualizado via RPC');
+            }
           });
           
-          if (updateError) {
-            console.error('❌ Error updating timestamp via RPC:', updateError);
-          } else {
-            console.log('✅ Timestamp actualizado via RPC:', new Date().toISOString());
-          }
-
-          // Mark session as verified in sessionStorage
-          markSessionVerified();
-          
-          // Final nuclear stop before callback
-          await nuclearCameraStop();
-          
-          // Call onSuccess immediately
-          console.log('📹 Calling onSuccess');
+          // Call onSuccess IMMEDIATELY - this triggers unmount
+          console.log('📹 Calling onSuccess IMMEDIATELY');
           onSuccess();
+          return; // Exit function immediately
         } else {
           console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
           setError(`Rostro no coincide (similitud: ${(similarity * 100).toFixed(1)}%). Intenta de nuevo.`);
@@ -613,26 +614,24 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
 
         console.log('✅ Embedding registrado!');
-        console.log('✅ Guardando timestamp', new Date().toISOString());
+        
+        // STOP CAMERA FIRST before any async operations
+        nuclearCameraStop();
+        
         setStatus('success');
         statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
-        
-        // NUCLEAR STOP - absolutely kill all camera streams
-        console.log('☢️ NUCLEAR STOP after registration success');
-        await nuclearCameraStop();
 
-        // Mark session as verified in sessionStorage
+        // Mark session as verified immediately
         markSessionVerified();
 
-        await logAccessWithLocation(true, locationData || {});
+        // Do async operations without blocking
+        logAccessWithLocation(true, locationData || {}).catch(console.error);
         
-        // Final nuclear stop before callback
-        await nuclearCameraStop();
-        
-        // Call onSuccess immediately
-        console.log('📹 Calling onSuccess');
+        // Call onSuccess IMMEDIATELY - this triggers unmount
+        console.log('📹 Calling onSuccess IMMEDIATELY');
         onSuccess();
+        return; // Exit function immediately
       } catch (err) {
         console.error('❌ Registration error:', err);
         setError('Error al registrar rostro. Intenta de nuevo.');
