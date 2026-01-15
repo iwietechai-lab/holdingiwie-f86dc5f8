@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useVideoCall } from '@/hooks/useVideoCall';
 import { useMeetingRecording } from '@/hooks/useMeetingRecording';
@@ -44,6 +46,7 @@ export default function VideoCallPage() {
   } = useMeetingRecording();
 
   const [showChat, setShowChat] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(true);
   const [chatInput, setChatInput] = useState('');
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null);
@@ -159,55 +162,147 @@ export default function VideoCallPage() {
     }
   };
 
+  // Get all participants including self
+  const allParticipants = [
+    { id: user?.id || '', name: profile?.full_name || 'Tú', isSelf: true },
+    ...Array.from(participants.entries()).map(([id, p]) => ({
+      id,
+      name: p.userName,
+      isSelf: false,
+    })),
+  ];
+
+  const participantCount = allParticipants.length;
+
+  // Calculate grid layout based on participant count
+  const getGridClass = () => {
+    if (participantCount === 1) return 'grid-cols-1';
+    if (participantCount === 2) return 'grid-cols-2';
+    if (participantCount <= 4) return 'grid-cols-2 grid-rows-2';
+    if (participantCount <= 6) return 'grid-cols-3 grid-rows-2';
+    if (participantCount <= 9) return 'grid-cols-3 grid-rows-3';
+    return 'grid-cols-4 grid-rows-3';
+  };
+
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center">
         <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header with recording indicator */}
-      <div className="h-14 bg-card border-b border-border flex items-center justify-between px-4">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
+          <h1 className="font-semibold text-foreground truncate max-w-[200px] md:max-w-none text-sm">
             {meetingTitle || 'Videollamada'}
           </h1>
           {isRecording && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-red-500/20 rounded-full">
-              <Circle className="w-3 h-3 fill-red-500 text-red-500 animate-pulse" />
-              <span className="text-sm text-red-400">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/20 rounded-full">
+              <Circle className="w-2 h-2 fill-red-500 text-red-500 animate-pulse" />
+              <span className="text-xs text-red-400">
                 REC {formatDuration(recordingDuration)}
               </span>
             </div>
           )}
           {isProcessing && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full">
-              <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
-              <span className="text-sm text-yellow-400">Procesando...</span>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-yellow-500/20 rounded-full">
+              <Loader2 className="w-2 h-2 text-yellow-400 animate-spin" />
+              <span className="text-xs text-yellow-400">Procesando...</span>
             </div>
           )}
         </div>
-        <div className="text-sm text-muted-foreground">
-          {participants.size + 1} participante{participants.size !== 0 ? 's' : ''}
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <Users className="w-3.5 h-3.5" />
+          {participantCount} participante{participantCount !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Main video area */}
-      <div className="flex-1 flex">
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Participants sidebar */}
+        <div className={cn(
+          "bg-card border-r border-border flex flex-col transition-all duration-300 shrink-0",
+          showParticipants ? "w-56" : "w-0"
+        )}>
+          {showParticipants && (
+            <>
+              <div className="p-3 border-b border-border flex items-center justify-between">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Participantes
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={() => setShowParticipants(false)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-2 space-y-1">
+                  {allParticipants.map((participant) => (
+                    <div 
+                      key={participant.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg text-sm",
+                        participant.isSelf ? "bg-primary/10" : "hover:bg-muted/50"
+                      )}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs bg-primary/20">
+                          {participant.name[0]?.toUpperCase() || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-sm">
+                          {participant.name}
+                          {participant.isSelf && <span className="text-muted-foreground"> (Tú)</span>}
+                        </p>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {participant.isSelf ? (
+                          <>
+                            {!isAudioEnabled && <MicOff className="w-3 h-3 text-red-500" />}
+                            {!isVideoEnabled && <VideoOff className="w-3 h-3 text-red-500" />}
+                          </>
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </div>
+
+        {/* Toggle sidebar button when hidden */}
+        {!showParticipants && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-6 rounded-none rounded-r-lg bg-card border border-l-0 border-border"
+            onClick={() => setShowParticipants(true)}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        )}
+
         {/* Video grid */}
-        <div className={cn("flex-1 p-4 grid gap-4", showChat ? "mr-80" : "")}>
+        <div className="flex-1 p-3 overflow-hidden">
           <div className={cn(
-            "grid gap-4 h-full",
-            participants.size === 0 ? "grid-cols-1" :
-            participants.size === 1 ? "grid-cols-2" :
-            participants.size <= 3 ? "grid-cols-2 grid-rows-2" :
-            "grid-cols-3 grid-rows-2"
+            "grid gap-2 h-full w-full",
+            getGridClass()
           )}>
             {/* Local video */}
-            <div className="relative bg-muted rounded-lg overflow-hidden min-h-[200px]">
+            <div className="relative bg-muted rounded-lg overflow-hidden">
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -217,34 +312,38 @@ export default function VideoCallPage() {
               />
               {!isVideoEnabled && (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                  <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-2xl font-bold">{profile?.full_name?.[0] || 'T'}</span>
-                  </div>
+                  <Avatar className="h-16 w-16">
+                    <AvatarFallback className="text-2xl bg-primary/20">
+                      {profile?.full_name?.[0] || 'T'}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
               )}
-              <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-xs text-white">
-                Tú {isScreenSharing && '(Compartiendo pantalla)'}
+              <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-black/60 rounded text-xs text-white">
+                Tú {isScreenSharing && '(Pantalla)'}
               </div>
-              <div className="absolute top-2 right-2 flex gap-1">
-                {!isAudioEnabled && <MicOff className="w-4 h-4 text-red-500" />}
-                {!isVideoEnabled && <VideoOff className="w-4 h-4 text-red-500" />}
+              <div className="absolute top-1.5 right-1.5 flex gap-1">
+                {!isAudioEnabled && <MicOff className="w-3.5 h-3.5 text-red-500" />}
+                {!isVideoEnabled && <VideoOff className="w-3.5 h-3.5 text-red-500" />}
               </div>
             </div>
 
             {/* Remote participants */}
             {Array.from(participants.entries()).map(([oderId, participant]) => (
-              <div key={oderId} className="relative bg-muted rounded-lg overflow-hidden min-h-[200px]">
+              <div key={oderId} className="relative bg-muted rounded-lg overflow-hidden">
                 {participant.stream ? (
                   <VideoPlayer stream={participant.stream} />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-2xl font-bold">{participant.odername[0]}</span>
-                    </div>
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback className="text-2xl bg-primary/20">
+                        {participant.userName[0]}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
                 )}
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-xs text-white">
-                  {participant.odername}
+                <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-black/60 rounded text-xs text-white">
+                  {participant.userName}
                 </div>
               </div>
             ))}
@@ -253,43 +352,46 @@ export default function VideoCallPage() {
 
         {/* Chat sidebar */}
         {showChat && (
-          <div className="fixed right-0 top-14 bottom-20 w-80 bg-card border-l border-border flex flex-col">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-semibold flex items-center gap-2">
+          <div className="w-72 bg-card border-l border-border flex flex-col shrink-0">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h3 className="font-medium text-sm flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
                 Chat
               </h3>
-              <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowChat(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatMessages.map(msg => (
-                <div key={msg.id} className={cn(
-                  "p-2 rounded-lg text-sm",
-                  msg.userId === user?.id ? "bg-primary/20 ml-4" : "bg-muted mr-4"
-                )}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-xs">{msg.userName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format(msg.timestamp, 'HH:mm')}
-                    </span>
+            <ScrollArea className="flex-1">
+              <div className="p-3 space-y-2">
+                {chatMessages.map(msg => (
+                  <div key={msg.id} className={cn(
+                    "p-2 rounded-lg text-sm",
+                    msg.userId === user?.id ? "bg-primary/20 ml-4" : "bg-muted mr-4"
+                  )}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-medium text-xs">{msg.userName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(msg.timestamp, 'HH:mm')}
+                      </span>
+                    </div>
+                    <p className="text-sm">{msg.message}</p>
                   </div>
-                  <p>{msg.message}</p>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+            </ScrollArea>
             
-            <div className="p-4 border-t border-border flex gap-2">
+            <div className="p-3 border-t border-border flex gap-2">
               <Input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Escribe un mensaje..."
+                placeholder="Mensaje..."
+                className="text-sm h-9"
                 onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
               />
-              <Button size="icon" onClick={handleSendChat}>
+              <Button size="icon" className="h-9 w-9" onClick={handleSendChat}>
                 <Send className="w-4 h-4" />
               </Button>
             </div>
@@ -298,11 +400,23 @@ export default function VideoCallPage() {
       </div>
 
       {/* Controls bar */}
-      <div className="h-20 bg-card border-t border-border flex items-center justify-center gap-4">
+      <div className="h-16 bg-card border-t border-border flex items-center justify-center gap-3 shrink-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "rounded-full w-12 h-12",
+            showParticipants ? "bg-primary/20" : ""
+          )}
+          onClick={() => setShowParticipants(!showParticipants)}
+        >
+          <Users className="w-5 h-5" />
+        </Button>
+
         <Button
           variant={isAudioEnabled ? "secondary" : "destructive"}
-          size="lg"
-          className="rounded-full w-14 h-14"
+          size="sm"
+          className="rounded-full w-12 h-12"
           onClick={toggleAudio}
         >
           {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -310,8 +424,8 @@ export default function VideoCallPage() {
         
         <Button
           variant={isVideoEnabled ? "secondary" : "destructive"}
-          size="lg"
-          className="rounded-full w-14 h-14"
+          size="sm"
+          className="rounded-full w-12 h-12"
           onClick={toggleVideo}
         >
           {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
@@ -319,8 +433,8 @@ export default function VideoCallPage() {
         
         <Button
           variant={isScreenSharing ? "default" : "secondary"}
-          size="lg"
-          className="rounded-full w-14 h-14"
+          size="sm"
+          className="rounded-full w-12 h-12"
           onClick={toggleScreenShare}
         >
           <MonitorUp className="w-5 h-5" />
@@ -328,8 +442,8 @@ export default function VideoCallPage() {
         
         <Button
           variant={showChat ? "default" : "secondary"}
-          size="lg"
-          className="rounded-full w-14 h-14"
+          size="sm"
+          className="rounded-full w-12 h-12"
           onClick={() => setShowChat(!showChat)}
         >
           <MessageSquare className="w-5 h-5" />
@@ -337,8 +451,8 @@ export default function VideoCallPage() {
         
         <Button
           variant="destructive"
-          size="lg"
-          className="rounded-full w-14 h-14"
+          size="sm"
+          className="rounded-full w-12 h-12"
           onClick={handleLeave}
           disabled={isProcessing}
         >
@@ -351,7 +465,7 @@ export default function VideoCallPage() {
       </div>
       
       {error && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg">
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm">
           {error}
         </div>
       )}

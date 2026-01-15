@@ -4,7 +4,7 @@ import Peer, { MediaConnection } from 'peerjs';
 
 interface Participant {
   oderId: string;
-  odername: string;
+  userName: string;
   stream: MediaStream | null;
   audioEnabled: boolean;
   videoEnabled: boolean;
@@ -168,7 +168,7 @@ export function useVideoCall(): UseVideoCallReturn {
         const newMap = new Map(prev);
         newMap.set(call.peer, {
           oderId: call.peer,
-          odername: peerName || 'Participante',
+          userName: peerName || 'Participante',
           stream: remoteStream,
           audioEnabled: true,
           videoEnabled: true,
