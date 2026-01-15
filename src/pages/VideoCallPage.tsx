@@ -184,14 +184,15 @@ export default function VideoCallPage() {
       }
     }
     
-    // Mark meeting as completed
+    // Mark meeting as paused (not completed) so it can be reactivated later
     if (meetingRequestId) {
       try {
         await supabase
           .from('meeting_requests')
-          .update({ status: 'completada' })
+          .update({ status: 'pausada' })
           .eq('id', meetingRequestId);
-        console.log('Meeting marked as completed');
+        console.log('Meeting marked as paused');
+        toast.info('Reunión pausada - puedes reactivarla desde el dashboard');
       } catch (err) {
         console.error('Error marking meeting as completed:', err);
       }

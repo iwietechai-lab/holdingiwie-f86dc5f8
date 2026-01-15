@@ -2069,6 +2069,7 @@ export type Database = {
         | "aprobada"
         | "rechazada"
         | "completada"
+        | "pausada"
       meeting_status: "scheduled" | "confirmed" | "cancelled" | "completed"
       task_status: "pendiente" | "en_progreso" | "completada" | "bloqueada"
       ticket_status: "open" | "in_progress" | "resolved" | "closed"
@@ -2220,6 +2221,7 @@ export const Constants = {
         "aprobada",
         "rechazada",
         "completada",
+        "pausada",
       ],
       meeting_status: ["scheduled", "confirmed", "cancelled", "completed"],
       task_status: ["pendiente", "en_progreso", "completada", "bloqueada"],
