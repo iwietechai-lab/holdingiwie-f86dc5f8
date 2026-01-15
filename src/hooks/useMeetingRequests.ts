@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type MeetingRequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'completada';
+export type MeetingRequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'completada' | 'pausada';
 export type Priority = 'baja' | 'media' | 'alta' | 'urgente';
 
 export interface MeetingRequest {
@@ -45,6 +45,8 @@ export interface UseMeetingRequestsReturn {
   deleteRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
   approveRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
   rejectRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
+  pauseRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
+  reactivateRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useMeetingRequests(): UseMeetingRequestsReturn {
@@ -237,6 +239,63 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
     }
   }, [requests, fetchRequests]);
 
+  const pauseRequest = useCallback(async (id: string) => {
+    try {
+      const request = requests.find(r => r.id === id);
+      if (!request) throw new Error('Solicitud no encontrada');
+      
+      const { error: updateError } = await supabase
+        .from('meeting_requests')
+        .update({ status: 'pausada' })
+        .eq('id', id);
+      
+      if (updateError) throw updateError;
+      
+      await fetchRequests();
+      toast.success('Reunión pausada - puede reactivarse más tarde');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error pausing meeting request:', err);
+      toast.error(err.message || 'Error al pausar solicitud');
+      return { success: false, error: err.message };
+    }
+  }, [requests, fetchRequests]);
+
+  const reactivateRequest = useCallback(async (id: string) => {
+    try {
+      const request = requests.find(r => r.id === id);
+      if (!request) throw new Error('Solicitud no encontrada');
+      
+      const { error: updateError } = await supabase
+        .from('meeting_requests')
+        .update({ status: 'aprobada' })
+        .eq('id', id);
+      
+      if (updateError) throw updateError;
+      
+      // Notify all participants
+      for (const participantId of request.participants) {
+        await supabase.rpc('create_notification', {
+          p_user_id: participantId,
+          p_title: 'Reunión reactivada',
+          p_message: `La reunión "${request.title}" ha sido reactivada`,
+          p_type: 'meeting',
+          p_priority: request.priority,
+          p_action_url: request.video_url || '/reuniones',
+          p_company_id: null,
+        });
+      }
+      
+      await fetchRequests();
+      toast.success('Reunión reactivada');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error reactivating meeting request:', err);
+      toast.error(err.message || 'Error al reactivar solicitud');
+      return { success: false, error: err.message };
+    }
+  }, [requests, fetchRequests]);
+
   useEffect(() => {
     fetchRequests();
     
@@ -271,5 +330,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
     deleteRequest,
     approveRequest,
     rejectRequest,
+    pauseRequest,
+    reactivateRequest,
   };
 }

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Clock, Check, X, Video, Users, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, Check, X, Video, Users, AlertTriangle, Pause, Play, CheckCircle, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,14 +13,16 @@ const STATUS_COLORS: Record<MeetingRequestStatus, string> = {
   pendiente: 'bg-yellow-500/20 text-yellow-400 border-yellow-500',
   aprobada: 'bg-green-500/20 text-green-400 border-green-500',
   rechazada: 'bg-red-500/20 text-red-400 border-red-500',
-  completada: 'bg-gray-500/20 text-gray-400 border-gray-500',
+  completada: 'bg-blue-500/20 text-blue-400 border-blue-500',
+  pausada: 'bg-orange-500/20 text-orange-400 border-orange-500',
 };
 
 const STATUS_LABELS: Record<MeetingRequestStatus, string> = {
   pendiente: 'Pendiente',
-  aprobada: 'Aprobada',
+  aprobada: 'Activa',
   rechazada: 'Rechazada',
-  completada: 'Completada',
+  completada: 'Finalizada',
+  pausada: 'Pausada',
 };
 
 const PRIORITY_COLORS = {
@@ -43,7 +45,7 @@ interface MeetingRequestsDashboardProps {
 }
 
 export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: MeetingRequestsDashboardProps) {
-  const { requests, isLoading, approveRequest, rejectRequest } = useMeetingRequests();
+  const { requests, isLoading, approveRequest, rejectRequest, pauseRequest, reactivateRequest } = useMeetingRequests();
   const { users } = useSuperadmin();
   const navigate = useNavigate();
 
@@ -61,8 +63,17 @@ export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: Meetin
       r.participants.includes(currentUserId) || r.creator_id === currentUserId
     ), [pendingRequests, currentUserId]);
   
-  const approvedRequests = useMemo(() => 
+  // Active meetings (aprobada status)
+  const activeRequests = useMemo(() => 
     requests.filter(r => r.status === 'aprobada'), [requests]);
+
+  // Paused meetings (can be reactivated)
+  const pausedRequests = useMemo(() => 
+    requests.filter(r => r.status === 'pausada'), [requests]);
+
+  // Completed meetings (finalized)
+  const completedRequests = useMemo(() => 
+    requests.filter(r => r.status === 'completada'), [requests]);
 
   const handleApprove = async (id: string) => {
     await approveRequest(id);
@@ -72,13 +83,21 @@ export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: Meetin
     await rejectRequest(id);
   };
 
+  const handlePause = async (id: string) => {
+    await pauseRequest(id);
+  };
+
+  const handleReactivate = async (id: string) => {
+    await reactivateRequest(id);
+  };
+
   const handleJoinCall = (request: MeetingRequest) => {
     if (request.video_url) {
       navigate(request.video_url);
     }
   };
 
-  const renderRequestCard = (request: MeetingRequest, showActions: boolean = false) => (
+  const renderRequestCard = (request: MeetingRequest, showApprovalActions: boolean = false) => (
     <div
       key={request.id}
       className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary/30 transition-colors"
@@ -121,8 +140,9 @@ export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: Meetin
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          {showActions && request.status === 'pendiente' && isSuperadmin && (
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Approval actions for pending requests */}
+          {showApprovalActions && request.status === 'pendiente' && isSuperadmin && (
             <>
               <Button
                 size="sm"
@@ -145,14 +165,51 @@ export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: Meetin
             </>
           )}
           
+          {/* Active meeting actions */}
           {request.status === 'aprobada' && request.video_url && (
+            <>
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-green-600 to-emerald-600"
+                onClick={() => handleJoinCall(request)}
+              >
+                <Video className="w-4 h-4 mr-1" />
+                Unirse
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-orange-400 border-orange-500 hover:bg-orange-500/20"
+                onClick={() => handlePause(request.id)}
+              >
+                <Pause className="w-4 h-4 mr-1" />
+                Pausar
+              </Button>
+            </>
+          )}
+
+          {/* Paused meeting actions */}
+          {request.status === 'pausada' && request.video_url && (
             <Button
               size="sm"
-              className="bg-gradient-to-r from-green-600 to-emerald-600"
-              onClick={() => handleJoinCall(request)}
+              className="bg-gradient-to-r from-primary to-primary/80"
+              onClick={() => handleReactivate(request.id)}
             >
-              <Video className="w-4 h-4 mr-1" />
-              Unirse
+              <Play className="w-4 h-4 mr-1" />
+              Reactivar
+            </Button>
+          )}
+
+          {/* Completed meeting - view history */}
+          {request.status === 'completada' && request.video_url && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-blue-400 border-blue-500 hover:bg-blue-500/20"
+              onClick={() => handleReactivate(request.id)}
+            >
+              <Play className="w-4 h-4 mr-1" />
+              Reabrir
             </Button>
           )}
         </div>
@@ -199,27 +256,72 @@ export function MeetingRequestsDashboard({ currentUserId, isSuperadmin }: Meetin
         </CardContent>
       </Card>
 
-      {/* Approved Meetings */}
+      {/* Active Meetings */}
       <Card className="bg-card/50 backdrop-blur-sm border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Video className="w-5 h-5 text-green-500" />
-            Reuniones Aprobadas
+            Reuniones Activas
+            {activeRequests.length > 0 && (
+              <Badge className="bg-green-500/20 text-green-400">
+                {activeRequests.length}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {approvedRequests.length === 0 ? (
+          {activeRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Video className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No hay reuniones aprobadas</p>
+              <p>No hay reuniones activas</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {approvedRequests.map(request => renderRequestCard(request, false))}
+              {activeRequests.map(request => renderRequestCard(request, false))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Paused Meetings */}
+      {pausedRequests.length > 0 && (
+        <Card className="bg-card/50 backdrop-blur-sm border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Pause className="w-5 h-5 text-orange-500" />
+              Reuniones Pausadas
+              <Badge className="bg-orange-500/20 text-orange-400">
+                {pausedRequests.length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pausedRequests.map(request => renderRequestCard(request, false))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Completed Meetings */}
+      {completedRequests.length > 0 && (
+        <Card className="bg-card/50 backdrop-blur-sm border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-blue-500" />
+              Reuniones Finalizadas
+              <Badge className="bg-blue-500/20 text-blue-400">
+                {completedRequests.length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {completedRequests.map(request => renderRequestCard(request, false))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
