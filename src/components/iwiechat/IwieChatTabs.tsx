@@ -31,7 +31,7 @@ export function IwieChatTabs({ activeTab, onTabChange }: IwieChatTabsProps) {
   ];
 
   return (
-    <nav className="flex bg-card/80 backdrop-blur-lg border-t border-border safe-area-bottom">
+    <nav className="flex bg-[#111118]/90 backdrop-blur-lg border-t border-white/10 safe-area-bottom">
       {tabs.map(tab => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -43,21 +43,21 @@ export function IwieChatTabs({ activeTab, onTabChange }: IwieChatTabsProps) {
             className={cn(
               "flex-1 flex flex-col items-center gap-1 py-3 px-4 transition-colors relative",
               isActive 
-                ? "text-primary" 
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-indigo-400" 
+                : "text-gray-500 hover:text-gray-300"
             )}
           >
             <div className="relative">
               <Icon className="w-6 h-6" />
               {tab.badge > 0 && (
-                <span className="absolute -top-1.5 -right-2 h-4 min-w-4 flex items-center justify-center px-1 rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                <span className="absolute -top-1.5 -right-2 h-4 min-w-4 flex items-center justify-center px-1 rounded-full bg-indigo-500 text-[10px] font-bold text-white">
                   {tab.badge > 99 ? '99+' : tab.badge}
                 </span>
               )}
             </div>
             <span className="text-xs font-medium">{tab.label}</span>
             {isActive && (
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-primary rounded-full" />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-indigo-500 rounded-full" />
             )}
           </button>
         );

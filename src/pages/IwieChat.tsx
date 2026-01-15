@@ -19,6 +19,14 @@ export default function IwieChat() {
   const [activeTab, setActiveTab] = useState<'chats' | 'calls'>(initialTab as 'chats' | 'calls');
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
 
+  // Force dark mode for IwieChat
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    return () => {
+      // Don't remove dark class on unmount to prevent flashing
+    };
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/login');
@@ -27,7 +35,7 @@ export default function IwieChat() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f]">
         <SpaceBackground />
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
@@ -37,7 +45,7 @@ export default function IwieChat() {
   // Show chat window when a chat is selected
   if (selectedChat) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-[#0a0a0f]">
         <SpaceBackground />
         <div className="flex-1 relative z-10 flex flex-col">
           <ChatWindow
@@ -50,7 +58,7 @@ export default function IwieChat() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background safe-area-inset">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0f] safe-area-inset">
       <SpaceBackground />
       
       <div className="flex-1 relative z-10 flex flex-col">
