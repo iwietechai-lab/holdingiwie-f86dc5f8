@@ -10,21 +10,29 @@ import { useFacialVerification } from '@/hooks/useFacialVerification';
 
 // Simple function to stop all camera streams - used as safety net
 const stopAllCameraStreams = () => {
-  console.log('📹 FacialVerificationGuard: Stopping all camera streams...');
+  console.log('📹 FacialVerificationGuard: ===== STOPPING ALL CAMERA STREAMS =====');
   
-  document.querySelectorAll('video').forEach((video) => {
+  const allVideos = document.querySelectorAll('video');
+  console.log('📹 FacialVerificationGuard: Found', allVideos.length, 'video elements');
+  
+  allVideos.forEach((video, i) => {
     const stream = video.srcObject as MediaStream | null;
     if (stream?.getTracks) {
-      stream.getTracks().forEach(track => {
-        console.log('📹 Stopping track:', track.kind);
+      const tracks = stream.getTracks();
+      console.log(`📹 FacialVerificationGuard: Video[${i}] has`, tracks.length, 'tracks');
+      tracks.forEach((track, idx) => {
+        console.log(`📹 FacialVerificationGuard: Video[${i}].Track[${idx}]:`, track.kind, 'readyState:', track.readyState);
         track.stop();
+        console.log(`📹 FacialVerificationGuard: Video[${i}].Track[${idx}] stopped, readyState now:`, track.readyState);
       });
     }
     video.srcObject = null;
     video.pause();
+    video.src = '';
+    video.load();
   });
   
-  console.log('📹 Camera streams stopped');
+  console.log('📹 FacialVerificationGuard: ===== CAMERA STREAMS STOPPED =====');
 };
 
 interface FacialVerificationGuardProps {
@@ -73,25 +81,40 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   }, []);
 
   const handleFaceSuccess = useCallback(async () => {
-    console.log('🎉 FacialVerificationGuard: Face success - hiding component');
+    console.log('🎉 FacialVerificationGuard: ===== FACE SUCCESS =====');
     
-    // Hide component FIRST (this unmounts RealFaceRecognition which cleans up its camera)
-    setShowFaceRecognition(false);
-    
-    // Extra cleanup as safety net
+    // Stop cameras FIRST
+    console.log('📹 FacialVerificationGuard: Stopping cameras before hiding component');
     stopAllCameraStreams();
     
+    // Hide component (this unmounts RealFaceRecognition)
+    console.log('📹 FacialVerificationGuard: Setting showFaceRecognition to false');
+    setShowFaceRecognition(false);
+    
+    // Extra cleanup with delay as safety net
+    setTimeout(() => {
+      console.log('📹 FacialVerificationGuard: Running delayed cleanup');
+      stopAllCameraStreams();
+    }, 100);
+    
     // Update verification record
+    console.log('📹 FacialVerificationGuard: Recording verification');
     await recordVerification();
     
-    console.log('✅ FacialVerificationGuard: Success handling complete');
+    console.log('✅ FacialVerificationGuard: ===== SUCCESS HANDLING COMPLETE =====');
   }, [recordVerification]);
 
   const handleCancel = async () => {
-    console.log('📹 FacialVerificationGuard: Cancel - stopping camera');
+    console.log('📹 FacialVerificationGuard: ===== CANCEL =====');
+    console.log('📹 FacialVerificationGuard: Stopping cameras before logout');
     stopAllCameraStreams();
-    await logout();
-    navigate('/login');
+    
+    // Delay before logout to ensure cleanup
+    setTimeout(async () => {
+      console.log('📹 FacialVerificationGuard: Running logout after delay');
+      await logout();
+      navigate('/login');
+    }, 100);
   };
 
   // Loading state
