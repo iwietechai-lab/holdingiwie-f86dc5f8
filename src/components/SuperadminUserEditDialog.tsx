@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   User, 
   Building2, 
@@ -8,7 +8,9 @@ import {
   EyeOff,
   Check,
   Network,
-  Upload
+  Upload,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Dialog,
@@ -31,6 +33,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   SuperadminUser, 
   DbCompany, 
@@ -42,7 +45,15 @@ import {
   SUPERADMIN_USER_ID
 } from '@/types/superadmin';
 import { useOrganization } from '@/hooks/useOrganization';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/lib/supabase';
+import { 
+  canModifyUser, 
+  canAssignRole, 
+  getAssignableRoles, 
+  canModifyPermission,
+  isSelfEdit 
+} from '@/utils/roleHierarchy';
 
 const VISIBILITY_LABELS: Record<keyof DashboardVisibility, { label: string; category: string }> = {
   // Módulos principales
@@ -82,6 +93,7 @@ interface SuperadminUserEditDialogProps {
   }) => Promise<{ success: boolean; error?: string }>;
   onSaveRole: (userId: string, role: AppRole) => Promise<{ success: boolean; error?: string }>;
   onSaveVisibility: (userId: string, visibility: DashboardVisibility) => Promise<{ success: boolean; error?: string }>;
+  currentUserIsSuperadmin?: boolean;
 }
 
 export function SuperadminUserEditDialog({
@@ -93,7 +105,9 @@ export function SuperadminUserEditDialog({
   onSaveProfile,
   onSaveRole,
   onSaveVisibility,
+  currentUserIsSuperadmin = false,
 }: SuperadminUserEditDialogProps) {
+  const { profile: currentUserProfile } = useSupabaseAuth();
   const [fullName, setFullName] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
@@ -228,6 +242,10 @@ export function SuperadminUserEditDialog({
   };
 
   const toggleVisibility = (key: keyof DashboardVisibility) => {
+    // Check if user can modify this permission
+    if (!canModifyPermission(key, currentUserProfile?.role, currentUserIsSuperadmin)) {
+      return;
+    }
     setVisibility(prev => ({
       ...prev,
       [key]: !prev[key],
@@ -236,12 +254,27 @@ export function SuperadminUserEditDialog({
 
   const selectedCompany = companies.find(c => c.id === companyId);
   const isSuperadminUser = user?.id === SUPERADMIN_USER_ID;
+  
+  // Check if current user is editing themselves
+  const isEditingSelf = isSelfEdit(currentUserProfile?.id, user?.id || null);
+  
+  // Check if current user can modify this target user
+  const canModifyTarget = useMemo(() => {
+    if (currentUserIsSuperadmin) return true;
+    if (isEditingSelf) return false; // Cannot edit own permissions
+    return canModifyUser(currentUserProfile?.role, user?.role, currentUserIsSuperadmin);
+  }, [currentUserIsSuperadmin, currentUserProfile?.role, user?.role, isEditingSelf]);
 
-  // Filter roles - don't allow assigning superadmin except to designated user
-  const availableRoles = Object.entries(APP_ROLE_LABELS).filter(([role]) => {
-    if (role === 'superadmin' && !isSuperadminUser) return false;
-    return true;
-  });
+  // Filter roles - only show roles the current user can assign
+  const availableRoles = useMemo(() => {
+    const assignable = getAssignableRoles(currentUserProfile?.role, currentUserIsSuperadmin);
+    return Object.entries(APP_ROLE_LABELS).filter(([role]) => {
+      // Never allow assigning superadmin unless current user is superadmin
+      if (role === 'superadmin' && !currentUserIsSuperadmin) return false;
+      // Only show roles the user can assign
+      return assignable.includes(role as AppRole);
+    });
+  }, [currentUserProfile?.role, currentUserIsSuperadmin]);
 
   const filteredSubGerencias = gerenciaId ? getSubGerenciasByGerencia(gerenciaId) : [];
   const filteredAreas = gerenciaId ? getAreasByGerencia(gerenciaId) : [];
@@ -518,13 +551,36 @@ export function SuperadminUserEditDialog({
 
           {/* Visibility Tab */}
           <TabsContent value="visibility" className="space-y-4 py-4">
+            {/* Warning if editing self */}
+            {isEditingSelf && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  No puedes modificar tus propios permisos. Contacta a un administrador.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Warning if cannot modify target */}
+            {!canModifyTarget && !isEditingSelf && (
+              <Alert>
+                <Lock className="h-4 w-4" />
+                <AlertDescription>
+                  Solo puedes modificar permisos de usuarios con rol inferior al tuyo.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Eye className="w-4 h-4" />
                 Permisos y Funcionalidades
               </Label>
               <p className="text-sm text-muted-foreground">
-                Selecciona las herramientas y módulos que puede acceder este usuario
+                {canModifyTarget 
+                  ? 'Selecciona las herramientas y módulos que puede acceder este usuario'
+                  : 'Solo visualización - no tienes permisos para modificar'
+                }
               </p>
             </div>
 
@@ -537,14 +593,27 @@ export function SuperadminUserEditDialog({
                     .filter(([_, config]) => config.category === category)
                     .map(([key, config]) => {
                       const isChecked = visibility[key as keyof DashboardVisibility];
+                      const canModify = canModifyTarget && canModifyPermission(
+                        key as keyof DashboardVisibility, 
+                        currentUserProfile?.role, 
+                        currentUserIsSuperadmin
+                      );
+                      const isLocked = !canModify;
+                      
                       return (
                         <div 
                           key={key}
-                          className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 cursor-pointer"
-                          onClick={() => toggleVisibility(key as keyof DashboardVisibility)}
+                          className={`flex items-center justify-between rounded-lg border p-3 ${
+                            canModify 
+                              ? 'hover:bg-muted/50 cursor-pointer' 
+                              : 'opacity-60 cursor-not-allowed'
+                          }`}
+                          onClick={() => canModify && toggleVisibility(key as keyof DashboardVisibility)}
                         >
                           <div className="flex items-center gap-3">
-                            {isChecked ? (
+                            {isLocked ? (
+                              <Lock className="w-4 h-4 text-muted-foreground" />
+                            ) : isChecked ? (
                               <Eye className="w-4 h-4 text-primary" />
                             ) : (
                               <EyeOff className="w-4 h-4 text-muted-foreground" />
@@ -552,10 +621,14 @@ export function SuperadminUserEditDialog({
                             <span className={isChecked ? 'text-foreground' : 'text-muted-foreground'}>
                               {config.label}
                             </span>
+                            {isLocked && (
+                              <span className="text-xs text-muted-foreground ml-1">(Bloqueado)</span>
+                            )}
                           </div>
                           <Checkbox 
                             checked={isChecked}
-                            onCheckedChange={() => toggleVisibility(key as keyof DashboardVisibility)}
+                            disabled={!canModify}
+                            onCheckedChange={() => canModify && toggleVisibility(key as keyof DashboardVisibility)}
                           />
                         </div>
                       );
