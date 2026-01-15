@@ -39,6 +39,28 @@ export function useFacialVerification(userId: string | undefined) {
   });
   
   const initializedRef = useRef<boolean>(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Safety timeout - prevent infinite loading state
+  useEffect(() => {
+    if (state.isLoading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn('useFacialVerification: Loading timeout reached, forcing state update');
+        setState(prev => {
+          if (prev.isLoading) {
+            return { ...prev, isLoading: false };
+          }
+          return prev;
+        });
+      }, 5000); // 5 second timeout
+    }
+    
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [state.isLoading]);
   
   // Initialize session tracking on mount
   useEffect(() => {

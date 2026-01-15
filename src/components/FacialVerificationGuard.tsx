@@ -62,6 +62,26 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   } = useFacialVerification(user?.id);
 
   const [showFaceRecognition, setShowFaceRecognition] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Safety timeout - if loading takes too long, show error state
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (authLoading || verificationLoading) {
+        console.warn('FacialVerificationGuard: Loading timeout reached');
+        setLoadingTimeout(true);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [authLoading, verificationLoading]);
+
+  // Reset timeout flag when loading completes
+  useEffect(() => {
+    if (!authLoading && !verificationLoading) {
+      setLoadingTimeout(false);
+    }
+  }, [authLoading, verificationLoading]);
 
   // If not authenticated, redirect to login
   useEffect(() => {
@@ -142,6 +162,51 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
       navigate('/login');
     }, 200);
   };
+
+  // Handle loading timeout - offer retry or logout
+  if (loadingTimeout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <SpaceBackground />
+        <Card className="max-w-md w-full bg-card/90 backdrop-blur-sm border-destructive">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mb-4">
+              <AlertTriangle className="w-8 h-8 text-destructive" />
+            </div>
+            <CardTitle className="text-xl text-foreground">
+              Error de Conexión
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-center">
+            <p className="text-muted-foreground">
+              La verificación está tardando demasiado. Puede haber un problema de conexión.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={async () => {
+                  await logout();
+                  navigate('/login');
+                }}
+              >
+                Cerrar Sesión
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setLoadingTimeout(false);
+                  window.location.reload();
+                }}
+              >
+                Reintentar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Loading state - show spinner
   if (authLoading) {
