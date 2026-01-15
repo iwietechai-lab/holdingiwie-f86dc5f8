@@ -236,7 +236,8 @@ export const GestorDocumentos = () => {
 
       // Grant permissions to selected users
       if (newDoc && selectedUserPermissions.length > 0) {
-        await grantPermissions(newDoc.id, selectedUserPermissions);
+        const docName = uploadNombre || uploadFile.name;
+        await grantPermissions(newDoc.id, selectedUserPermissions, docName);
       }
 
       toast({

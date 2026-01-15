@@ -481,11 +481,27 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         if (similarity >= SIMILARITY_THRESHOLD) {
           console.log('✅ Face match successful!');
           
-          // Stop camera and update state
+          // Stop camera FIRST - multiple methods to ensure it stops
+          console.log('📹 Stopping camera before success callback');
           stopCameraStream();
+          
+          // Also stop via global cleanup
+          document.querySelectorAll('video').forEach(video => {
+            const stream = video.srcObject as MediaStream | null;
+            if (stream?.getTracks) {
+              stream.getTracks().forEach(track => {
+                console.log('📹 Force stopping track:', track.kind, track.readyState);
+                track.stop();
+              });
+            }
+            video.srcObject = null;
+            video.pause();
+          });
+          
           setStatus('success');
           statusRef.current = 'success';
           setInstruction('¡Verificación completada!');
+          setIsCameraActive(false);
           markSessionVerified();
           
           // Async operations
@@ -496,8 +512,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             update_timestamp: true
           }).then(() => console.log('✅ Timestamp updated'));
           
-          // Call onSuccess immediately
-          onSuccess();
+          // Small delay to ensure camera is fully stopped, then call onSuccess
+          setTimeout(() => {
+            console.log('📹 Calling onSuccess after camera cleanup');
+            onSuccess();
+          }, 50);
           return;
         } else {
           console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
@@ -543,18 +562,37 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
         console.log('✅ Embedding registrado!');
         
-        // Stop camera and update state
+        // Stop camera FIRST - multiple methods to ensure it stops
+        console.log('📹 Stopping camera before success callback (registration)');
         stopCameraStream();
+        
+        // Also stop via global cleanup
+        document.querySelectorAll('video').forEach(video => {
+          const stream = video.srcObject as MediaStream | null;
+          if (stream?.getTracks) {
+            stream.getTracks().forEach(track => {
+              console.log('📹 Force stopping track:', track.kind, track.readyState);
+              track.stop();
+            });
+          }
+          video.srcObject = null;
+          video.pause();
+        });
+        
         setStatus('success');
         statusRef.current = 'success';
         setInstruction('¡Rostro registrado exitosamente!');
+        setIsCameraActive(false);
         markSessionVerified();
         
         // Async operations
         logAccessWithLocation(true, locationData || {}).catch(console.error);
         
-        // Call onSuccess immediately
-        onSuccess();
+        // Small delay to ensure camera is fully stopped, then call onSuccess
+        setTimeout(() => {
+          console.log('📹 Calling onSuccess after camera cleanup (registration)');
+          onSuccess();
+        }, 50);
         return;
       } catch (err) {
         console.error('❌ Registration error:', err);

@@ -74,9 +74,9 @@ export function EditPermissionsDialog({
       // Find users to remove (in initial but not in selected)
       const usersToRemove = initialSelectedUsers.filter(id => !selectedUsers.includes(id));
 
-      // Add new permissions
+      // Add new permissions with document name for notifications
       if (usersToAdd.length > 0) {
-        const success = await grantPermissions(documentId, usersToAdd);
+        const success = await grantPermissions(documentId, usersToAdd, documentName);
         if (!success) throw new Error('Error granting permissions');
       }
 
