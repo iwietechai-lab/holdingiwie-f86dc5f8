@@ -46,6 +46,23 @@ import { es } from 'date-fns/locale';
 
 import mauricioAvatar from '@/assets/faces/mauricio.jpg';
 
+// Helper function to format analysis text with proper line breaks
+const formatAnalysisText = (text: string): string => {
+  if (!text) return '';
+  
+  // Add line breaks after periods followed by a space and uppercase letter (new sentence)
+  let formatted = text.replace(/\. ([A-ZÁÉÍÓÚÑ])/g, '.\n\n$1');
+  
+  // Add line breaks after colons when followed by text
+  formatted = formatted.replace(/: ([A-ZÁÉÍÓÚÑ])/g, ':\n\n$1');
+  
+  // Ensure bullet points and numbered lists have proper formatting
+  formatted = formatted.replace(/(\d+\.\s)/g, '\n$1');
+  formatted = formatted.replace(/(•\s|–\s|-\s)/g, '\n$1');
+  
+  return formatted;
+};
+
 export default function CEOChatPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading, profile } = useSupabaseAuth();
@@ -756,8 +773,8 @@ export default function CEOChatPage() {
 
       {/* AI Analysis Results Dialog */}
       <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
               Análisis AI CEO
@@ -768,8 +785,8 @@ export default function CEOChatPage() {
           </DialogHeader>
           
           {analysisResult && (
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6">
+            <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-4">
+              <div className="space-y-6 pb-4">
                 {/* Score */}
                 {analysisResult.score > 0 && (
                   <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
@@ -797,8 +814,8 @@ export default function CEOChatPage() {
                       <TrendingUp className="w-4 h-4 text-blue-500" />
                       Análisis
                     </h4>
-                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
-                      <MarkdownRenderer content={analysisResult.analysis} />
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed whitespace-pre-line">
+                      <MarkdownRenderer content={formatAnalysisText(analysisResult.analysis)} />
                     </div>
                   </div>
                 )}
@@ -810,8 +827,8 @@ export default function CEOChatPage() {
                       <MessageSquare className="w-4 h-4 text-green-500" />
                       Feedback
                     </h4>
-                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
-                      <MarkdownRenderer content={analysisResult.feedback} />
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed whitespace-pre-line">
+                      <MarkdownRenderer content={formatAnalysisText(analysisResult.feedback)} />
                     </div>
                   </div>
                 )}
@@ -832,7 +849,7 @@ export default function CEOChatPage() {
                           <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-medium shrink-0">
                             {idx + 1}
                           </div>
-                          <p className="text-sm">{String(suggestion)}</p>
+                          <p className="text-sm leading-relaxed">{String(suggestion)}</p>
                         </div>
                       ))}
                     </div>
@@ -842,7 +859,7 @@ export default function CEOChatPage() {
             </ScrollArea>
           )}
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
             <Button onClick={() => setShowAnalysisDialog(false)}>
               Cerrar
             </Button>
