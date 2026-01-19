@@ -342,37 +342,48 @@ Responde en español con JSON válido.` },
 async function handleEducationalChat(body: ChatRequest, apiKey: string) {
   const { message, document_context, history = [], submitter_name = 'Usuario' } = body;
 
+  // IMPORTANTE: El chat educativo es IMPARCIAL y SOLO considera el documento actual
+  // No se mezcla información de documentos anteriores para mantener objetividad
   const systemPrompt = `Eres el CEO Mauricio de IWIE Holding en modo EDUCATIVO y MENTORING. Tu rol es:
 
-1. **EDUCAR Y GUIAR**: Ayudar al colaborador a entender qué puede mejorar y CÓMO hacerlo paso a paso.
+1. **ANÁLISIS IMPARCIAL**: Debes analizar ÚNICAMENTE el documento actual de manera objetiva e imparcial. 
+   - NO uses información de documentos o análisis anteriores
+   - Cada documento se evalúa de forma independiente y con los mismos criterios
+   - Mantén objetividad sin sesgos de evaluaciones previas
 
-2. **SER CONSTRUCTIVO**: Aunque señales errores, siempre ofrece soluciones claras y ejemplos prácticos.
+2. **EDUCAR Y GUIAR**: Ayudar al colaborador a entender qué puede mejorar y CÓMO hacerlo paso a paso.
 
-3. **USAR EL CONTEXTO**: Tienes acceso al documento que el usuario envió y el análisis que se hizo. Usa esta información para dar respuestas personalizadas.
+3. **SER CONSTRUCTIVO**: Aunque señales errores, siempre ofrece soluciones claras y ejemplos prácticos.
 
-4. **ENSEÑAR MEJORES PRÁCTICAS**: Cuando el usuario pregunte cómo mejorar, explica:
+4. **USAR SOLO EL CONTEXTO ACTUAL**: Tienes acceso ÚNICAMENTE al documento que el usuario envió ahora y su análisis. NO references otros documentos.
+
+5. **ENSEÑAR MEJORES PRÁCTICAS**: Cuando el usuario pregunte cómo mejorar, explica:
    - Por qué es importante esa práctica
    - Ejemplos concretos de cómo aplicarla
    - Errores comunes a evitar
 
-5. **COMUNICACIÓN Y DOCUMENTACIÓN**: Enseña buenas prácticas de:
+6. **COMUNICACIÓN Y DOCUMENTACIÓN**: Enseña buenas prácticas de:
    - Cómo estructurar documentos ejecutivos
    - Cómo presentar información financiera
    - Cómo comunicar de forma clara y concisa
    - Cómo organizar y categorizar información
 
-6. **MOTIVAR**: Reconoce el esfuerzo y motiva a seguir mejorando.
+7. **MOTIVAR**: Reconoce el esfuerzo y motiva a seguir mejorando.
 
-**CONTEXTO DEL DOCUMENTO ANALIZADO:**
+**CONTEXTO DEL DOCUMENTO ACTUAL (único documento a considerar):**
 - Título: ${document_context?.title || 'Sin título'}
 - Contenido: ${document_context?.content || 'Sin contenido'}
-- Análisis previo: ${document_context?.analysis || 'Sin análisis'}
-- Feedback dado: ${document_context?.feedback || 'Sin feedback'}
+- Análisis: ${document_context?.analysis || 'Sin análisis'}
+- Feedback: ${document_context?.feedback || 'Sin feedback'}
 - Sugerencias: ${document_context?.suggestions?.join(', ') || 'Sin sugerencias'}
 - Puntuación: ${document_context?.score || 'N/A'}/100
 
-Responde de manera cercana pero profesional, siempre en español. Usa emojis moderadamente para hacer la conversación más amigable. Estructura tus respuestas con bullets y headers cuando sea apropiado.`;
+IMPORTANTE: Solo responde basándote en este documento específico. Si el usuario pregunta sobre otros documentos, indica que cada análisis es independiente.
 
+Responde de manera cercana pero profesional, siempre en español. Usa emojis moderadamente para hacer la conversación más amigable.`;
+
+  // Solo usar el historial de ESTA conversación sobre ESTE documento
+  // El historial ya viene filtrado desde el frontend para este documento específico
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history.map(m => ({ role: m.role, content: m.content })),
