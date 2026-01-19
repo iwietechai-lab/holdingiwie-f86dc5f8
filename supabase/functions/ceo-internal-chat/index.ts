@@ -356,15 +356,37 @@ Responde SOLO con el JSON, sin texto adicional.`;
 async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
   const { title, content, file_url, file_type, submitter_name } = body;
 
-  // IMPORTANTE: Extraer el contenido REAL del archivo
-  let extractedContent = content || '';
+  // IMPORTANTE: Usar el contenido PARSEADO desde el frontend
+  // El frontend ya parsea Excel/CSV correctamente con XLSX library
+  let extractedContent = '';
   
-  if (file_url) {
-    console.log('Extracting real content from file...');
+  // PRIORIZAR el contenido parseado del frontend
+  if (content && content.length > 100 && !content.includes('[Error')) {
+    console.log('Using pre-parsed content from frontend, length:', content.length);
+    extractedContent = content;
+  } else if (file_url) {
+    // Solo como fallback si no hay contenido parseado
+    console.log('No pre-parsed content, attempting backend extraction...');
     const fileContent = await extractFileContent(file_url, file_type);
     extractedContent = fileContent;
-    console.log(`Extracted content length: ${extractedContent.length}`);
+    console.log(`Backend extracted content length: ${extractedContent.length}`);
   }
+  
+  // Si no hay contenido útil, dar error claro
+  if (!extractedContent || extractedContent.length < 50 || extractedContent.includes('[Error') || extractedContent.includes('[Archivo Excel')) {
+    console.error('No valid content extracted from document');
+    return new Response(
+      JSON.stringify({
+        analysis: `## ⚠️ Error al Leer Documento\n\nNo fue posible extraer el contenido del archivo "${title}".\n\n**Posibles causas:**\n- El archivo está corrupto o protegido\n- Formato no soportado\n- El archivo está vacío\n\n**Solución:**\n1. Intenta exportar el archivo a formato CSV\n2. O copia el contenido a un archivo de texto (.txt)\n3. Vuelve a subir el archivo`,
+        feedback: 'No se pudo leer el contenido del archivo. Por favor, intenta con otro formato.',
+        score: 0,
+        suggestions: ['Exporta el archivo a CSV', 'Verifica que el archivo no esté corrupto', 'Prueba con un archivo de texto']
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  console.log('Final content to analyze (first 500 chars):', extractedContent.substring(0, 500));
 
   const analysisPrompt = `Analiza el siguiente documento/contenido enviado por ${submitter_name} como si fueras el CEO Mauricio revisándolo.
 
