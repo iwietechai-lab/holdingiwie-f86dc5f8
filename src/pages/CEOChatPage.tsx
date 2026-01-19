@@ -350,93 +350,83 @@ export default function CEOChatPage() {
               </CardContent>
             </Card>
 
+            {/* User Submissions History - Always visible for non-superadmins */}
+            {!isSuperadmin && userSubmissions.length > 0 && (
+              <Card className="bg-card/50 backdrop-blur-sm border-border">
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Mis Documentos Enviados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="py-2 px-2">
+                  <ScrollArea className="h-48">
+                    <div className="space-y-2 px-2">
+                      {userSubmissions.map(sub => (
+                        <div 
+                          key={sub.id} 
+                          className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{sub.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
+                              </p>
+                            </div>
+                            <Badge 
+                              variant={
+                                sub.status === 'revisado' ? 'default' : 
+                                sub.status === 'en_revision' ? 'secondary' : 
+                                'outline'
+                              }
+                              className="shrink-0 text-[10px]"
+                            >
+                              {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
+                              {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
+                              {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                              {sub.status}
+                            </Badge>
+                          </div>
+                          {/* Quick Analyze Button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full text-xs h-7"
+                            disabled={analyzingSubmissionId === sub.id}
+                            onClick={() => handleAnalyzeNow(sub)}
+                          >
+                            {analyzingSubmissionId === sub.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Analizando...
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 className="w-3 h-3 mr-1" />
+                                Analizar Ahora por AI CEO
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Quick Actions */}
             <div className="space-y-2">
               {!isSuperadmin && (
-                <>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => setShowSubmitDialog(true)}
-                  >
-                    <FileUp className="w-4 h-4 mr-2" />
-                    Enviar Documento para Revisión
-                  </Button>
-                  
-                  {/* User Submissions History */}
-                  {userSubmissions.length > 0 && (
-                    <Card className="bg-card/50 backdrop-blur-sm border-border">
-                      <CardHeader className="py-3 px-4">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Mis Documentos Enviados
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="py-2 px-2">
-                         <ScrollArea className="h-48">
-                          <div className="space-y-2 px-2">
-                            {userSubmissions.map(sub => (
-                              <div 
-                                key={sub.id} 
-                                className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                              >
-                                <div className="flex items-start gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{sub.title}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
-                                    </p>
-                                  </div>
-                                  <Badge 
-                                    variant={
-                                      sub.status === 'revisado' ? 'default' : 
-                                      sub.status === 'en_revision' ? 'secondary' : 
-                                      'outline'
-                                    }
-                                    className="shrink-0 text-[10px]"
-                                  >
-                                    {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
-                                    {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                    {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                                    {sub.status === 'pendiente' ? 'Pendiente' : 
-                                     sub.status === 'en_revision' ? 'En Revisión' : 
-                                     'Revisado'}
-                                  </Badge>
-                                </div>
-                                
-                                {/* AI Analysis Button */}
-                                <Button
-                                  size="sm"
-                                  variant={sub.ai_analysis ? "secondary" : "outline"}
-                                  className="w-full h-7 text-xs"
-                                  onClick={() => sub.ai_analysis ? handleViewExistingAnalysis(sub) : handleAnalyzeNow(sub)}
-                                  disabled={analyzingSubmissionId === sub.id}
-                                >
-                                  {analyzingSubmissionId === sub.id ? (
-                                    <>
-                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                      Analizando...
-                                    </>
-                                  ) : sub.ai_analysis ? (
-                                    <>
-                                      <Sparkles className="w-3 h-3 mr-1" />
-                                      Ver Análisis AI
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Wand2 className="w-3 h-3 mr-1" />
-                                      Analizar Ahora por AI CEO
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => setShowSubmitDialog(true)}
+                >
+                  <FileUp className="w-4 h-4 mr-2" />
+                  Enviar Documento para Revisión
+                </Button>
               )}
               {isSuperadmin && (
                 <>
@@ -773,7 +763,7 @@ export default function CEOChatPage() {
 
       {/* AI Analysis Results Dialog */}
       <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -785,7 +775,7 @@ export default function CEOChatPage() {
           </DialogHeader>
           
           {analysisResult && (
-            <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-4">
+            <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(85vh - 180px)' }}>
               <div className="space-y-6 pb-4">
                 {/* Score */}
                 {analysisResult.score > 0 && (
@@ -814,7 +804,7 @@ export default function CEOChatPage() {
                       <TrendingUp className="w-4 h-4 text-blue-500" />
                       Análisis
                     </h4>
-                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed whitespace-pre-line">
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed">
                       <MarkdownRenderer content={formatAnalysisText(analysisResult.analysis)} />
                     </div>
                   </div>
@@ -827,7 +817,7 @@ export default function CEOChatPage() {
                       <MessageSquare className="w-4 h-4 text-green-500" />
                       Feedback
                     </h4>
-                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed whitespace-pre-line">
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm leading-relaxed">
                       <MarkdownRenderer content={formatAnalysisText(analysisResult.feedback)} />
                     </div>
                   </div>
@@ -856,10 +846,10 @@ export default function CEOChatPage() {
                   </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           )}
 
-          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button onClick={() => setShowAnalysisDialog(false)}>
               Cerrar
             </Button>
