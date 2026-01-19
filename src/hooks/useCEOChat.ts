@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from './useSupabaseAuth';
 import { useSuperadmin } from './useSuperadmin';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 export interface Company {
   id: string;
@@ -543,6 +544,74 @@ export function useCEOChat() {
     }
   }, [user?.id, profile]);
 
+  // Parse file content in the browser
+  const parseFileContent = async (file: File): Promise<string> => {
+    const fileName = file.name.toLowerCase();
+    
+    // Handle Excel files
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        let content = '';
+        
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          
+          content += `\n\n=== HOJA: ${sheetName} ===\n\n`;
+          
+          if (jsonData.length > 0) {
+            // Get headers
+            const headers = Object.keys(jsonData[0] as object);
+            content += `| ${headers.join(' | ')} |\n`;
+            content += `|${headers.map(() => '---').join('|')}|\n`;
+            
+            // Add rows
+            for (const row of jsonData) {
+              const values = headers.map(h => String((row as Record<string, unknown>)[h] || ''));
+              content += `| ${values.join(' | ')} |\n`;
+            }
+            
+            // Also add detailed data
+            content += `\n--- DATOS DETALLADOS ---\n`;
+            for (const row of jsonData) {
+              content += JSON.stringify(row) + '\n';
+            }
+          }
+        }
+        
+        return content || '[Archivo Excel vacío o sin datos]';
+      } catch (error) {
+        console.error('Error parsing Excel:', error);
+        return `[Error al parsear Excel: ${error instanceof Error ? error.message : 'Unknown'}]`;
+      }
+    }
+    
+    // Handle CSV files
+    if (fileName.endsWith('.csv')) {
+      try {
+        const text = await file.text();
+        return `=== CONTENIDO CSV ===\n\n${text}`;
+      } catch (error) {
+        return `[Error al leer CSV]`;
+      }
+    }
+    
+    // Handle text files
+    if (fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.json')) {
+      try {
+        const text = await file.text();
+        return text;
+      } catch (error) {
+        return `[Error al leer archivo de texto]`;
+      }
+    }
+    
+    // For other files, return indication
+    return `[Archivo ${file.name} - tipo: ${file.type}]`;
+  };
+
   // Submit file/content from team for CEO analysis
   const submitForCEOReview = async (data: {
     title: string;
@@ -556,8 +625,15 @@ export function useCEOChat() {
       let fileUrl = null;
       let fileName = null;
       let fileType = null;
+      let parsedContent = data.content || '';
 
       if (data.file) {
+        // Parse file content in the browser BEFORE uploading
+        console.log('Parsing file content in browser...');
+        const extractedContent = await parseFileContent(data.file);
+        parsedContent = extractedContent;
+        console.log('Extracted content length:', parsedContent.length);
+
         // Sanitize filename to avoid invalid characters
         const sanitizedFileName = data.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath = `${user?.id}/${Date.now()}_${sanitizedFileName}`;
@@ -579,12 +655,12 @@ export function useCEOChat() {
         fileType = data.file.type;
       }
 
-      // Insert submission
+      // Insert submission with PARSED CONTENT
       const { data: submission, error } = await supabase
         .from('ceo_team_submissions')
         .insert({
           title: data.title,
-          content: data.content || null,
+          content: parsedContent, // Save the parsed content!
           file_url: fileUrl,
           file_name: fileName,
           file_type: fileType,
@@ -600,14 +676,15 @@ export function useCEOChat() {
         throw new Error(`Error al guardar documento: ${error.message}`);
       }
 
-      // Trigger AI analysis (non-blocking)
+      // Trigger AI analysis with REAL PARSED CONTENT
       supabase.functions.invoke('ceo-internal-chat', {
         body: {
           action: 'analyze_submission',
           submission_id: submission.id,
           title: data.title,
-          content: data.content || `Archivo: ${fileName}`,
+          content: parsedContent, // Send parsed content!
           file_url: fileUrl,
+          file_type: fileType,
           submitter_name: profile?.full_name || 'Usuario'
         }
       }).then(({ data: analysisResult }) => {
