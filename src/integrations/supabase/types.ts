@@ -417,6 +417,91 @@ export type Database = {
         }
         Relationships: []
       }
+      ceo_internal_chat: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          message_type: string | null
+          metadata: Json | null
+          project_id: string | null
+          role: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          project_id?: string | null
+          role: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          project_id?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_internal_chat_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ceo_internal_reports: {
+        Row: {
+          action_items: Json | null
+          chat_messages_ids: Json | null
+          conclusions: string | null
+          created_at: string | null
+          id: string
+          key_decisions: Json | null
+          project_id: string | null
+          summary: string
+          title: string
+        }
+        Insert: {
+          action_items?: Json | null
+          chat_messages_ids?: Json | null
+          conclusions?: string | null
+          created_at?: string | null
+          id?: string
+          key_decisions?: Json | null
+          project_id?: string | null
+          summary: string
+          title: string
+        }
+        Update: {
+          action_items?: Json | null
+          chat_messages_ids?: Json | null
+          conclusions?: string | null
+          created_at?: string | null
+          id?: string
+          key_decisions?: Json | null
+          project_id?: string | null
+          summary?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_internal_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ceo_knowledge: {
         Row: {
           analyzed_summary: string | null
@@ -431,6 +516,7 @@ export type Database = {
           id: string
           is_confidential: boolean | null
           key_points: Json | null
+          project_id: string | null
           title: string
           updated_at: string | null
         }
@@ -447,6 +533,7 @@ export type Database = {
           id?: string
           is_confidential?: boolean | null
           key_points?: Json | null
+          project_id?: string | null
           title: string
           updated_at?: string | null
         }
@@ -463,6 +550,7 @@ export type Database = {
           id?: string
           is_confidential?: boolean | null
           key_points?: Json | null
+          project_id?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -472,6 +560,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ceo_knowledge_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -513,6 +608,222 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ceo_pending_reviews: {
+        Row: {
+          actioned_at: string | null
+          created_at: string | null
+          id: string
+          is_actioned: boolean | null
+          is_read: boolean | null
+          priority: string | null
+          read_at: string | null
+          reference_id: string
+          review_type: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          actioned_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_actioned?: boolean | null
+          is_read?: boolean | null
+          priority?: string | null
+          read_at?: string | null
+          reference_id: string
+          review_type: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          actioned_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_actioned?: boolean | null
+          is_read?: boolean | null
+          priority?: string | null
+          read_at?: string | null
+          reference_id?: string
+          review_type?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      ceo_projects: {
+        Row: {
+          color: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ceo_team_submissions: {
+        Row: {
+          ai_analysis: string | null
+          ai_feedback: string | null
+          ai_improvement_suggestions: Json | null
+          ai_score: number | null
+          ceo_notes: string | null
+          ceo_reviewed_at: string | null
+          content: string | null
+          created_at: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          notify_ceo: boolean | null
+          project_id: string | null
+          status: string | null
+          submission_type: string | null
+          submitted_by: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_analysis?: string | null
+          ai_feedback?: string | null
+          ai_improvement_suggestions?: Json | null
+          ai_score?: number | null
+          ceo_notes?: string | null
+          ceo_reviewed_at?: string | null
+          content?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notify_ceo?: boolean | null
+          project_id?: string | null
+          status?: string | null
+          submission_type?: string | null
+          submitted_by: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_analysis?: string | null
+          ai_feedback?: string | null
+          ai_improvement_suggestions?: Json | null
+          ai_score?: number | null
+          ceo_notes?: string | null
+          ceo_reviewed_at?: string | null
+          content?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notify_ceo?: boolean | null
+          project_id?: string | null
+          status?: string | null
+          submission_type?: string | null
+          submitted_by?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_team_submissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ceo_thoughts: {
+        Row: {
+          ai_key_points: Json | null
+          ai_summary: string | null
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_processed: boolean | null
+          priority: string | null
+          processed_at: string | null
+          project_id: string | null
+          tags: Json | null
+          thought_type: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_key_points?: Json | null
+          ai_summary?: string | null
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_processed?: boolean | null
+          priority?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          tags?: Json | null
+          thought_type?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_key_points?: Json | null
+          ai_summary?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_processed?: boolean | null
+          priority?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          tags?: Json | null
+          thought_type?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_thoughts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_projects"
             referencedColumns: ["id"]
           },
         ]
