@@ -157,8 +157,7 @@ export function AnalysisChatDialog({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 min-h-0 overflow-hidden px-6">
-          <ScrollArea className="h-full">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           <div className="space-y-6 pb-4">
             {/* Score */}
             {analysisResult.score > 0 && (
@@ -307,7 +306,6 @@ export function AnalysisChatDialog({
               )}
             </div>
           </div>
-          </ScrollArea>
         </div>
 
         {/* Chat Input */}
