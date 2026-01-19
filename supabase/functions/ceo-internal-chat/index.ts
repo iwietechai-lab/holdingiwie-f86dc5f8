@@ -17,6 +17,7 @@ interface ChatRequest {
   title?: string;
   content?: string;
   file_url?: string;
+  file_type?: string;
   submitter_name?: string;
   document_context?: {
     title?: string;
@@ -26,6 +27,133 @@ interface ChatRequest {
     suggestions?: string[];
     score?: number;
   };
+}
+
+// Function to parse CSV content
+function parseCSV(text: string): string {
+  const lines = text.split('\n');
+  let result = '';
+  
+  for (let i = 0; i < lines.length; i++) {
+    const cells = lines[i].split(/[,;|\t]/);
+    if (cells.length > 0 && cells.some(c => c.trim())) {
+      if (i === 0) {
+        result += `| ${cells.map(c => c.trim()).join(' | ')} |\n`;
+        result += `|${cells.map(() => '---').join('|')}|\n`;
+      } else {
+        result += `| ${cells.map(c => c.trim()).join(' | ')} |\n`;
+      }
+    }
+  }
+  
+  return result;
+}
+
+// Function to download and parse file content
+async function extractFileContent(fileUrl: string, fileType?: string): Promise<string> {
+  try {
+    console.log(`Downloading file from: ${fileUrl}`);
+    const response = await fetch(fileUrl);
+    
+    if (!response.ok) {
+      console.error(`Failed to download file: ${response.status}`);
+      return `[Error al descargar archivo: ${response.status}]`;
+    }
+
+    const contentType = fileType || response.headers.get('content-type') || '';
+    console.log(`File content type: ${contentType}`);
+
+    // Handle Excel files (.xlsx, .xls) - Use AI to process binary
+    if (contentType.includes('spreadsheet') || 
+        contentType.includes('excel') || 
+        fileUrl.endsWith('.xlsx') || 
+        fileUrl.endsWith('.xls') ||
+        contentType.includes('vnd.openxmlformats-officedocument') ||
+        contentType.includes('vnd.ms-excel')) {
+      
+      console.log('Excel file detected - extracting raw data...');
+      const arrayBuffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      
+      // Try to extract text content from Excel (simplified approach)
+      // Excel files contain XML internally, try to extract readable parts
+      let textContent = '';
+      
+      // Convert bytes to string where possible (looking for readable content)
+      try {
+        // Create a decoder for the content
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const rawText = decoder.decode(bytes);
+        
+        // Extract strings that look like data (between tags or readable sequences)
+        const matches = rawText.match(/[A-Za-z0-9áéíóúñÁÉÍÓÚÑ$.,\-\s]{3,}/g);
+        if (matches) {
+          // Filter out garbage and keep meaningful content
+          const meaningfulContent = matches
+            .filter(m => m.trim().length > 2)
+            .filter(m => !/^[x0-9a-f]+$/i.test(m)) // Remove hex-like strings
+            .filter(m => !/Content|Type|xml|xmlns|rels|workbook|sheet/i.test(m)) // Remove XML metadata
+            .slice(0, 500); // Limit to prevent huge outputs
+          
+          textContent = meaningfulContent.join('\n');
+        }
+      } catch (e) {
+        console.error('Error decoding Excel:', e);
+      }
+      
+      if (textContent.length > 50) {
+        return `=== CONTENIDO EXTRAÍDO DEL ARCHIVO EXCEL ===\n\nNota: Este es contenido extraído de un archivo Excel. Los datos pueden necesitar interpretación.\n\n${textContent}\n\n=== FIN DEL CONTENIDO ===`;
+      } else {
+        return `[Archivo Excel detectado: ${fileUrl}. El archivo está en formato binario. Por favor, proporcione los datos principales en texto o CSV para un análisis más preciso. Si el archivo tiene datos importantes, expórtelo a CSV.]`;
+      }
+    }
+
+    // Handle CSV files - FULL SUPPORT
+    if (contentType.includes('csv') || fileUrl.endsWith('.csv')) {
+      console.log('Parsing CSV file...');
+      const text = await response.text();
+      const parsed = parseCSV(text);
+      return `=== CONTENIDO DEL ARCHIVO CSV ===\n\n${parsed}\n\n=== DATOS RAW ===\n${text}`;
+    }
+
+    // Handle text files - FULL SUPPORT
+    if (contentType.includes('text') || 
+        fileUrl.endsWith('.txt') || 
+        fileUrl.endsWith('.md')) {
+      const text = await response.text();
+      return `=== CONTENIDO DEL ARCHIVO ===\n\n${text}`;
+    }
+
+    // Handle JSON files - FULL SUPPORT
+    if (contentType.includes('json') || fileUrl.endsWith('.json')) {
+      const json = await response.json();
+      return `=== CONTENIDO JSON ===\n\n${JSON.stringify(json, null, 2)}`;
+    }
+
+    // Handle PDF - limited support
+    if (contentType.includes('pdf') || fileUrl.endsWith('.pdf')) {
+      return `[Archivo PDF detectado. Para análisis de PDFs, por favor copie el contenido relevante en texto o exporte a un formato legible.]`;
+    }
+
+    // For other files, try to read as text
+    try {
+      const text = await response.text();
+      if (text && text.length > 0 && text.length < 100000) {
+        // Check if it looks like readable text
+        const readableChars = text.match(/[a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s.,;:!?$\-]/g)?.length || 0;
+        if (readableChars / text.length > 0.7) {
+          return `=== CONTENIDO DEL ARCHIVO ===\n\n${text}`;
+        }
+      }
+    } catch (e) {
+      console.error('Could not read file as text:', e);
+    }
+
+    return `[Archivo detectado pero no se pudo extraer contenido legible. Tipo: ${contentType}. Por favor exporte a CSV o TXT para análisis.]`;
+  } catch (error) {
+    console.error('Error extracting file content:', error);
+    return `[Error al procesar archivo: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+  }
 }
 
 serve(async (req) => {
@@ -226,20 +354,33 @@ Responde SOLO con el JSON, sin texto adicional.`;
 }
 
 async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
-  const { title, content, file_url, submitter_name } = body;
+  const { title, content, file_url, file_type, submitter_name } = body;
+
+  // IMPORTANTE: Extraer el contenido REAL del archivo
+  let extractedContent = content || '';
+  
+  if (file_url) {
+    console.log('Extracting real content from file...');
+    const fileContent = await extractFileContent(file_url, file_type);
+    extractedContent = fileContent;
+    console.log(`Extracted content length: ${extractedContent.length}`);
+  }
 
   const analysisPrompt = `Analiza el siguiente documento/contenido enviado por ${submitter_name} como si fueras el CEO Mauricio revisándolo.
 
-**Título:** ${title}
-**Contenido:** ${content || 'Archivo adjunto'}
-${file_url ? `**Archivo:** ${file_url}` : ''}
+**Título del documento:** ${title}
 
-## INSTRUCCIONES DE ANÁLISIS FINANCIERO/GASTOS:
+**CONTENIDO REAL DEL DOCUMENTO (extraído del archivo):**
+${extractedContent}
 
-Si el documento contiene información financiera, rendiciones de gastos, flujos de caja o movimientos bancarios, DEBES:
+## INSTRUCCIONES DE ANÁLISIS:
 
-1. **Categorizar TODOS los gastos** en las siguientes categorías:
-   - 🏢 **GASTOS EMPRESARIALES/OPERACIONALES**: Pagos a proveedores, servicios, software, arriendos comerciales, abogados, etc.
+IMPORTANTE: Debes analizar el CONTENIDO REAL proporcionado arriba. NO inventes datos. Extrae la información exacta del documento.
+
+Si el documento contiene información financiera, rendiciones de gastos, flujos de caja o movimientos bancarios:
+
+1. **EXTRAER y categorizar TODOS los gastos reales** encontrados en el documento:
+   - 🏢 **GASTOS EMPRESARIALES/OPERACIONALES**: Pagos a proveedores, servicios, software, arriendos comerciales, abogados, fletes, aduanas, impuestos de importación, etc.
    - 👤 **GASTOS PERSONALES**: Comida personal, cumpleaños, supermercado, entretenimiento personal, etc.
    - 🚗 **TRANSPORTE/COMBUSTIBLE**: Gasolina, estacionamiento, peajes
    - 📱 **TECNOLOGÍA/SERVICIOS**: Planes de internet, Starlink, software, IA, etc.
@@ -247,31 +388,25 @@ Si el documento contiene información financiera, rendiciones de gastos, flujos 
    - 💳 **FINANCIEROS**: Intereses, préstamos, pagos bancarios
    - ❓ **OTROS/SIN CLASIFICAR**: Gastos que no encajan claramente
 
-2. **Calcular totales por categoría** y mostrar porcentajes del total
+2. **Listar CADA ítem con su monto exacto** tal como aparece en el documento
 
-3. **ALERTAR sobre mezcla de gastos personales con empresariales** - esto es crítico para la contabilidad
+3. **Calcular totales REALES por categoría** y mostrar porcentajes del total
 
-4. **Mostrar balance**: Ingresos totales vs Egresos totales vs Saldo final
+4. **ALERTAR sobre mezcla de gastos personales con empresariales** si los hay
 
-5. **Identificar patrones problemáticos**: Gastos recurrentes elevados, gastos no justificados, etc.
+5. **Mostrar balance real**: Ingresos totales vs Egresos totales vs Saldo final (solo si hay datos)
 
 ## FORMATO DE RESPUESTA:
 
-Proporciona un análisis detallado que incluya:
-1. Evaluación general del documento (1-100)
-2. **Tabla de categorización de gastos** con montos y porcentajes
-3. Alertas sobre gastos personales mezclados
-4. Sugerencias de mejora en la gestión financiera
-
 Responde en JSON con esta estructura:
 {
-  "analysis": "## 📊 Resumen Ejecutivo\\n\\n[Resumen general]\\n\\n## 📁 Categorización de Gastos\\n\\n### 🏢 Gastos Empresariales ($X.XXX - XX%)\\n- Detalle item 1\\n- Detalle item 2\\n\\n### 👤 Gastos Personales ($X.XXX - XX%)\\n- Detalle item 1\\n\\n### 🚗 Transporte ($X.XXX - XX%)\\n...\\n\\n## ⚠️ Alertas\\n\\n- [Alertas importantes sobre mezcla de gastos]\\n\\n## 📈 Balance Final\\n\\n- Ingresos: $X.XXX\\n- Egresos: $X.XXX\\n- Saldo: $X.XXX",
-  "feedback": "Mensaje de feedback directo para el colaborador con recomendaciones específicas sobre separación de gastos y mejoras en rendición",
+  "analysis": "## 📊 Resumen Ejecutivo\\n\\n[Resumen basado en datos REALES del documento]\\n\\n## 📋 Datos Extraídos del Documento\\n\\n[Lista detallada de cada ítem encontrado con montos]\\n\\n## 📁 Categorización de Gastos\\n\\n### 🏢 Gastos Empresariales ($X.XXX - XX%)\\n- Ítem 1: $XXX\\n- Ítem 2: $XXX\\n\\n### 👤 Gastos Personales ($X.XXX - XX%)\\n[Si hay]\\n\\n## ⚠️ Alertas\\n\\n[Alertas basadas en el análisis real]\\n\\n## 📈 Balance Final\\n\\n- Total Ingresos: $X.XXX\\n- Total Egresos: $X.XXX\\n- Saldo: $X.XXX",
+  "feedback": "Mensaje de feedback directo basado en el análisis REAL del documento",
   "score": 75,
-  "suggestions": ["Separar cuenta personal de empresarial", "Crear categorías claras antes de rendir", "Incluir justificación en gastos mayores a $50.000"]
+  "suggestions": ["Sugerencia 1 específica", "Sugerencia 2 específica", "Sugerencia 3 específica"]
 }
 
-Responde SOLO con el JSON. Usa saltos de línea (\\n) para formatear correctamente.`;
+CRÍTICO: Usa los datos REALES del documento. NO inventes cifras ni ítems. Si no hay datos suficientes, indica qué falta.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -280,21 +415,22 @@ Responde SOLO con el JSON. Usa saltos de línea (\\n) para formatear correctamen
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-2.5-pro',
       messages: [
-        { role: 'system', content: `Eres el CEO Mauricio analizando trabajo de tu equipo. Sé constructivo pero exigente. 
+        { role: 'system', content: `Eres el CEO Mauricio analizando documentos de tu equipo. 
 
-IMPORTANTE: Para documentos financieros o rendiciones de gastos:
-- SIEMPRE categoriza los gastos en: Empresariales, Personales, Transporte, Tecnología, Vivienda, Financieros, Otros
-- SIEMPRE alerta cuando haya mezcla de gastos personales con empresariales
-- SIEMPRE muestra totales y porcentajes por categoría
-- Usa formato con saltos de línea para legibilidad
+REGLAS CRÍTICAS:
+1. ANALIZA ÚNICAMENTE el contenido REAL proporcionado
+2. EXTRAE datos exactos del documento (montos, ítems, fechas)
+3. NO inventes información que no esté en el documento
+4. Si el documento está vacío o no tiene datos claros, INDÍCALO
+5. Sé específico con los números y detalles encontrados
 
 Responde en español con JSON válido.` },
         { role: 'user', content: analysisPrompt }
       ],
-      temperature: 0.5,
-      max_tokens: 3000
+      temperature: 0.3,
+      max_tokens: 4000
     })
   });
 
