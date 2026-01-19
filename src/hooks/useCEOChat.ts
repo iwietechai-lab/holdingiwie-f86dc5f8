@@ -512,7 +512,7 @@ export function useCEOChat() {
     }
   };
 
-  // Load user's own submissions history
+  // Load user's own submissions history - loads immediately without waiting for projects
   const loadUserSubmissions = useCallback(async () => {
     if (!user?.id) return;
     
@@ -526,12 +526,11 @@ export function useCEOChat() {
       if (error) throw error;
 
       const enriched = (data || []).map(submission => {
-        const project = projects.find(p => p.id === submission.project_id);
         return {
           ...submission,
           submitter_name: profile?.full_name || 'Usuario',
           submitter_email: '',
-          project_name: project?.name || 'Sin proyecto',
+          project_name: 'Sin proyecto', // Will be enriched later if projects are available
           ai_improvement_suggestions: Array.isArray(submission.ai_improvement_suggestions) 
             ? submission.ai_improvement_suggestions 
             : null
@@ -542,7 +541,7 @@ export function useCEOChat() {
     } catch (error) {
       console.error('Error loading user submissions:', error);
     }
-  }, [user?.id, projects, profile]);
+  }, [user?.id, profile]);
 
   // Submit file/content from team for CEO analysis
   const submitForCEOReview = async (data: {
@@ -782,12 +781,12 @@ export function useCEOChat() {
     };
   }, [isSuperadmin]);
 
-  // Load user submissions on user change
+  // Load user submissions on user change - doesn't depend on projects
   useEffect(() => {
-    if (user?.id && projects.length > 0) {
+    if (user?.id) {
       loadUserSubmissions();
     }
-  }, [user?.id, projects, loadUserSubmissions]);
+  }, [user?.id, loadUserSubmissions]);
 
   return {
     // Data
