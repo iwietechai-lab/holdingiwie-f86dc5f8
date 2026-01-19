@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
 import { isMobileDevice, isRunningAsApp } from '@/utils/deviceDetection';
-type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition' | 'forgot-password';
+type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition' | 'forgot-password' | 'reset-password';
 
 // Animated stars component
 const AnimatedStars = () => {
@@ -52,10 +52,43 @@ export const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingProfileCheck, setPendingProfileCheck] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
-  // Redirect if already authenticated and has profile
+  // Check for password recovery flow from URL hash
   useEffect(() => {
-    if (isAuthenticated && !authLoading && profile) {
+    const checkPasswordRecovery = async () => {
+      // Check URL hash for recovery tokens
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+      
+      if (type === 'recovery' && accessToken) {
+        console.log('Password recovery detected from URL');
+        setIsPasswordRecovery(true);
+        setStep('reset-password');
+        return;
+      }
+
+      // Also listen for PASSWORD_RECOVERY event
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          console.log('PASSWORD_RECOVERY event detected');
+          setIsPasswordRecovery(true);
+          setStep('reset-password');
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    checkPasswordRecovery();
+  }, []);
+
+  // Redirect if already authenticated and has profile (but NOT during password recovery)
+  useEffect(() => {
+    if (isAuthenticated && !authLoading && profile && !isPasswordRecovery && step !== 'reset-password') {
       // If on mobile and not running as app, redirect to IwieChat
       if (isMobileDevice() && !isRunningAsApp()) {
         navigate('/iwiechat');
@@ -63,12 +96,12 @@ export const Login = () => {
         navigate('/dashboard');
       }
     }
-  }, [isAuthenticated, authLoading, profile, navigate]);
+  }, [isAuthenticated, authLoading, profile, navigate, isPasswordRecovery, step]);
 
-  // Check if user needs profile setup after login
+  // Check if user needs profile setup after login (but NOT during password recovery)
   useEffect(() => {
     const checkProfileExists = async () => {
-      if (isAuthenticated && user && step === 'credentials' && !pendingProfileCheck) {
+      if (isAuthenticated && user && step === 'credentials' && !pendingProfileCheck && !isPasswordRecovery) {
         setPendingProfileCheck(true);
         
         try {
@@ -253,7 +286,66 @@ export const Login = () => {
     setIsLoading(false);
   };
 
-  if (authLoading) {
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newPassword || !confirmPassword) {
+      toast({
+        title: 'Error',
+        description: 'Por favor, completa todos los campos',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: 'Error',
+        description: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Error',
+        description: 'Las contraseñas no coinciden',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: '¡Contraseña actualizada!',
+        description: 'Tu contraseña ha sido cambiada exitosamente',
+      });
+      // Clear recovery state and go to credentials
+      setIsPasswordRecovery(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setStep('credentials');
+      // Clear URL hash
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    
+    setIsLoading(false);
+  };
+
+  if (authLoading && !isPasswordRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -404,12 +496,14 @@ export const Login = () => {
               {step === 'register' && 'Registro de Nuevo Usuario'}
               {step === 'face-recognition' && 'Verificación Facial'}
               {step === 'forgot-password' && 'Recuperar Contraseña'}
+              {step === 'reset-password' && 'Nueva Contraseña'}
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
               {step === 'credentials' && 'Ingresa tus credenciales para acceder al sistema'}
               {step === 'register' && 'Crea tu cuenta con un correo autorizado'}
               {step === 'face-recognition' && 'Verificación de identidad requerida para continuar'}
               {step === 'forgot-password' && 'Te enviaremos un enlace para restablecer tu contraseña'}
+              {step === 'reset-password' && 'Ingresa tu nueva contraseña'}
             </CardDescription>
           </CardHeader>
           
@@ -614,6 +708,83 @@ export const Login = () => {
                     </Button>
                   </form>
                 )}
+              </div>
+            ) : step === 'reset-password' ? (
+              <div className="space-y-5">
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/30 space-y-2">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Lock className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Restablecer Contraseña</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ingresa y confirma tu nueva contraseña. Debe tener al menos 6 caracteres.
+                  </p>
+                </div>
+
+                <form onSubmit={handleResetPassword} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password" className="text-foreground text-sm">
+                      Nueva Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="new-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="pl-10 pr-10 bg-input border-border focus:border-primary h-11"
+                        autoComplete="new-password"
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password" className="text-foreground text-sm">
+                      Confirmar Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="confirm-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pl-10 pr-10 bg-input border-border focus:border-primary h-11"
+                        autoComplete="new-password"
+                        minLength={6}
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button
+                    type="submit"
+                    className="w-full h-12 neon-glow bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Sparkles className="w-5 h-5 animate-spin mr-2" />
+                        Actualizando...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-5 h-5 mr-2" />
+                        Actualizar Contraseña
+                      </>
+                    )}
+                  </Button>
+                </form>
               </div>
             ) : null}
           </CardContent>
