@@ -14,8 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID } from '@/types/superadmin';
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
 import { isMobileDevice, isRunningAsApp } from '@/utils/deviceDetection';
-
-type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition';
+type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition' | 'forgot-password';
 
 // Animated stars component
 const AnimatedStars = () => {
@@ -52,6 +51,7 @@ export const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingProfileCheck, setPendingProfileCheck] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Redirect if already authenticated and has profile
   useEffect(() => {
@@ -208,6 +208,51 @@ export const Login = () => {
     setStep('credentials');
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast({
+        title: 'Error',
+        description: 'Por favor, ingresa tu correo electrónico',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: 'Error',
+        description: 'Por favor, ingresa un correo válido',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      setResetEmailSent(true);
+      toast({
+        title: '¡Correo enviado!',
+        description: 'Revisa tu bandeja de entrada para restablecer tu contraseña',
+      });
+    }
+    
+    setIsLoading(false);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -358,11 +403,13 @@ export const Login = () => {
               {step === 'credentials' && 'Acceso Seguro a IWIE Holding'}
               {step === 'register' && 'Registro de Nuevo Usuario'}
               {step === 'face-recognition' && 'Verificación Facial'}
+              {step === 'forgot-password' && 'Recuperar Contraseña'}
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
               {step === 'credentials' && 'Ingresa tus credenciales para acceder al sistema'}
               {step === 'register' && 'Crea tu cuenta con un correo autorizado'}
               {step === 'face-recognition' && 'Verificación de identidad requerida para continuar'}
+              {step === 'forgot-password' && 'Te enviaremos un enlace para restablecer tu contraseña'}
             </CardDescription>
           </CardHeader>
           
@@ -448,6 +495,16 @@ export const Login = () => {
                       </button>
                     </div>
                   </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => { setResetEmailSent(false); setStep('forgot-password'); }}
+                      className="text-sm text-primary hover:text-primary/80 hover:underline transition-colors"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </div>
                   
                   <Button
                     type="submit"
@@ -489,6 +546,75 @@ export const Login = () => {
                 onBack={() => setStep('credentials')}
                 onSuccess={handleRegisterSuccess}
               />
+            ) : step === 'forgot-password' ? (
+              <div className="space-y-5">
+                {resetEmailSent ? (
+                  <div className="text-center space-y-4">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <Mail className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">¡Correo enviado!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Revisa tu bandeja de entrada en <span className="font-medium text-foreground">{email}</span> para restablecer tu contraseña.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-11 mt-4"
+                      onClick={() => { setResetEmailSent(false); setStep('credentials'); }}
+                    >
+                      Volver al inicio de sesión
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email" className="text-foreground text-sm">
+                        Correo Electrónico
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="tu.email@iwie.space"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pl-10 bg-input border-border focus:border-primary h-11"
+                          autoComplete="email"
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button
+                      type="submit"
+                      className="w-full h-12 neon-glow bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Sparkles className="w-5 h-5 animate-spin mr-2" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-5 h-5 mr-2" />
+                          Enviar enlace de recuperación
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setStep('credentials')}
+                    >
+                      Volver al inicio de sesión
+                    </Button>
+                  </form>
+                )}
+              </div>
             ) : null}
           </CardContent>
         </Card>
