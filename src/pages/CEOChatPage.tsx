@@ -351,7 +351,7 @@ export default function CEOChatPage() {
             </Card>
 
             {/* User Submissions History - Always visible for non-superadmins */}
-            {!isSuperadmin && userSubmissions.length > 0 && (
+            {!isSuperadmin && (
               <Card className="bg-card/50 backdrop-blur-sm border-border">
                 <CardHeader className="py-3 px-4">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -362,54 +362,61 @@ export default function CEOChatPage() {
                 <CardContent className="py-2 px-2">
                   <ScrollArea className="h-48">
                     <div className="space-y-2 px-2">
-                      {userSubmissions.map(sub => (
-                        <div 
-                          key={sub.id} 
-                          className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{sub.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
-                              </p>
-                            </div>
-                            <Badge 
-                              variant={
-                                sub.status === 'revisado' ? 'default' : 
-                                sub.status === 'en_revision' ? 'secondary' : 
-                                'outline'
-                              }
-                              className="shrink-0 text-[10px]"
-                            >
-                              {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
-                              {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
-                              {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                              {sub.status}
-                            </Badge>
-                          </div>
-                          {/* Quick Analyze Button */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full text-xs h-7"
-                            disabled={analyzingSubmissionId === sub.id}
-                            onClick={() => handleAnalyzeNow(sub)}
-                          >
-                            {analyzingSubmissionId === sub.id ? (
-                              <>
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                Analizando...
-                              </>
-                            ) : (
-                              <>
-                                <Wand2 className="w-3 h-3 mr-1" />
-                                Analizar Ahora por AI CEO
-                              </>
-                            )}
-                          </Button>
+                      {userSubmissions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                          <FileText className="w-8 h-8 mb-2 opacity-50" />
+                          <p className="text-xs text-center">No hay documentos enviados aún</p>
                         </div>
-                      ))}
+                      ) : (
+                        userSubmissions.map(sub => (
+                          <div 
+                            key={sub.id} 
+                            className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{sub.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
+                                </p>
+                              </div>
+                              <Badge 
+                                variant={
+                                  sub.status === 'revisado' ? 'default' : 
+                                  sub.status === 'en_revision' ? 'secondary' : 
+                                  'outline'
+                                }
+                                className="shrink-0 text-[10px]"
+                              >
+                                {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
+                                {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                {sub.status}
+                              </Badge>
+                            </div>
+                            {/* Quick Analyze Button */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-xs h-7"
+                              disabled={analyzingSubmissionId === sub.id}
+                              onClick={() => handleAnalyzeNow(sub)}
+                            >
+                              {analyzingSubmissionId === sub.id ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  Analizando...
+                                </>
+                              ) : (
+                                <>
+                                  <Wand2 className="w-3 h-3 mr-1" />
+                                  Analizar Ahora por AI CEO
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -763,7 +770,7 @@ export default function CEOChatPage() {
 
       {/* AI Analysis Results Dialog */}
       <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
-        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -775,8 +782,8 @@ export default function CEOChatPage() {
           </DialogHeader>
           
           {analysisResult && (
-            <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(85vh - 180px)' }}>
-              <div className="space-y-6 pb-4">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-6 pb-4 pr-4">
                 {/* Score */}
                 {analysisResult.score > 0 && (
                   <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
@@ -846,10 +853,10 @@ export default function CEOChatPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </ScrollArea>
           )}
 
-          <DialogFooter className="shrink-0 border-t pt-4">
+          <DialogFooter className="shrink-0 border-t pt-4 mt-2">
             <Button onClick={() => setShowAnalysisDialog(false)}>
               Cerrar
             </Button>
