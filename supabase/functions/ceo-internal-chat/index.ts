@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,18 +29,18 @@ serve(async (req) => {
     const body: ChatRequest = await req.json();
     const { action, message, project_context, thoughts_context, history = [] } = body;
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
 
     // Handle different actions
     if (action === 'generate_report') {
-      return await handleGenerateReport(body);
+      return await handleGenerateReport(body, LOVABLE_API_KEY);
     }
 
     if (action === 'analyze_submission') {
-      return await handleAnalyzeSubmission(body);
+      return await handleAnalyzeSubmission(body, LOVABLE_API_KEY);
     }
 
     // Default: CEO internal chat
@@ -73,11 +72,11 @@ Responde siempre en español, de manera profesional pero cercana. Cuando termine
       { role: 'user', content: message }
     ];
 
-    const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
@@ -88,6 +87,20 @@ Responde siempre en español, de manera profesional pero cercana. Cuando termine
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const errorText = await response.text();
+      console.error('AI API error:', response.status, errorText);
       throw new Error(`AI API error: ${response.status}`);
     }
 
@@ -122,7 +135,7 @@ Responde siempre en español, de manera profesional pero cercana. Cuando termine
   }
 });
 
-async function handleGenerateReport(body: ChatRequest) {
+async function handleGenerateReport(body: ChatRequest, apiKey: string) {
   const { messages = [], project_name = 'General' } = body;
 
   const reportPrompt = `Analiza la siguiente conversación estratégica y genera un informe ejecutivo estructurado.
@@ -141,11 +154,11 @@ Genera un informe JSON con la siguiente estructura exacta:
 
 Responde SOLO con el JSON, sin texto adicional.`;
 
-  const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash',
@@ -159,6 +172,18 @@ Responde SOLO con el JSON, sin texto adicional.`;
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (response.status === 402) {
+      return new Response(
+        JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     throw new Error(`AI API error: ${response.status}`);
   }
 
@@ -188,7 +213,7 @@ Responde SOLO con el JSON, sin texto adicional.`;
   }
 }
 
-async function handleAnalyzeSubmission(body: ChatRequest) {
+async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
   const { title, content, file_url, submitter_name } = body;
 
   const analysisPrompt = `Analiza el siguiente documento/contenido enviado por ${submitter_name} como si fueras el CEO Mauricio revisándolo.
@@ -214,11 +239,11 @@ Responde en JSON con esta estructura:
 
 Responde SOLO con el JSON.`;
 
-  const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash',
@@ -232,6 +257,18 @@ Responde SOLO con el JSON.`;
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (response.status === 402) {
+      return new Response(
+        JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     throw new Error(`AI API error: ${response.status}`);
   }
 
