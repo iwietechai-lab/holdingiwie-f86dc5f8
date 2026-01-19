@@ -51,9 +51,11 @@ export default function CEOChatPage() {
     internalMessages,
     pendingReviews,
     teamSubmissions,
+    userSubmissions,
     selectedProjectId,
     isLoading,
     isSending,
+    isSubmitting,
     setSelectedProjectId,
     createProject,
     sendInternalMessage,
@@ -110,14 +112,16 @@ export default function CEOChatPage() {
       toast.error('El título es requerido');
       return;
     }
-    await submitForCEOReview({
+    const result = await submitForCEOReview({
       title: submission.title,
       content: submission.content,
       file: submission.file || undefined,
       project_id: selectedProjectId
     });
-    setSubmission({ title: '', content: '', file: null });
-    setShowSubmitDialog(false);
+    if (result) {
+      setSubmission({ title: '', content: '', file: null });
+      setShowSubmitDialog(false);
+    }
   };
 
   const handleGenerateReport = async () => {
@@ -235,14 +239,62 @@ export default function CEOChatPage() {
             {/* Quick Actions */}
             <div className="space-y-2">
               {!isSuperadmin && (
-                <Button 
-                  className="w-full justify-start" 
-                  variant="outline"
-                  onClick={() => setShowSubmitDialog(true)}
-                >
-                  <FileUp className="w-4 h-4 mr-2" />
-                  Enviar Documento para Revisión
-                </Button>
+                <>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                    onClick={() => setShowSubmitDialog(true)}
+                  >
+                    <FileUp className="w-4 h-4 mr-2" />
+                    Enviar Documento para Revisión
+                  </Button>
+                  
+                  {/* User Submissions History */}
+                  {userSubmissions.length > 0 && (
+                    <Card className="bg-card/50 backdrop-blur-sm border-border">
+                      <CardHeader className="py-3 px-4">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          Mis Documentos Enviados
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="py-2 px-2">
+                        <ScrollArea className="max-h-48">
+                          <div className="space-y-2 px-2">
+                            {userSubmissions.slice(0, 5).map(sub => (
+                              <div 
+                                key={sub.id} 
+                                className="flex items-start gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{sub.title}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
+                                  </p>
+                                </div>
+                                <Badge 
+                                  variant={
+                                    sub.status === 'revisado' ? 'default' : 
+                                    sub.status === 'en_revision' ? 'secondary' : 
+                                    'outline'
+                                  }
+                                  className="shrink-0 text-[10px]"
+                                >
+                                  {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
+                                  {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                  {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                  {sub.status === 'pendiente' ? 'Pendiente' : 
+                                   sub.status === 'en_revision' ? 'En Revisión' : 
+                                   'Revisado'}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
               {isSuperadmin && (
                 <>
@@ -464,8 +516,8 @@ export default function CEOChatPage() {
       </Dialog>
 
       {/* Submit for Review Dialog (Team) */}
-      <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent>
+      <Dialog open={showSubmitDialog} onOpenChange={(open) => !isSubmitting && setShowSubmitDialog(open)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileUp className="w-5 h-5" />
@@ -475,48 +527,63 @@ export default function CEOChatPage() {
               Tu documento será analizado y recibirás feedback inmediato.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Título</Label>
-              <Input
-                value={submission.title}
-                onChange={(e) => setSubmission(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Título del documento o consulta"
-              />
+          
+          {isSubmitting ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="font-medium">Subiendo documento...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Por favor espera mientras procesamos tu envío
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Contenido o Descripción</Label>
-              <Textarea
-                value={submission.content}
-                onChange={(e) => setSubmission(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Describe tu documento o escribe tu consulta..."
-                rows={4}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Archivo (opcional)</Label>
-              <Input
-                type="file"
-                onChange={(e) => setSubmission(prev => ({ 
-                  ...prev, 
-                  file: e.target.files?.[0] || null 
-                }))}
-                accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
-              />
-              <p className="text-xs text-muted-foreground">
-                Formatos: PDF, Word, Excel, PowerPoint, TXT
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmitForReview}>
-              <FileUp className="w-4 h-4 mr-2" />
-              Enviar
-            </Button>
-          </DialogFooter>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Título</Label>
+                  <Input
+                    value={submission.title}
+                    onChange={(e) => setSubmission(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Título del documento o consulta"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contenido o Descripción</Label>
+                  <Textarea
+                    value={submission.content}
+                    onChange={(e) => setSubmission(prev => ({ ...prev, content: e.target.value }))}
+                    placeholder="Describe tu documento o escribe tu consulta..."
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Archivo (opcional)</Label>
+                  <Input
+                    type="file"
+                    onChange={(e) => setSubmission(prev => ({ 
+                      ...prev, 
+                      file: e.target.files?.[0] || null 
+                    }))}
+                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Formatos: PDF, Word, Excel, PowerPoint, TXT
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowSubmitDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmitForReview}>
+                  <FileUp className="w-4 h-4 mr-2" />
+                  Enviar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
