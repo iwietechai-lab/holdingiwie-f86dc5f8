@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Brain,
@@ -19,13 +19,19 @@ import {
   Eye,
   Trash2,
   Edit,
-  Download
+  Download,
+  Image,
+  Video,
+  Link,
+  Paperclip,
+  X,
+  Building2
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { useCEOChat, CEOTeamSubmission, CEOThought, CEOInternalReport } from '@/hooks/useCEOChat';
+import { useCEOChat, CEOTeamSubmission, CEOThought, CEOInternalReport, CEOAttachment, Company } from '@/hooks/useCEOChat';
 import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,8 +67,10 @@ export default function CEODashboardPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, profile } = useSupabaseAuth();
   const { isSuperadmin, isCheckingRole } = useSuperadmin();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
+    companies,
     projects,
     thoughts,
     teamSubmissions,
@@ -74,7 +82,8 @@ export default function CEODashboardPage() {
     createProject,
     createThought,
     updateSubmissionNotes,
-    markReviewAsRead
+    markReviewAsRead,
+    uploadFile
   } = useCEOChat();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -83,6 +92,7 @@ export default function CEODashboardPage() {
   
   // Dialog states
   const [showThoughtDialog, setShowThoughtDialog] = useState(false);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [showSubmissionDetail, setShowSubmissionDetail] = useState<CEOTeamSubmission | null>(null);
   const [showReportDetail, setShowReportDetail] = useState<CEOInternalReport | null>(null);
   
@@ -92,11 +102,21 @@ export default function CEODashboardPage() {
     content: '',
     thought_type: 'idea',
     priority: 'media',
-    project_id: null as string | null
+    project_id: null as string | null,
+    attachments: [] as CEOAttachment[]
+  });
+
+  // New project form
+  const [newProject, setNewProject] = useState({
+    name: '',
+    description: '',
+    company_id: '' as string,
+    color: '#8B5CF6'
   });
 
   // CEO notes for submission
   const [ceoNotes, setCeoNotes] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -111,6 +131,57 @@ export default function CEODashboardPage() {
     }
   }, [isCheckingRole, isSuperadmin, navigate]);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newAttachments: CEOAttachment[] = [];
+
+    for (const file of Array.from(files)) {
+      const attachment = await uploadFile(file);
+      if (attachment) {
+        newAttachments.push(attachment);
+      }
+    }
+
+    setNewThought(prev => ({
+      ...prev,
+      attachments: [...prev.attachments, ...newAttachments]
+    }));
+    setIsUploading(false);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setNewThought(prev => ({
+      ...prev,
+      attachments: prev.attachments.filter(a => a.id !== attachmentId)
+    }));
+  };
+
+  const handleAddLink = () => {
+    const url = prompt('Ingresa la URL del enlace:');
+    if (!url) return;
+
+    const name = prompt('Nombre del enlace (opcional):') || url;
+    
+    const linkAttachment: CEOAttachment = {
+      id: crypto.randomUUID(),
+      name,
+      url,
+      type: 'link'
+    };
+
+    setNewThought(prev => ({
+      ...prev,
+      attachments: [...prev.attachments, linkAttachment]
+    }));
+  };
+
   const handleCreateThought = async () => {
     if (!newThought.title.trim() || !newThought.content.trim()) {
       toast.error('Título y contenido son requeridos');
@@ -121,8 +192,32 @@ export default function CEODashboardPage() {
       project_id: newThought.project_id || selectedProjectId
     });
     if (success) {
-      setNewThought({ title: '', content: '', thought_type: 'idea', priority: 'media', project_id: null });
+      setNewThought({ 
+        title: '', 
+        content: '', 
+        thought_type: 'idea', 
+        priority: 'media', 
+        project_id: null,
+        attachments: []
+      });
       setShowThoughtDialog(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProject.name.trim()) {
+      toast.error('El nombre del proyecto es requerido');
+      return;
+    }
+    const result = await createProject({
+      name: newProject.name,
+      description: newProject.description || undefined,
+      company_id: newProject.company_id || undefined,
+      color: newProject.color
+    });
+    if (result) {
+      setNewProject({ name: '', description: '', company_id: '', color: '#8B5CF6' });
+      setShowProjectDialog(false);
     }
   };
 
@@ -136,7 +231,6 @@ export default function CEODashboardPage() {
   const handleOpenSubmission = (submission: CEOTeamSubmission) => {
     setShowSubmissionDetail(submission);
     setCeoNotes(submission.ceo_notes || '');
-    // Mark related pending review as read
     const review = pendingReviews.find(r => r.reference_id === submission.id);
     if (review) {
       markReviewAsRead(review.id);
@@ -163,6 +257,23 @@ export default function CEODashboardPage() {
   const getThoughtTypeInfo = (type: string) => THOUGHT_TYPES.find(t => t.value === type) || THOUGHT_TYPES[0];
   const getPriorityInfo = (priority: string) => PRIORITIES.find(p => p.value === priority) || PRIORITIES[1];
 
+  const getAttachmentIcon = (type: string) => {
+    switch (type) {
+      case 'image': return Image;
+      case 'video': return Video;
+      case 'link': return Link;
+      default: return FileText;
+    }
+  };
+
+  // Group projects by company
+  const projectsByCompany = companies.map(company => ({
+    company,
+    projects: projects.filter(p => p.company_id === company.id)
+  })).filter(g => g.projects.length > 0 || true); // Show all companies
+
+  const projectsWithoutCompany = projects.filter(p => !p.company_id);
+
   return (
     <div className="min-h-screen flex">
       <SpaceBackground />
@@ -185,6 +296,10 @@ export default function CEODashboardPage() {
               <Button variant="outline" onClick={() => navigate('/ceo-chat')}>
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Ir al Chat
+              </Button>
+              <Button variant="outline" onClick={() => setShowProjectDialog(true)}>
+                <FolderKanban className="w-4 h-4 mr-2" />
+                Nuevo Proyecto
               </Button>
               <Button onClick={() => setShowThoughtDialog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -247,6 +362,10 @@ export default function CEODashboardPage() {
               <TabsTrigger value="pendientes" className="gap-2">
                 <AlertCircle className="w-4 h-4" />
                 Pendientes ({pendingSubmissions.length})
+              </TabsTrigger>
+              <TabsTrigger value="proyectos" className="gap-2">
+                <FolderKanban className="w-4 h-4" />
+                Proyectos ({projects.length})
               </TabsTrigger>
               <TabsTrigger value="pensamientos" className="gap-2">
                 <Lightbulb className="w-4 h-4" />
@@ -317,6 +436,107 @@ export default function CEODashboardPage() {
               </Card>
             </TabsContent>
 
+            {/* Proyectos Tab */}
+            <TabsContent value="proyectos" className="flex-1 mt-0">
+              <Card className="h-full bg-card/50 backdrop-blur-sm">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Proyectos por Empresa</CardTitle>
+                    <Button size="sm" onClick={() => setShowProjectDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Proyecto
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <ScrollArea className="h-[calc(100vh-400px)]">
+                    <div className="space-y-6">
+                      {companies.map(company => {
+                        const companyProjects = projects.filter(p => p.company_id === company.id);
+                        return (
+                          <div key={company.id}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-xl">{company.icon}</span>
+                              <h3 className="font-semibold" style={{ color: company.color || undefined }}>
+                                {company.name}
+                              </h3>
+                              <Badge variant="outline" className="ml-auto">
+                                {companyProjects.length} proyectos
+                              </Badge>
+                            </div>
+                            {companyProjects.length === 0 ? (
+                              <p className="text-sm text-muted-foreground ml-8">Sin proyectos</p>
+                            ) : (
+                              <div className="grid grid-cols-3 gap-3 ml-8">
+                                {companyProjects.map(project => (
+                                  <Card 
+                                    key={project.id} 
+                                    className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                    style={{ borderLeftColor: project.color, borderLeftWidth: 4 }}
+                                    onClick={() => setSelectedProjectId(project.id)}
+                                  >
+                                    <CardContent className="p-3">
+                                      <h4 className="font-medium text-sm">{project.name}</h4>
+                                      {project.description && (
+                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                          {project.description}
+                                        </p>
+                                      )}
+                                      <Badge 
+                                        variant="outline" 
+                                        className="mt-2 text-xs"
+                                      >
+                                        {project.status}
+                                      </Badge>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Projects without company */}
+                      {projectsWithoutCompany.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Building2 className="w-5 h-5 text-muted-foreground" />
+                            <h3 className="font-semibold text-muted-foreground">Sin Empresa Asignada</h3>
+                            <Badge variant="outline" className="ml-auto">
+                              {projectsWithoutCompany.length} proyectos
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 ml-8">
+                            {projectsWithoutCompany.map(project => (
+                              <Card 
+                                key={project.id} 
+                                className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                style={{ borderLeftColor: project.color, borderLeftWidth: 4 }}
+                                onClick={() => setSelectedProjectId(project.id)}
+                              >
+                                <CardContent className="p-3">
+                                  <h4 className="font-medium text-sm">{project.name}</h4>
+                                  {project.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                      {project.description}
+                                    </p>
+                                  )}
+                                  <Badge variant="outline" className="mt-2 text-xs">
+                                    {project.status}
+                                  </Badge>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Pensamientos Tab */}
             <TabsContent value="pensamientos" className="flex-1 mt-0">
               <Card className="h-full bg-card/50 backdrop-blur-sm">
@@ -370,6 +590,14 @@ export default function CEODashboardPage() {
                                   <p className="text-sm text-muted-foreground line-clamp-2">
                                     {thought.content}
                                   </p>
+                                  {thought.attachments && thought.attachments.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2">
+                                      <Paperclip className="w-3 h-3 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">
+                                        {thought.attachments.length} adjuntos
+                                      </span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-2 mt-2">
                                     <Badge variant="outline" className="text-xs">
                                       {typeInfo.label}
@@ -400,15 +628,15 @@ export default function CEODashboardPage() {
                   {reports.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                       <FileText className="w-16 h-16 mb-4 opacity-50" />
-                      <p className="text-lg font-medium">Sin informes aún</p>
-                      <p className="text-sm">Los informes se generan desde las conversaciones del chat</p>
+                      <p className="text-lg font-medium">Sin informes</p>
+                      <p className="text-sm">Los informes se generan automáticamente de tus conversaciones</p>
                     </div>
                   ) : (
                     <ScrollArea className="h-[calc(100vh-400px)]">
                       <div className="space-y-3">
                         {reports.map(report => (
                           <Card 
-                            key={report.id}
+                            key={report.id} 
                             className="cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => setShowReportDetail(report)}
                           >
@@ -417,7 +645,7 @@ export default function CEODashboardPage() {
                                 <div>
                                   <h3 className="font-medium">{report.title}</h3>
                                   <p className="text-sm text-muted-foreground">
-                                    Proyecto: {report.project_name} • {format(new Date(report.created_at), "d 'de' MMMM, yyyy", { locale: es })}
+                                    {report.project_name} • {format(new Date(report.created_at), "d 'de' MMMM, yyyy", { locale: es })}
                                   </p>
                                   <p className="text-sm mt-2 line-clamp-2">{report.summary}</p>
                                 </div>
@@ -440,34 +668,41 @@ export default function CEODashboardPage() {
                   <CardTitle className="text-base">Documentos Revisados</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <ScrollArea className="h-[calc(100vh-400px)]">
-                    <div className="space-y-3">
-                      {reviewedSubmissions.map(submission => (
-                        <Card 
-                          key={submission.id}
-                          className="cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => handleOpenSubmission(submission)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  <h3 className="font-medium">{submission.title}</h3>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                  De: {submission.submitter_name} • Revisado: {submission.ceo_reviewed_at ? formatDistanceToNow(new Date(submission.ceo_reviewed_at), { addSuffix: true, locale: es }) : 'N/A'}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="text-green-500 border-green-500/30">
-                                Revisado
-                              </Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                  {reviewedSubmissions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <CheckCircle2 className="w-16 h-16 mb-4 opacity-50" />
+                      <p className="text-lg font-medium">Sin documentos revisados</p>
+                      <p className="text-sm">Los documentos revisados aparecerán aquí</p>
                     </div>
-                  </ScrollArea>
+                  ) : (
+                    <ScrollArea className="h-[calc(100vh-400px)]">
+                      <div className="space-y-3">
+                        {reviewedSubmissions.map(submission => (
+                          <Card 
+                            key={submission.id} 
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleOpenSubmission(submission)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Badge variant="outline">{submission.submission_type}</Badge>
+                                    <Badge variant="default" className="bg-green-600">Revisado</Badge>
+                                  </div>
+                                  <h3 className="font-medium">{submission.title}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    De: {submission.submitter_name} • Revisado {submission.ceo_reviewed_at && formatDistanceToNow(new Date(submission.ceo_reviewed_at), { addSuffix: true, locale: es })}
+                                  </p>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -480,7 +715,7 @@ export default function CEODashboardPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-primary" />
+              <Lightbulb className="w-5 h-5 text-yellow-400" />
               Nuevo Pensamiento
             </DialogTitle>
             <DialogDescription>
@@ -543,9 +778,34 @@ export default function CEODashboardPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin proyecto</SelectItem>
-                  {projects.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
+                  {companies.map(company => {
+                    const companyProjects = projects.filter(p => p.company_id === company.id);
+                    if (companyProjects.length === 0) return null;
+                    return (
+                      <div key={company.id}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                          <span>{company.icon}</span> {company.name}
+                        </div>
+                        {companyProjects.map(p => (
+                          <SelectItem key={p.id} value={p.id} className="pl-6">
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {projectsWithoutCompany.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        Sin empresa
+                      </div>
+                      {projectsWithoutCompany.map(p => (
+                        <SelectItem key={p.id} value={p.id} className="pl-6">
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -566,13 +826,162 @@ export default function CEODashboardPage() {
                 rows={6}
               />
             </div>
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <Label>Adjuntos</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  Archivo
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => handleFileUpload(e as any);
+                    input.click();
+                  }}
+                  disabled={isUploading}
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Imagen
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleAddLink}
+                >
+                  <Link className="w-4 h-4 mr-2" />
+                  Enlace
+                </Button>
+              </div>
+
+              {newThought.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {newThought.attachments.map(attachment => {
+                    const AttachmentIcon = getAttachmentIcon(attachment.type);
+                    return (
+                      <div 
+                        key={attachment.id}
+                        className="flex items-center gap-2 px-2 py-1 bg-muted rounded-md text-sm"
+                      >
+                        <AttachmentIcon className="w-4 h-4" />
+                        <span className="max-w-[150px] truncate">{attachment.name}</span>
+                        <button 
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowThoughtDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateThought}>
+            <Button onClick={handleCreateThought} disabled={isUploading}>
               Guardar Pensamiento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Project Dialog */}
+      <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderKanban className="w-5 h-5 text-primary" />
+              Nuevo Proyecto
+            </DialogTitle>
+            <DialogDescription>
+              Crea un nuevo proyecto para organizar tus ideas y conversaciones.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Empresa</Label>
+              <Select 
+                value={newProject.company_id || 'none'} 
+                onValueChange={(v) => setNewProject(prev => ({ ...prev, company_id: v === 'none' ? '' : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin empresa asignada</SelectItem>
+                  {companies.map(company => (
+                    <SelectItem key={company.id} value={company.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{company.icon}</span>
+                        {company.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nombre del Proyecto</Label>
+              <Input
+                value={newProject.name}
+                onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ej: Estrategia Q1 2026"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción (opcional)</Label>
+              <Textarea
+                value={newProject.description}
+                onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe el objetivo del proyecto..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={newProject.color}
+                  onChange={(e) => setNewProject(prev => ({ ...prev, color: e.target.value }))}
+                  className="w-10 h-10 rounded cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground">{newProject.color}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProjectDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateProject}>
+              Crear Proyecto
             </Button>
           </DialogFooter>
         </DialogContent>

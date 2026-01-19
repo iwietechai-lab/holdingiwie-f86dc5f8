@@ -4,6 +4,22 @@ import { useSupabaseAuth } from './useSupabaseAuth';
 import { useSuperadmin } from './useSuperadmin';
 import { toast } from 'sonner';
 
+export interface Company {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+}
+
+export interface CEOAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: 'image' | 'document' | 'video' | 'link';
+  file_type?: string;
+  size?: number;
+}
+
 export interface CEOProject {
   id: string;
   name: string;
@@ -13,6 +29,7 @@ export interface CEOProject {
   color: string;
   created_at: string;
   updated_at: string;
+  company?: Company | null;
 }
 
 export interface CEOThought {
@@ -27,6 +44,7 @@ export interface CEOThought {
   ai_key_points: any[] | null;
   tags: string[];
   priority: string;
+  attachments: CEOAttachment[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +57,7 @@ export interface CEOInternalMessage {
   content: string;
   message_type: string;
   metadata: Record<string, any> | null;
+  attachments: CEOAttachment[];
   created_by: string | null;
   created_at: string;
 }
@@ -95,6 +114,7 @@ export function useCEOChat() {
   const { user, profile } = useSupabaseAuth();
   const { isSuperadmin } = useSuperadmin();
   
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<CEOProject[]>([]);
   const [thoughts, setThoughts] = useState<CEOThought[]>([]);
   const [internalMessages, setInternalMessages] = useState<CEOInternalMessage[]>([]);
@@ -106,7 +126,22 @@ export function useCEOChat() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
 
-  // Load projects
+  // Load companies
+  const loadCompanies = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, icon, color')
+        .order('name');
+
+      if (error) throw error;
+      setCompanies((data || []) as Company[]);
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  }, []);
+
+  // Load projects with company info
   const loadProjects = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -115,11 +150,18 @@ export function useCEOChat() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects((data || []) as CEOProject[]);
+      
+      // Enrich with company data
+      const enriched = (data || []).map(project => {
+        const company = companies.find(c => c.id === project.company_id);
+        return { ...project, company } as CEOProject;
+      });
+      
+      setProjects(enriched);
     } catch (error) {
       console.error('Error loading projects:', error);
     }
-  }, []);
+  }, [companies]);
 
   // Load thoughts for a project
   const loadThoughts = useCallback(async (projectId?: string | null) => {
@@ -139,8 +181,9 @@ export function useCEOChat() {
       setThoughts((data || []).map(t => ({
         ...t,
         tags: Array.isArray(t.tags) ? t.tags : [],
-        ai_key_points: Array.isArray(t.ai_key_points) ? t.ai_key_points : null
-      })) as CEOThought[]);
+        ai_key_points: Array.isArray(t.ai_key_points) ? t.ai_key_points : null,
+        attachments: Array.isArray(t.attachments) ? t.attachments as unknown as CEOAttachment[] : []
+      })) as unknown as CEOThought[]);
     } catch (error) {
       console.error('Error loading thoughts:', error);
     }
@@ -160,7 +203,10 @@ export function useCEOChat() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setInternalMessages((data || []) as CEOInternalMessage[]);
+      setInternalMessages((data || []).map(m => ({
+        ...m,
+        attachments: Array.isArray(m.attachments) ? m.attachments as unknown as CEOAttachment[] : []
+      })) as unknown as CEOInternalMessage[]);
     } catch (error) {
       console.error('Error loading internal messages:', error);
     }
@@ -270,7 +316,40 @@ export function useCEOChat() {
     }
   };
 
-  // Create thought
+  // Upload file to CEO storage
+  const uploadFile = async (file: File, bucket: string = 'ceo-files'): Promise<CEOAttachment | null> => {
+    try {
+      const filePath = `${user?.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      const fileType = file.type.startsWith('image/') ? 'image' 
+        : file.type.startsWith('video/') ? 'video' 
+        : 'document';
+
+      return {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url: urlData.publicUrl,
+        type: fileType,
+        file_type: file.type,
+        size: file.size
+      };
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Error al subir archivo');
+      return null;
+    }
+  };
+
+  // Create thought with attachments
   const createThought = async (data: {
     title: string;
     content: string;
@@ -278,18 +357,20 @@ export function useCEOChat() {
     project_id?: string | null;
     priority?: string;
     tags?: string[];
+    attachments?: CEOAttachment[];
   }) => {
     try {
       const { error } = await supabase
         .from('ceo_thoughts')
-        .insert({
+        .insert([{
           title: data.title,
           content: data.content,
           thought_type: data.thought_type || 'idea',
           project_id: data.project_id || null,
           priority: data.priority || 'media',
-          tags: data.tags || []
-        });
+          tags: data.tags || [],
+          attachments: (data.attachments || []) as unknown as any
+        }]);
 
       if (error) throw error;
       await loadThoughts(selectedProjectId);
@@ -550,11 +631,18 @@ export function useCEOChat() {
   useEffect(() => {
     const loadAll = async () => {
       setIsLoading(true);
-      await loadProjects();
+      await loadCompanies();
       setIsLoading(false);
     };
     loadAll();
-  }, []);
+  }, [loadCompanies]);
+
+  // Load projects when companies are loaded
+  useEffect(() => {
+    if (companies.length > 0) {
+      loadProjects();
+    }
+  }, [companies, loadProjects]);
 
   // Load data when project changes
   useEffect(() => {
@@ -590,6 +678,7 @@ export function useCEOChat() {
 
   return {
     // Data
+    companies,
     projects,
     thoughts,
     internalMessages,
@@ -612,8 +701,10 @@ export function useCEOChat() {
     submitForCEOReview,
     markReviewAsRead,
     updateSubmissionNotes,
+    uploadFile,
     
     // Refresh functions
+    loadCompanies,
     loadProjects,
     loadThoughts,
     loadInternalMessages,

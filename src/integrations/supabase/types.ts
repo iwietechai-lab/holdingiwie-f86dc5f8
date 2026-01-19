@@ -419,6 +419,7 @@ export type Database = {
       }
       ceo_internal_chat: {
         Row: {
+          attachments: Json | null
           content: string
           created_at: string | null
           created_by: string | null
@@ -429,6 +430,7 @@ export type Database = {
           role: string
         }
         Insert: {
+          attachments?: Json | null
           content: string
           created_at?: string | null
           created_by?: string | null
@@ -439,6 +441,7 @@ export type Database = {
           role: string
         }
         Update: {
+          attachments?: Json | null
           content?: string
           created_at?: string | null
           created_by?: string | null
@@ -773,6 +776,7 @@ export type Database = {
         Row: {
           ai_key_points: Json | null
           ai_summary: string | null
+          attachments: Json | null
           content: string
           created_at: string | null
           created_by: string | null
@@ -789,6 +793,7 @@ export type Database = {
         Insert: {
           ai_key_points?: Json | null
           ai_summary?: string | null
+          attachments?: Json | null
           content: string
           created_at?: string | null
           created_by?: string | null
@@ -805,6 +810,7 @@ export type Database = {
         Update: {
           ai_key_points?: Json | null
           ai_summary?: string | null
+          attachments?: Json | null
           content?: string
           created_at?: string | null
           created_by?: string | null
