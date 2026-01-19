@@ -18,6 +18,14 @@ interface ChatRequest {
   content?: string;
   file_url?: string;
   submitter_name?: string;
+  document_context?: {
+    title?: string;
+    content?: string;
+    analysis?: string;
+    feedback?: string;
+    suggestions?: string[];
+    score?: number;
+  };
 }
 
 serve(async (req) => {
@@ -41,6 +49,10 @@ serve(async (req) => {
 
     if (action === 'analyze_submission') {
       return await handleAnalyzeSubmission(body, LOVABLE_API_KEY);
+    }
+
+    if (action === 'educational_chat') {
+      return await handleEducationalChat(body, LOVABLE_API_KEY);
     }
 
     // Default: CEO internal chat
@@ -325,4 +337,85 @@ Responde en español con JSON válido.` },
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+}
+
+async function handleEducationalChat(body: ChatRequest, apiKey: string) {
+  const { message, document_context, history = [], submitter_name = 'Usuario' } = body;
+
+  const systemPrompt = `Eres el CEO Mauricio de IWIE Holding en modo EDUCATIVO y MENTORING. Tu rol es:
+
+1. **EDUCAR Y GUIAR**: Ayudar al colaborador a entender qué puede mejorar y CÓMO hacerlo paso a paso.
+
+2. **SER CONSTRUCTIVO**: Aunque señales errores, siempre ofrece soluciones claras y ejemplos prácticos.
+
+3. **USAR EL CONTEXTO**: Tienes acceso al documento que el usuario envió y el análisis que se hizo. Usa esta información para dar respuestas personalizadas.
+
+4. **ENSEÑAR MEJORES PRÁCTICAS**: Cuando el usuario pregunte cómo mejorar, explica:
+   - Por qué es importante esa práctica
+   - Ejemplos concretos de cómo aplicarla
+   - Errores comunes a evitar
+
+5. **COMUNICACIÓN Y DOCUMENTACIÓN**: Enseña buenas prácticas de:
+   - Cómo estructurar documentos ejecutivos
+   - Cómo presentar información financiera
+   - Cómo comunicar de forma clara y concisa
+   - Cómo organizar y categorizar información
+
+6. **MOTIVAR**: Reconoce el esfuerzo y motiva a seguir mejorando.
+
+**CONTEXTO DEL DOCUMENTO ANALIZADO:**
+- Título: ${document_context?.title || 'Sin título'}
+- Contenido: ${document_context?.content || 'Sin contenido'}
+- Análisis previo: ${document_context?.analysis || 'Sin análisis'}
+- Feedback dado: ${document_context?.feedback || 'Sin feedback'}
+- Sugerencias: ${document_context?.suggestions?.join(', ') || 'Sin sugerencias'}
+- Puntuación: ${document_context?.score || 'N/A'}/100
+
+Responde de manera cercana pero profesional, siempre en español. Usa emojis moderadamente para hacer la conversación más amigable. Estructura tus respuestas con bullets y headers cuando sea apropiado.`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: message }
+  ];
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages,
+      temperature: 0.7,
+      max_tokens: 2000
+    })
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (response.status === 402) {
+      return new Response(
+        JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    throw new Error(`AI API error: ${response.status}`);
+  }
+
+  const aiResponse = await response.json();
+  const assistantMessage = aiResponse.choices?.[0]?.message?.content || 'No pude generar una respuesta.';
+
+  return new Response(
+    JSON.stringify({
+      response: assistantMessage
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
 }
