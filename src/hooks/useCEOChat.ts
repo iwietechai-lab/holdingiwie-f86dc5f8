@@ -678,6 +678,61 @@ export function useCEOChat() {
     }
   };
 
+  // Analyze submission immediately with AI CEO
+  const analyzeSubmissionNow = async (submission: CEOTeamSubmission): Promise<{
+    analysis: string;
+    feedback: string;
+    score: number;
+    suggestions: string[];
+  } | null> => {
+    try {
+      toast.info('Analizando documento con AI CEO...');
+      
+      const { data: analysisResult, error } = await supabase.functions.invoke('ceo-internal-chat', {
+        body: {
+          action: 'analyze_submission',
+          submission_id: submission.id,
+          title: submission.title,
+          content: submission.content || `Archivo: ${submission.file_name || 'documento'}`,
+          file_url: submission.file_url,
+          submitter_name: profile?.full_name || 'Usuario'
+        }
+      });
+
+      if (error) throw error;
+
+      if (analysisResult) {
+        // Update the submission with AI analysis
+        await supabase
+          .from('ceo_team_submissions')
+          .update({
+            ai_analysis: analysisResult.analysis,
+            ai_feedback: analysisResult.feedback,
+            ai_score: analysisResult.score,
+            ai_improvement_suggestions: analysisResult.suggestions,
+            status: 'en_revision'
+          })
+          .eq('id', submission.id);
+
+        await loadUserSubmissions();
+        toast.success('Análisis AI completado');
+        
+        return {
+          analysis: analysisResult.analysis,
+          feedback: analysisResult.feedback,
+          score: analysisResult.score,
+          suggestions: analysisResult.suggestions || []
+        };
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error('Error analyzing submission:', error);
+      toast.error('Error al analizar documento');
+      return null;
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const loadAll = async () => {
@@ -762,6 +817,7 @@ export function useCEOChat() {
     markReviewAsRead,
     updateSubmissionNotes,
     uploadFile,
+    analyzeSubmissionNow,
     
     // Refresh functions
     loadCompanies,

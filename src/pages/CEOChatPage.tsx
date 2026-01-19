@@ -16,7 +16,11 @@ import {
   FileText,
   Sparkles,
   Bell,
-  Brain
+  Brain,
+  Wand2,
+  Star,
+  Lightbulb,
+  TrendingUp
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -60,7 +64,8 @@ export default function CEOChatPage() {
     createProject,
     sendInternalMessage,
     generateReport,
-    submitForCEOReview
+    submitForCEOReview,
+    analyzeSubmissionNow
   } = useCEOChat();
 
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -70,6 +75,15 @@ export default function CEOChatPage() {
   const [newProject, setNewProject] = useState({ name: '', description: '', color: '#8B5CF6' });
   const [submission, setSubmission] = useState({ title: '', content: '', file: null as File | null });
   const [activeTab, setActiveTab] = useState('chat');
+  const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{
+    submission: typeof userSubmissions[0] | null;
+    analysis: string;
+    feedback: string;
+    score: number;
+    suggestions: string[];
+  } | null>(null);
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +140,33 @@ export default function CEOChatPage() {
 
   const handleGenerateReport = async () => {
     await generateReport(selectedProjectId);
+  };
+
+  const handleAnalyzeNow = async (sub: typeof userSubmissions[0]) => {
+    setAnalyzingSubmissionId(sub.id);
+    const result = await analyzeSubmissionNow(sub);
+    setAnalyzingSubmissionId(null);
+    
+    if (result) {
+      setAnalysisResult({
+        submission: sub,
+        ...result
+      });
+      setShowAnalysisDialog(true);
+    }
+  };
+
+  const handleViewExistingAnalysis = (sub: typeof userSubmissions[0]) => {
+    if (sub.ai_analysis || sub.ai_feedback) {
+      setAnalysisResult({
+        submission: sub,
+        analysis: sub.ai_analysis || '',
+        feedback: sub.ai_feedback || '',
+        score: sub.ai_score || 0,
+        suggestions: Array.isArray(sub.ai_improvement_suggestions) ? sub.ai_improvement_suggestions : []
+      });
+      setShowAnalysisDialog(true);
+    }
   };
 
   if (authLoading || isLoading) {
@@ -264,29 +305,57 @@ export default function CEOChatPage() {
                             {userSubmissions.slice(0, 5).map(sub => (
                               <div 
                                 key={sub.id} 
-                                className="flex items-start gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                                className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                               >
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{sub.title}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
-                                  </p>
+                                <div className="flex items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{sub.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatDistanceToNow(new Date(sub.created_at), { addSuffix: true, locale: es })}
+                                    </p>
+                                  </div>
+                                  <Badge 
+                                    variant={
+                                      sub.status === 'revisado' ? 'default' : 
+                                      sub.status === 'en_revision' ? 'secondary' : 
+                                      'outline'
+                                    }
+                                    className="shrink-0 text-[10px]"
+                                  >
+                                    {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
+                                    {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                    {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                    {sub.status === 'pendiente' ? 'Pendiente' : 
+                                     sub.status === 'en_revision' ? 'En Revisión' : 
+                                     'Revisado'}
+                                  </Badge>
                                 </div>
-                                <Badge 
-                                  variant={
-                                    sub.status === 'revisado' ? 'default' : 
-                                    sub.status === 'en_revision' ? 'secondary' : 
-                                    'outline'
-                                  }
-                                  className="shrink-0 text-[10px]"
+                                
+                                {/* AI Analysis Button */}
+                                <Button
+                                  size="sm"
+                                  variant={sub.ai_analysis ? "secondary" : "outline"}
+                                  className="w-full h-7 text-xs"
+                                  onClick={() => sub.ai_analysis ? handleViewExistingAnalysis(sub) : handleAnalyzeNow(sub)}
+                                  disabled={analyzingSubmissionId === sub.id}
                                 >
-                                  {sub.status === 'pendiente' && <Clock className="w-3 h-3 mr-1" />}
-                                  {sub.status === 'en_revision' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                  {sub.status === 'revisado' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                                  {sub.status === 'pendiente' ? 'Pendiente' : 
-                                   sub.status === 'en_revision' ? 'En Revisión' : 
-                                   'Revisado'}
-                                </Badge>
+                                  {analyzingSubmissionId === sub.id ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                      Analizando...
+                                    </>
+                                  ) : sub.ai_analysis ? (
+                                    <>
+                                      <Sparkles className="w-3 h-3 mr-1" />
+                                      Ver Análisis AI
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Wand2 className="w-3 h-3 mr-1" />
+                                      Analizar Ahora por AI CEO
+                                    </>
+                                  )}
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -584,6 +653,102 @@ export default function CEOChatPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Analysis Results Dialog */}
+      <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Análisis AI CEO
+            </DialogTitle>
+            <DialogDescription>
+              {analysisResult?.submission?.title}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {analysisResult && (
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6">
+                {/* Score */}
+                {analysisResult.score > 0 && (
+                  <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+                    <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/20">
+                      <span className="text-2xl font-bold text-primary">{analysisResult.score}</span>
+                    </div>
+                    <div>
+                      <p className="font-medium flex items-center gap-2">
+                        <Star className="w-4 h-4 text-yellow-500" />
+                        Puntuación del Documento
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {analysisResult.score >= 80 ? 'Excelente trabajo' : 
+                         analysisResult.score >= 60 ? 'Buen documento, hay oportunidades de mejora' : 
+                         'Se recomienda revisar las sugerencias'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Analysis */}
+                {analysisResult.analysis && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-blue-500" />
+                      Análisis
+                    </h4>
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
+                      <MarkdownRenderer content={analysisResult.analysis} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {analysisResult.feedback && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-green-500" />
+                      Feedback
+                    </h4>
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
+                      <MarkdownRenderer content={analysisResult.feedback} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Suggestions */}
+                {analysisResult.suggestions && analysisResult.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-500" />
+                      Sugerencias de Mejora
+                    </h4>
+                    <div className="space-y-2">
+                      {analysisResult.suggestions.map((suggestion, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-start gap-3 p-3 rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-medium shrink-0">
+                            {idx + 1}
+                          </div>
+                          <p className="text-sm">{String(suggestion)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setShowAnalysisDialog(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
