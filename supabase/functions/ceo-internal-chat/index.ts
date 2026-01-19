@@ -388,47 +388,68 @@ async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
   
   console.log('Final content to analyze (first 500 chars):', extractedContent.substring(0, 500));
 
-  const analysisPrompt = `Analiza el siguiente documento/contenido enviado por ${submitter_name} como si fueras el CEO Mauricio revisándolo.
+  const analysisPrompt = `Eres el CEO analizando el siguiente documento enviado por ${submitter_name}. Debes proporcionar un análisis EJECUTIVO de alta calidad, con feedback estratégico detallado.
 
 **Título del documento:** ${title}
 
 **CONTENIDO REAL DEL DOCUMENTO (extraído del archivo):**
 ${extractedContent}
 
-## INSTRUCCIONES DE ANÁLISIS:
+## INSTRUCCIONES DE ANÁLISIS CEO:
 
-IMPORTANTE: Debes analizar el CONTENIDO REAL proporcionado arriba. NO inventes datos. Extrae la información exacta del documento.
+CRÍTICO: Analiza el contenido REAL proporcionado arriba. Extrae TODOS los datos exactos. NO inventes información.
 
-Si el documento contiene información financiera, rendiciones de gastos, flujos de caja o movimientos bancarios:
+### TU ANÁLISIS DEBE INCLUIR:
 
-1. **EXTRAER y categorizar TODOS los gastos reales** encontrados en el documento:
-   - 🏢 **GASTOS EMPRESARIALES/OPERACIONALES**: Pagos a proveedores, servicios, software, arriendos comerciales, abogados, fletes, aduanas, impuestos de importación, etc.
-   - 👤 **GASTOS PERSONALES**: Comida personal, cumpleaños, supermercado, entretenimiento personal, etc.
-   - 🚗 **TRANSPORTE/COMBUSTIBLE**: Gasolina, estacionamiento, peajes
-   - 📱 **TECNOLOGÍA/SERVICIOS**: Planes de internet, Starlink, software, IA, etc.
-   - 🏠 **VIVIENDA/ARRIENDOS**: Dividendos, arriendos de casas
-   - 💳 **FINANCIEROS**: Intereses, préstamos, pagos bancarios
-   - ❓ **OTROS/SIN CLASIFICAR**: Gastos que no encajan claramente
+1. **RESUMEN EJECUTIVO** (2-3 párrafos)
+   - Qué contiene el documento
+   - Para qué sirve
+   - Viabilidad general
 
-2. **Listar CADA ítem con su monto exacto** tal como aparece en el documento
+2. **FORTALEZAS** del documento/modelo/propuesta
+   - Lista con bullets claros
+   - Destaca lo que está bien hecho
 
-3. **Calcular totales REALES por categoría** y mostrar porcentajes del total
+3. **ÁREAS DE MEJORA** (análisis crítico constructivo)
+   - Qué falta o podría mejorarse
+   - Riesgos identificados
+   - Vacíos de información
 
-4. **ALERTAR sobre mezcla de gastos personales con empresariales** si los hay
+4. **TABLAS DE DATOS** (usa formato markdown)
+   - Extrae y presenta los datos clave en tablas
+   - Incluye columnas relevantes del documento
+   - Muestra cálculos importantes
 
-5. **Mostrar balance real**: Ingresos totales vs Egresos totales vs Saldo final (solo si hay datos)
+5. **ACCIONES RECOMENDADAS**
+   - Lista de acciones específicas
+   - Indica responsable si aplica
+   - Sugiere plazos
 
-## FORMATO DE RESPUESTA:
+6. **CONCLUSIÓN CEO**
+   - Tu veredicto general
+   - Próximos pasos sugeridos
+   - Mensaje motivador al equipo
 
-Responde en JSON con esta estructura:
+### FORMATO DE TABLAS MARKDOWN (OBLIGATORIO si hay datos tabulares):
+| Concepto | Valor USD | Valor CLP | Observación |
+|----------|-----------|-----------|-------------|
+| Dato 1   | 1,000     | 900,000   | Nota        |
+
+## RESPONDE EN JSON:
+
 {
-  "analysis": "## 📊 Resumen Ejecutivo\\n\\n[Resumen basado en datos REALES del documento]\\n\\n## 📋 Datos Extraídos del Documento\\n\\n[Lista detallada de cada ítem encontrado con montos]\\n\\n## 📁 Categorización de Gastos\\n\\n### 🏢 Gastos Empresariales ($X.XXX - XX%)\\n- Ítem 1: $XXX\\n- Ítem 2: $XXX\\n\\n### 👤 Gastos Personales ($X.XXX - XX%)\\n[Si hay]\\n\\n## ⚠️ Alertas\\n\\n[Alertas basadas en el análisis real]\\n\\n## 📈 Balance Final\\n\\n- Total Ingresos: $X.XXX\\n- Total Egresos: $X.XXX\\n- Saldo: $X.XXX",
-  "feedback": "Mensaje de feedback directo basado en el análisis REAL del documento",
-  "score": 75,
-  "suggestions": ["Sugerencia 1 específica", "Sugerencia 2 específica", "Sugerencia 3 específica"]
+  "analysis": "## Feedback del CEO al Equipo: [Título Descriptivo]\\n\\nEquipo,\\n\\nHe revisado en detalle el documento [nombre]...\\n\\n### 1. Resumen Ejecutivo\\n\\n[Análisis detallado]\\n\\n### 2. Fortalezas\\n\\n- **Punto fuerte 1**: Explicación\\n- **Punto fuerte 2**: Explicación\\n\\n### 3. Áreas de Mejora\\n\\n- **Mejora 1**: Descripción del problema y sugerencia\\n- **Mejora 2**: Descripción del problema y sugerencia\\n\\n### 4. Datos Clave del Documento\\n\\n[TABLAS MARKDOWN con los datos extraídos]\\n\\n### 5. Acciones Recomendadas\\n\\n1. **Acción 1**: Descripción. *Responsable: X. Plazo: Y.*\\n2. **Acción 2**: Descripción. *Responsable: X. Plazo: Y.*\\n\\n### 6. Conclusión\\n\\n[Mensaje de cierre motivador con próximos pasos]\\n\\nAtentamente,\\nMauricio Ortiz\\nCEO, IWIE Drones",
+  "feedback": "[Resumen de 2-3 oraciones del feedback principal - directo y accionable]",
+  "score": 85,
+  "suggestions": ["Sugerencia específica 1 basada en datos reales", "Sugerencia específica 2", "Sugerencia específica 3", "Sugerencia específica 4"]
 }
 
-CRÍTICO: Usa los datos REALES del documento. NO inventes cifras ni ítems. Si no hay datos suficientes, indica qué falta.`;
+IMPORTANTE: 
+- El "analysis" debe ser MUY DETALLADO (mínimo 800 palabras)
+- Incluye TODAS las tablas de datos del documento
+- Extrae CADA número y dato relevante
+- El score debe reflejar la calidad real del documento (0-100)
+- Las suggestions deben ser accionables y específicas`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -439,20 +460,29 @@ CRÍTICO: Usa los datos REALES del documento. NO inventes cifras ni ítems. Si n
     body: JSON.stringify({
       model: 'google/gemini-2.5-pro',
       messages: [
-        { role: 'system', content: `Eres el CEO Mauricio analizando documentos de tu equipo. 
+        { role: 'system', content: `Eres el CEO Mauricio Ortiz de IWIE Holding, analizando documentos estratégicos y financieros de tu equipo.
+
+TU ESTILO DE ANÁLISIS:
+- Profesional pero cercano
+- Detallado y con datos concretos
+- Usa tablas markdown para presentar información numérica
+- Identifica fortalezas Y áreas de mejora
+- Siempre proporciona acciones concretas con responsables
+- Termina con mensaje motivador
 
 REGLAS CRÍTICAS:
 1. ANALIZA ÚNICAMENTE el contenido REAL proporcionado
-2. EXTRAE datos exactos del documento (montos, ítems, fechas)
-3. NO inventes información que no esté en el documento
-4. Si el documento está vacío o no tiene datos claros, INDÍCALO
-5. Sé específico con los números y detalles encontrados
+2. EXTRAE TODOS los datos exactos (montos, porcentajes, ítems)
+3. CREA TABLAS MARKDOWN con los datos numéricos
+4. NO inventes información que no esté en el documento
+5. Sé MUY específico con los números encontrados
+6. El análisis debe ser extenso y de alta calidad ejecutiva
 
-Responde en español con JSON válido.` },
+Responde en español con JSON válido. El campo "analysis" debe tener mínimo 800 palabras.` },
         { role: 'user', content: analysisPrompt }
       ],
-      temperature: 0.3,
-      max_tokens: 4000
+      temperature: 0.4,
+      max_tokens: 8000
     })
   });
 
