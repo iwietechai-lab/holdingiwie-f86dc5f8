@@ -559,7 +559,9 @@ export function useCEOChat() {
       let fileType = null;
 
       if (data.file) {
-        const filePath = `${user?.id}/${Date.now()}-${data.file.name}`;
+        // Sanitize filename to avoid invalid characters
+        const sanitizedFileName = data.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `${user?.id}/${Date.now()}_${sanitizedFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('ceo-team-submissions')
           .upload(filePath, data.file);

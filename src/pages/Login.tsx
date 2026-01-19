@@ -56,23 +56,44 @@ export const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
-  // Check for password recovery flow from URL hash
+  // Check for password recovery flow from URL hash or query params
   useEffect(() => {
     const checkPasswordRecovery = async () => {
-      // Check URL hash for recovery tokens
+      // Check URL hash for recovery tokens (Supabase redirects with hash)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const type = hashParams.get('type');
       
-      if (type === 'recovery' && accessToken) {
+      // Also check query params (some flows use query params)
+      const queryParams = new URLSearchParams(window.location.search);
+      const queryType = queryParams.get('type');
+      const error = queryParams.get('error');
+      const errorDescription = queryParams.get('error_description');
+      
+      // Handle error cases (expired link, etc.)
+      if (error) {
+        console.log('Auth error:', error, errorDescription);
+        toast({
+          title: 'Error',
+          description: errorDescription || 'El enlace ha expirado o es inválido. Solicita uno nuevo.',
+          variant: 'destructive',
+        });
+        setStep('forgot-password');
+        // Clean URL
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+      
+      if ((type === 'recovery' && accessToken) || queryType === 'recovery') {
         console.log('Password recovery detected from URL');
         setIsPasswordRecovery(true);
         setStep('reset-password');
         return;
       }
 
-      // Also listen for PASSWORD_RECOVERY event
+      // Listen for PASSWORD_RECOVERY event from Supabase
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('Auth state change:', event);
         if (event === 'PASSWORD_RECOVERY') {
           console.log('PASSWORD_RECOVERY event detected');
           setIsPasswordRecovery(true);
@@ -84,7 +105,7 @@ export const Login = () => {
     };
 
     checkPasswordRecovery();
-  }, []);
+  }, [toast]);
 
   // Redirect if already authenticated and has profile (but NOT during password recovery)
   useEffect(() => {
