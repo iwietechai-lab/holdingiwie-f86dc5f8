@@ -20,7 +20,8 @@ import {
   Wand2,
   Star,
   Lightbulb,
-  TrendingUp
+  TrendingUp,
+  X
 } from 'lucide-react';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { Sidebar } from '@/components/Sidebar';
@@ -84,8 +85,11 @@ export default function CEOChatPage() {
     suggestions: string[];
   } | null>(null);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  const [chatAttachment, setChatAttachment] = useState<File | null>(null);
+  const [isUploadingChatFile, setIsUploadingChatFile] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -98,10 +102,62 @@ export default function CEOChatPage() {
   }, [internalMessages]);
 
   const handleSend = async () => {
-    if (!inputMessage.trim() || isSending) return;
+    if ((!inputMessage.trim() && !chatAttachment) || isSending) return;
     const message = inputMessage.trim();
     setInputMessage('');
-    await sendInternalMessage(message);
+    
+    // If there's an attachment, analyze it first
+    if (chatAttachment) {
+      await handleQuickAnalysis(message);
+    } else {
+      await sendInternalMessage(message);
+    }
+  };
+
+  const handleQuickAnalysis = async (message: string) => {
+    if (!chatAttachment) return;
+    
+    setIsUploadingChatFile(true);
+    try {
+      const result = await submitForCEOReview({
+        title: chatAttachment.name,
+        content: message || `Análisis rápido de: ${chatAttachment.name}`,
+        file: chatAttachment,
+        project_id: selectedProjectId
+      });
+      
+      if (result) {
+        // Immediately analyze the submission
+        const analysisResult = await analyzeSubmissionNow(result as any);
+        if (analysisResult) {
+          setAnalysisResult({
+            submission: result as any,
+            ...analysisResult
+          });
+          setShowAnalysisDialog(true);
+        }
+      }
+      setChatAttachment(null);
+      if (chatFileInputRef.current) {
+        chatFileInputRef.current.value = '';
+      }
+    } finally {
+      setIsUploadingChatFile(false);
+    }
+  };
+
+  const handleChatFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setChatAttachment(file);
+    }
+  };
+
+  const removeChatAttachment = () => {
+    setChatAttachment(null);
+    if (chatFileInputRef.current) {
+      chatFileInputRef.current.value = '';
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -300,9 +356,9 @@ export default function CEOChatPage() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="py-2 px-2">
-                        <ScrollArea className="max-h-48">
+                         <ScrollArea className="h-48">
                           <div className="space-y-2 px-2">
-                            {userSubmissions.slice(0, 5).map(sub => (
+                            {userSubmissions.map(sub => (
                               <div 
                                 key={sub.id} 
                                 className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
@@ -501,25 +557,67 @@ export default function CEOChatPage() {
 
               {/* Input Area */}
               <div className="p-4 border-t border-border">
+                {/* Attachment Preview */}
+                {chatAttachment && (
+                  <div className="mb-2 flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                    <FileText className="w-4 h-4 text-primary" />
+                    <span className="text-sm flex-1 truncate">{chatAttachment.name}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={removeChatAttachment}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
+                  {/* Hidden file input */}
+                  <input
+                    ref={chatFileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleChatFileSelect}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png"
+                  />
+                  
+                  {/* Attach file button */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 self-end"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    disabled={isSending || isUploadingChatFile}
+                    title="Adjuntar documento para análisis rápido"
+                  >
+                    <FileUp className="w-4 h-4" />
+                  </Button>
+                  
                   <Textarea
-                    placeholder={isSuperadmin 
-                      ? "Escribe tu idea, pregunta o tema para debatir..." 
-                      : "Escribe tu consulta..."}
+                    placeholder={chatAttachment 
+                      ? "Describe el documento o deja vacío para análisis automático..." 
+                      : (isSuperadmin 
+                        ? "Escribe tu idea, pregunta o tema para debatir..." 
+                        : "Escribe tu consulta...")}
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    disabled={isSending}
+                    disabled={isSending || isUploadingChatFile}
                     className="flex-1 min-h-[44px] max-h-32 resize-none"
                     rows={1}
                   />
                   <Button
                     onClick={handleSend}
-                    disabled={!inputMessage.trim() || isSending}
+                    disabled={(!inputMessage.trim() && !chatAttachment) || isSending || isUploadingChatFile}
                     className="bg-gradient-to-r from-primary to-secondary self-end"
                   >
-                    {isSending ? (
+                    {isSending || isUploadingChatFile ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : chatAttachment ? (
+                      <Wand2 className="w-4 h-4" />
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
