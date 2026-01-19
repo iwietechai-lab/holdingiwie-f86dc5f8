@@ -547,44 +547,71 @@ export function useCEOChat() {
   // Parse file content in the browser
   const parseFileContent = async (file: File): Promise<string> => {
     const fileName = file.name.toLowerCase();
+    console.log('📄 Parsing file:', fileName, 'Type:', file.type, 'Size:', file.size);
     
     // Handle Excel files
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       try {
+        console.log('📊 Reading Excel file...');
         const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        let content = '';
+        console.log('📊 ArrayBuffer size:', arrayBuffer.byteLength);
+        
+        const workbook = XLSX.read(arrayBuffer, { 
+          type: 'array',
+          cellDates: true,
+          cellNF: true,
+          cellStyles: true
+        });
+        
+        console.log('📊 Workbook sheets:', workbook.SheetNames);
+        let content = `=== ARCHIVO EXCEL: ${file.name} ===\n`;
+        content += `Total de hojas: ${workbook.SheetNames.length}\n`;
         
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(sheet);
           
-          content += `\n\n=== HOJA: ${sheetName} ===\n\n`;
+          // Get data with headers
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          // Get raw values too
+          const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
           
-          if (jsonData.length > 0) {
-            // Get headers
-            const headers = Object.keys(jsonData[0] as object);
-            content += `| ${headers.join(' | ')} |\n`;
-            content += `|${headers.map(() => '---').join('|')}|\n`;
-            
-            // Add rows
-            for (const row of jsonData) {
-              const values = headers.map(h => String((row as Record<string, unknown>)[h] || ''));
-              content += `| ${values.join(' | ')} |\n`;
+          content += `\n\n========== HOJA: ${sheetName} ==========\n\n`;
+          console.log(`📊 Sheet "${sheetName}" has ${jsonData.length} rows (json), ${rawData.length} rows (raw)`);
+          
+          // If sheet has data
+          if (rawData.length > 0) {
+            // Add raw rows first (more reliable for getting all data)
+            content += '--- DATOS EN FORMATO TABLA ---\n';
+            for (let i = 0; i < rawData.length; i++) {
+              const row = rawData[i] as unknown[];
+              if (row.some(cell => cell !== '')) {
+                content += `Fila ${i + 1}: ${row.map(cell => String(cell ?? '')).join(' | ')}\n`;
+              }
             }
             
-            // Also add detailed data
-            content += `\n--- DATOS DETALLADOS ---\n`;
-            for (const row of jsonData) {
-              content += JSON.stringify(row) + '\n';
+            // Also add as JSON for structured access
+            if (jsonData.length > 0) {
+              content += '\n--- DATOS ESTRUCTURADOS (JSON) ---\n';
+              for (const row of jsonData) {
+                content += JSON.stringify(row, null, 0) + '\n';
+              }
             }
+          } else {
+            content += '[Hoja vacía]\n';
           }
         }
         
-        return content || '[Archivo Excel vacío o sin datos]';
+        console.log('📊 Total extracted content length:', content.length);
+        console.log('📊 First 1000 chars:', content.substring(0, 1000));
+        
+        if (content.length < 100) {
+          return `[Archivo Excel "${file.name}" parece estar vacío o corrupto. Tamaño: ${file.size} bytes]`;
+        }
+        
+        return content;
       } catch (error) {
-        console.error('Error parsing Excel:', error);
-        return `[Error al parsear Excel: ${error instanceof Error ? error.message : 'Unknown'}]`;
+        console.error('❌ Error parsing Excel:', error);
+        return `[Error al parsear Excel "${file.name}": ${error instanceof Error ? error.message : 'Unknown'}. Por favor, intenta exportar a CSV.]`;
       }
     }
     
