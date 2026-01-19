@@ -125,6 +125,8 @@ export function useCEOChat() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userSubmissions, setUserSubmissions] = useState<CEOTeamSubmission[]>([]);
 
   // Load companies
   const loadCompanies = useCallback(async () => {
@@ -510,6 +512,38 @@ export function useCEOChat() {
     }
   };
 
+  // Load user's own submissions history
+  const loadUserSubmissions = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('ceo_team_submissions')
+        .select('*')
+        .eq('submitted_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const enriched = (data || []).map(submission => {
+        const project = projects.find(p => p.id === submission.project_id);
+        return {
+          ...submission,
+          submitter_name: profile?.full_name || 'Usuario',
+          submitter_email: '',
+          project_name: project?.name || 'Sin proyecto',
+          ai_improvement_suggestions: Array.isArray(submission.ai_improvement_suggestions) 
+            ? submission.ai_improvement_suggestions 
+            : null
+        };
+      });
+
+      setUserSubmissions(enriched as CEOTeamSubmission[]);
+    } catch (error) {
+      console.error('Error loading user submissions:', error);
+    }
+  }, [user?.id, projects, profile]);
+
   // Submit file/content from team for CEO analysis
   const submitForCEOReview = async (data: {
     title: string;
@@ -518,6 +552,7 @@ export function useCEOChat() {
     submission_type?: string;
     project_id?: string | null;
   }) => {
+    setIsSubmitting(true);
     try {
       let fileUrl = null;
       let fileName = null;
@@ -529,7 +564,10 @@ export function useCEOChat() {
           .from('ceo-team-submissions')
           .upload(filePath, data.file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Error al subir archivo: ${uploadError.message}`);
+        }
 
         const { data: urlData } = supabase.storage
           .from('ceo-team-submissions')
@@ -556,10 +594,13 @@ export function useCEOChat() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw new Error(`Error al guardar documento: ${error.message}`);
+      }
 
-      // Trigger AI analysis
-      const { data: analysisResult } = await supabase.functions.invoke('ceo-internal-chat', {
+      // Trigger AI analysis (non-blocking)
+      supabase.functions.invoke('ceo-internal-chat', {
         body: {
           action: 'analyze_submission',
           submission_id: submission.id,
@@ -568,28 +609,36 @@ export function useCEOChat() {
           file_url: fileUrl,
           submitter_name: profile?.full_name || 'Usuario'
         }
+      }).then(({ data: analysisResult }) => {
+        // Update with AI analysis
+        if (analysisResult) {
+          supabase
+            .from('ceo_team_submissions')
+            .update({
+              ai_analysis: analysisResult.analysis,
+              ai_feedback: analysisResult.feedback,
+              ai_score: analysisResult.score,
+              ai_improvement_suggestions: analysisResult.suggestions,
+              status: 'en_revision'
+            })
+            .eq('id', submission.id)
+            .then(() => {
+              loadUserSubmissions();
+            });
+        }
+      }).catch(err => {
+        console.error('AI analysis error:', err);
       });
 
-      // Update with AI analysis
-      if (analysisResult) {
-        await supabase
-          .from('ceo_team_submissions')
-          .update({
-            ai_analysis: analysisResult.analysis,
-            ai_feedback: analysisResult.feedback,
-            ai_score: analysisResult.score,
-            ai_improvement_suggestions: analysisResult.suggestions,
-            status: 'en_revision'
-          })
-          .eq('id', submission.id);
-      }
-
       toast.success('Documento enviado para análisis del CEO');
+      await loadUserSubmissions();
       return submission;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting for review:', error);
-      toast.error('Error al enviar documento');
+      toast.error(error.message || 'Error al enviar documento');
       return null;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -676,6 +725,13 @@ export function useCEOChat() {
     };
   }, [isSuperadmin]);
 
+  // Load user submissions on user change
+  useEffect(() => {
+    if (user?.id && projects.length > 0) {
+      loadUserSubmissions();
+    }
+  }, [user?.id, projects, loadUserSubmissions]);
+
   return {
     // Data
     companies,
@@ -685,11 +741,13 @@ export function useCEOChat() {
     teamSubmissions,
     pendingReviews,
     reports,
+    userSubmissions,
     selectedProjectId,
     
     // State
     isLoading,
     isSending,
+    isSubmitting,
     isSuperadmin,
     
     // Actions
@@ -709,6 +767,7 @@ export function useCEOChat() {
     loadThoughts,
     loadInternalMessages,
     loadTeamSubmissions,
+    loadUserSubmissions,
     loadPendingReviews,
     loadReports
   };
