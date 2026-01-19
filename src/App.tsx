@@ -14,6 +14,8 @@ import SuperadminDashboard from "./pages/SuperadminDashboard";
 import OrganizationStructure from "./pages/OrganizationStructure";
 import CEOChatbotPage from "./pages/CEOChatbotPage";
 import CEOKnowledgeManager from "./pages/CEOKnowledgeManager";
+import CEOChatPage from "./pages/CEOChatPage";
+import CEODashboardPage from "./pages/CEODashboardPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import VideoCallPage from "./pages/VideoCallPage";
 import TicketsPage from "./pages/TicketsPage";
@@ -55,6 +57,8 @@ function AppContent() {
         <Route path="/empresa" element={<ProtectedRoute blockMobile><CompanyDashboard /></ProtectedRoute>} />
         <Route path="/chatbot" element={<ProtectedRoute blockMobile><Chatbot /></ProtectedRoute>} />
         <Route path="/ceo-chatbot" element={<ProtectedRoute blockMobile><CEOChatbotPage /></ProtectedRoute>} />
+        <Route path="/ceo-chat" element={<ProtectedRoute blockMobile><CEOChatPage /></ProtectedRoute>} />
+        <Route path="/ceo-dashboard" element={<ProtectedRoute blockMobile><CEODashboardPage /></ProtectedRoute>} />
         <Route path="/ceo-knowledge" element={<ProtectedRoute blockMobile><CEOKnowledgeManager /></ProtectedRoute>} />
         <Route path="/gestor-documentos" element={<ProtectedRoute blockMobile><GestorDocumentos /></ProtectedRoute>} />
         <Route path="/organizacion" element={<ProtectedRoute blockMobile><OrganizationStructure /></ProtectedRoute>} />

@@ -133,6 +133,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
   const globalMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
+    { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
