@@ -222,22 +222,44 @@ async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
 **Contenido:** ${content || 'Archivo adjunto'}
 ${file_url ? `**Archivo:** ${file_url}` : ''}
 
+## INSTRUCCIONES DE ANÁLISIS FINANCIERO/GASTOS:
+
+Si el documento contiene información financiera, rendiciones de gastos, flujos de caja o movimientos bancarios, DEBES:
+
+1. **Categorizar TODOS los gastos** en las siguientes categorías:
+   - 🏢 **GASTOS EMPRESARIALES/OPERACIONALES**: Pagos a proveedores, servicios, software, arriendos comerciales, abogados, etc.
+   - 👤 **GASTOS PERSONALES**: Comida personal, cumpleaños, supermercado, entretenimiento personal, etc.
+   - 🚗 **TRANSPORTE/COMBUSTIBLE**: Gasolina, estacionamiento, peajes
+   - 📱 **TECNOLOGÍA/SERVICIOS**: Planes de internet, Starlink, software, IA, etc.
+   - 🏠 **VIVIENDA/ARRIENDOS**: Dividendos, arriendos de casas
+   - 💳 **FINANCIEROS**: Intereses, préstamos, pagos bancarios
+   - ❓ **OTROS/SIN CLASIFICAR**: Gastos que no encajan claramente
+
+2. **Calcular totales por categoría** y mostrar porcentajes del total
+
+3. **ALERTAR sobre mezcla de gastos personales con empresariales** - esto es crítico para la contabilidad
+
+4. **Mostrar balance**: Ingresos totales vs Egresos totales vs Saldo final
+
+5. **Identificar patrones problemáticos**: Gastos recurrentes elevados, gastos no justificados, etc.
+
+## FORMATO DE RESPUESTA:
+
 Proporciona un análisis detallado que incluya:
-1. Evaluación general del trabajo (1-100)
-2. Puntos fuertes identificados
-3. Áreas de mejora
-4. Sugerencias específicas de mejora
-5. Feedback constructivo para el colaborador
+1. Evaluación general del documento (1-100)
+2. **Tabla de categorización de gastos** con montos y porcentajes
+3. Alertas sobre gastos personales mezclados
+4. Sugerencias de mejora en la gestión financiera
 
 Responde en JSON con esta estructura:
 {
-  "analysis": "Análisis detallado del contenido",
-  "feedback": "Mensaje de feedback directo para el colaborador (puede ser felicitación o sugerencias de mejora)",
-  "score": 85,
-  "suggestions": ["Sugerencia 1", "Sugerencia 2", "Sugerencia 3"]
+  "analysis": "## 📊 Resumen Ejecutivo\\n\\n[Resumen general]\\n\\n## 📁 Categorización de Gastos\\n\\n### 🏢 Gastos Empresariales ($X.XXX - XX%)\\n- Detalle item 1\\n- Detalle item 2\\n\\n### 👤 Gastos Personales ($X.XXX - XX%)\\n- Detalle item 1\\n\\n### 🚗 Transporte ($X.XXX - XX%)\\n...\\n\\n## ⚠️ Alertas\\n\\n- [Alertas importantes sobre mezcla de gastos]\\n\\n## 📈 Balance Final\\n\\n- Ingresos: $X.XXX\\n- Egresos: $X.XXX\\n- Saldo: $X.XXX",
+  "feedback": "Mensaje de feedback directo para el colaborador con recomendaciones específicas sobre separación de gastos y mejoras en rendición",
+  "score": 75,
+  "suggestions": ["Separar cuenta personal de empresarial", "Crear categorías claras antes de rendir", "Incluir justificación en gastos mayores a $50.000"]
 }
 
-Responde SOLO con el JSON.`;
+Responde SOLO con el JSON. Usa saltos de línea (\\n) para formatear correctamente.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -248,11 +270,19 @@ Responde SOLO con el JSON.`;
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash',
       messages: [
-        { role: 'system', content: 'Eres el CEO Mauricio analizando trabajo de tu equipo. Sé constructivo pero exigente. Responde en español con JSON válido.' },
+        { role: 'system', content: `Eres el CEO Mauricio analizando trabajo de tu equipo. Sé constructivo pero exigente. 
+
+IMPORTANTE: Para documentos financieros o rendiciones de gastos:
+- SIEMPRE categoriza los gastos en: Empresariales, Personales, Transporte, Tecnología, Vivienda, Financieros, Otros
+- SIEMPRE alerta cuando haya mezcla de gastos personales con empresariales
+- SIEMPRE muestra totales y porcentajes por categoría
+- Usa formato con saltos de línea para legibilidad
+
+Responde en español con JSON válido.` },
         { role: 'user', content: analysisPrompt }
       ],
       temperature: 0.5,
-      max_tokens: 1500
+      max_tokens: 3000
     })
   });
 
