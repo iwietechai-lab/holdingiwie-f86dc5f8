@@ -720,16 +720,24 @@ IMPORTANTE:
 - El score debe reflejar la calidad real del documento (0-100)
 - Las suggestions deben ser accionables y específicas`;
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-pro',
-      messages: [
-        { role: 'system', content: `Eres el CEO Mauricio Ortiz de IWIE Holding, analizando documentos estratégicos y financieros de tu equipo.
+  console.log('Calling AI API for analysis...');
+  
+  let response;
+  try {
+    // Use AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    
+    response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash', // Use flash for faster response
+        messages: [
+          { role: 'system', content: `Eres el CEO Mauricio Ortiz de IWIE Holding, analizando documentos estratégicos y financieros de tu equipo.
 
 TU ESTILO DE ANÁLISIS:
 - Profesional pero cercano
@@ -745,17 +753,40 @@ REGLAS CRÍTICAS:
 3. CREA TABLAS MARKDOWN con los datos numéricos
 4. NO inventes información que no esté en el documento
 5. Sé MUY específico con los números encontrados
-6. El análisis debe ser extenso y de alta calidad ejecutiva
 
-Responde en español con JSON válido. El campo "analysis" debe tener mínimo 800 palabras.` },
-        { role: 'user', content: analysisPrompt }
-      ],
-      temperature: 0.4,
-      max_tokens: 8000
-    })
-  });
+Responde en español con JSON válido.` },
+          { role: 'user', content: analysisPrompt }
+        ],
+        temperature: 0.4,
+        max_tokens: 4000 // Reduced for faster response
+      }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+  } catch (fetchError) {
+    console.error('Fetch error (possible timeout):', fetchError);
+    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'El análisis tardó demasiado tiempo. Por favor, intente con un documento más corto o inténtelo de nuevo.',
+          analysis: '## ⏳ Tiempo Excedido\n\nEl análisis del documento tardó más de lo esperado. Esto puede ocurrir con documentos muy extensos.\n\n**Sugerencias:**\n- Intente nuevamente\n- Si el documento es muy largo, divídalo en secciones\n- Copie las partes más importantes y envíelas por separado',
+          feedback: 'El procesamiento tardó demasiado. Intente con un documento más corto.',
+          score: 0,
+          suggestions: ['Reintentar el análisis', 'Dividir el documento en partes más pequeñas', 'Copiar solo las secciones clave']
+        }),
+        { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    throw fetchError;
+  }
+
+  console.log('AI API response status:', response.status);
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('AI API error response:', errorText);
+    
     if (response.status === 429) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
@@ -768,28 +799,34 @@ Responde en español con JSON válido. El campo "analysis" debe tener mínimo 80
         { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    throw new Error(`AI API error: ${response.status}`);
+    throw new Error(`AI API error: ${response.status} - ${errorText}`);
   }
 
   const aiResponse = await response.json();
+  console.log('AI response received, parsing...');
+  
   let content_response = aiResponse.choices?.[0]?.message?.content || '{}';
   
   // Clean markdown code blocks if present
   content_response = content_response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   
+  console.log('Parsed content length:', content_response.length);
+  
   try {
     const analysisData = JSON.parse(content_response);
+    console.log('Successfully parsed JSON response');
     return new Response(
       JSON.stringify(analysisData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch {
+  } catch (parseError) {
+    console.error('JSON parse error, returning raw content:', parseError);
     return new Response(
       JSON.stringify({
         analysis: content_response,
         feedback: 'Documento recibido para revisión.',
         score: 70,
-        suggestions: []
+        suggestions: ['Revisar formato del documento']
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
