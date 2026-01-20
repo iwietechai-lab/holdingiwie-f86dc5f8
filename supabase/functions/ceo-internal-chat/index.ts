@@ -49,6 +49,17 @@ function parseCSV(text: string): string {
   return result;
 }
 
+// Maximum content length to prevent token overflow
+const MAX_CONTENT_LENGTH = 60000;
+
+function truncateContent(content: string): string {
+  if (content.length <= MAX_CONTENT_LENGTH) return content;
+  
+  console.log(`Content too long (${content.length} chars), truncating...`);
+  const truncated = content.substring(0, MAX_CONTENT_LENGTH);
+  return truncated + `\n\n[... CONTENIDO TRUNCADO - El documento original tiene ${content.length.toLocaleString()} caracteres. Se analizan los primeros ${MAX_CONTENT_LENGTH.toLocaleString()} caracteres ...]`;
+}
+
 // Function to download and parse file content
 async function extractFileContent(fileUrl: string, fileType?: string): Promise<string> {
   try {
@@ -102,7 +113,7 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
       }
       
       if (textContent.length > 50) {
-        return `=== CONTENIDO EXTRAÍDO DEL ARCHIVO EXCEL ===\n\nNota: Este es contenido extraído de un archivo Excel. Los datos pueden necesitar interpretación.\n\n${textContent}\n\n=== FIN DEL CONTENIDO ===`;
+        return truncateContent(`=== CONTENIDO EXTRAÍDO DEL ARCHIVO EXCEL ===\n\nNota: Este es contenido extraído de un archivo Excel. Los datos pueden necesitar interpretación.\n\n${textContent}\n\n=== FIN DEL CONTENIDO ===`);
       } else {
         return `[Archivo Excel detectado: ${fileUrl}. El archivo está en formato binario. Por favor, proporcione los datos principales en texto o CSV para un análisis más preciso. Si el archivo tiene datos importantes, expórtelo a CSV.]`;
       }
@@ -113,7 +124,7 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
       console.log('Parsing CSV file...');
       const text = await response.text();
       const parsed = parseCSV(text);
-      return `=== CONTENIDO DEL ARCHIVO CSV ===\n\n${parsed}\n\n=== DATOS RAW ===\n${text}`;
+      return truncateContent(`=== CONTENIDO DEL ARCHIVO CSV ===\n\n${parsed}\n\n=== DATOS RAW ===\n${text}`);
     }
 
     // Handle text files - FULL SUPPORT
@@ -121,18 +132,108 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
         fileUrl.endsWith('.txt') || 
         fileUrl.endsWith('.md')) {
       const text = await response.text();
-      return `=== CONTENIDO DEL ARCHIVO ===\n\n${text}`;
+      return truncateContent(`=== CONTENIDO DEL ARCHIVO ===\n\n${text}`);
     }
 
     // Handle JSON files - FULL SUPPORT
     if (contentType.includes('json') || fileUrl.endsWith('.json')) {
       const json = await response.json();
-      return `=== CONTENIDO JSON ===\n\n${JSON.stringify(json, null, 2)}`;
+      return truncateContent(`=== CONTENIDO JSON ===\n\n${JSON.stringify(json, null, 2)}`);
     }
 
-    // Handle PDF - limited support
+    // Handle PDF - try to extract text
     if (contentType.includes('pdf') || fileUrl.endsWith('.pdf')) {
-      return `[Archivo PDF detectado. Para análisis de PDFs, por favor copie el contenido relevante en texto o exporte a un formato legible.]`;
+      console.log('PDF file detected - attempting text extraction...');
+      try {
+        const arrayBuffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const rawText = decoder.decode(bytes);
+        
+        // Try to extract readable text from PDF
+        // PDFs contain text streams, try to find them
+        const textMatches: string[] = [];
+        
+        // Look for text between parentheses (common in PDF text streams)
+        const parenMatches = rawText.match(/\(([^)]{2,500})\)/g);
+        if (parenMatches) {
+          for (const match of parenMatches) {
+            const cleaned = match.slice(1, -1)
+              .replace(/\\[nrt]/g, ' ')
+              .replace(/\\/g, '')
+              .trim();
+            if (cleaned.length > 3 && /[a-záéíóúñA-ZÁÉÍÓÚÑ]{2,}/.test(cleaned)) {
+              textMatches.push(cleaned);
+            }
+          }
+        }
+        
+        // Also look for text in BT...ET blocks (text objects)
+        const btMatches = rawText.match(/BT[\s\S]*?ET/g);
+        if (btMatches) {
+          for (const block of btMatches) {
+            const tjMatches = block.match(/\(([^)]+)\)\s*Tj/g);
+            if (tjMatches) {
+              for (const tj of tjMatches) {
+                const text = tj.replace(/\)\s*Tj$/, '').replace(/^\(/, '').trim();
+                if (text.length > 2) textMatches.push(text);
+              }
+            }
+          }
+        }
+        
+        if (textMatches.length > 10) {
+          const extractedText = [...new Set(textMatches)].join(' ');
+          console.log(`Extracted ${textMatches.length} text fragments from PDF`);
+          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL PDF ===\n\nNota: Texto extraído automáticamente. Puede contener errores de formato.\n\n${extractedText}\n\n=== FIN DEL CONTENIDO ===`);
+        }
+      } catch (e) {
+        console.error('Error extracting PDF text:', e);
+      }
+      
+      return `[PDF detectado pero no se pudo extraer texto legible. Por favor, copie el contenido relevante del PDF y péguelo como texto, o exporte a formato .txt]`;
+    }
+
+    // Handle Word documents
+    if (contentType.includes('word') || 
+        contentType.includes('msword') ||
+        contentType.includes('vnd.openxmlformats-officedocument.wordprocessingml') ||
+        fileUrl.endsWith('.docx') || 
+        fileUrl.endsWith('.doc')) {
+      console.log('Word document detected - attempting extraction...');
+      try {
+        const arrayBuffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const rawText = decoder.decode(bytes);
+        
+        // DOCX files are ZIP archives containing XML
+        // Try to extract text content
+        const textMatches: string[] = [];
+        
+        // Look for text between XML tags
+        const xmlTextMatches = rawText.match(/>([^<]{3,500})</g);
+        if (xmlTextMatches) {
+          for (const match of xmlTextMatches) {
+            const cleaned = match.slice(1, -1).trim();
+            if (cleaned.length > 3 && 
+                /[a-záéíóúñA-ZÁÉÍÓÚÑ]{2,}/.test(cleaned) &&
+                !/^[\d\s.,-]+$/.test(cleaned)) {
+              textMatches.push(cleaned);
+            }
+          }
+        }
+        
+        if (textMatches.length > 5) {
+          const extractedText = [...new Set(textMatches)].join(' ');
+          console.log(`Extracted ${textMatches.length} text fragments from Word doc`);
+          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL DOCUMENTO WORD ===\n\nNota: Texto extraído automáticamente. Puede contener errores de formato.\n\n${extractedText}\n\n=== FIN DEL CONTENIDO ===`);
+        }
+      } catch (e) {
+        console.error('Error extracting Word text:', e);
+      }
+      
+      return `[Documento Word detectado pero no se pudo extraer texto legible. Por favor, copie el contenido del documento y péguelo como texto, o guarde como .txt]`;
     }
 
     // For other files, try to read as text
@@ -142,7 +243,7 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
         // Check if it looks like readable text
         const readableChars = text.match(/[a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s.,;:!?$\-]/g)?.length || 0;
         if (readableChars / text.length > 0.7) {
-          return `=== CONTENIDO DEL ARCHIVO ===\n\n${text}`;
+          return truncateContent(`=== CONTENIDO DEL ARCHIVO ===\n\n${text}`);
         }
       }
     } catch (e) {
@@ -360,27 +461,63 @@ async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
   // El frontend ya parsea Excel/CSV correctamente con XLSX library
   let extractedContent = '';
   
-  // PRIORIZAR el contenido parseado del frontend
-  if (content && content.length > 100 && !content.includes('[Error')) {
+  // Check if frontend indicates parsing is required (PDF, Word, PPT)
+  const requiresParsing = content && (
+    content.includes('[PDF_REQUIRES_PARSING:') ||
+    content.includes('[WORD_REQUIRES_PARSING:') ||
+    content.includes('[PPT_REQUIRES_PARSING:')
+  );
+  
+  // PRIORIZAR el contenido parseado del frontend si es válido
+  if (content && content.length > 100 && !content.includes('[Error') && !requiresParsing) {
     console.log('Using pre-parsed content from frontend, length:', content.length);
-    extractedContent = content;
-  } else if (file_url) {
-    // Solo como fallback si no hay contenido parseado
-    console.log('No pre-parsed content, attempting backend extraction...');
-    const fileContent = await extractFileContent(file_url, file_type);
-    extractedContent = fileContent;
-    console.log(`Backend extracted content length: ${extractedContent.length}`);
+    extractedContent = truncateContent(content);
+  } else if (file_url || requiresParsing) {
+    // Fallback: intentar extraer desde el archivo directamente
+    console.log('Attempting backend extraction...', requiresParsing ? '(requires parsing)' : '');
+    if (file_url) {
+      const fileContent = await extractFileContent(file_url, file_type);
+      extractedContent = fileContent;
+      console.log(`Backend extracted content length: ${extractedContent.length}`);
+    }
   }
   
-  // Si no hay contenido útil, dar error claro
-  if (!extractedContent || extractedContent.length < 50 || extractedContent.includes('[Error') || extractedContent.includes('[Archivo Excel')) {
+  // Check for various error conditions
+  const hasError = !extractedContent || 
+    extractedContent.length < 50 || 
+    extractedContent.includes('[Error') ||
+    (extractedContent.includes('[') && extractedContent.includes('detectado') && extractedContent.includes('no se pudo'));
+  
+  // Si no hay contenido útil, dar error claro con instrucciones específicas
+  if (hasError) {
     console.error('No valid content extracted from document');
+    
+    let errorMessage = `## ⚠️ Error al Leer Documento\n\nNo fue posible extraer el contenido del archivo "${title}".`;
+    let errorFeedback = 'No se pudo leer el contenido del archivo.';
+    let errorSuggestions = ['Verifica que el archivo no esté corrupto'];
+    
+    // Customize error based on file type
+    const fileName = (title || '').toLowerCase();
+    if (fileName.endsWith('.pdf')) {
+      errorMessage += `\n\n**El archivo es un PDF.**\n\n**Opciones:**\n1. Abre el PDF y copia el texto relevante\n2. Pega el texto copiado en el chat\n3. O guarda el PDF como archivo de texto (.txt)\n\n*Tip: Si el PDF tiene muchas imágenes o es escaneado, puede que no tenga texto extraíble.*`;
+      errorFeedback = 'PDF detectado pero no se pudo extraer texto. Copia el contenido manualmente.';
+      errorSuggestions = ['Copia el texto del PDF y pégalo en el chat', 'Guarda como archivo .txt', 'Verifica que el PDF no sea una imagen escaneada'];
+    } else if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+      errorMessage += `\n\n**El archivo es un documento Word.**\n\n**Opciones:**\n1. Abre el documento y copia el texto\n2. Guarda como archivo de texto (.txt)\n3. Exporta a PDF y luego copia el texto`;
+      errorFeedback = 'Documento Word detectado pero no se pudo leer. Guarda como .txt o copia el texto.';
+      errorSuggestions = ['Guarda el documento como .txt', 'Copia el texto y pégalo directamente', 'Exporta a CSV si tiene tablas'];
+    } else if (fileName.endsWith('.ppt') || fileName.endsWith('.pptx')) {
+      errorMessage += `\n\n**El archivo es una presentación PowerPoint.**\n\n**Para analizar presentaciones:**\n1. Copia el texto de las diapositivas\n2. O exporta las notas del presentador\n3. O guarda como PDF y luego extrae el texto`;
+      errorFeedback = 'PowerPoint detectado. Copia el contenido de las diapositivas para análisis.';
+      errorSuggestions = ['Copia el texto de las diapositivas', 'Exporta las notas del presentador', 'Guarda como PDF primero'];
+    }
+    
     return new Response(
       JSON.stringify({
-        analysis: `## ⚠️ Error al Leer Documento\n\nNo fue posible extraer el contenido del archivo "${title}".\n\n**Posibles causas:**\n- El archivo está corrupto o protegido\n- Formato no soportado\n- El archivo está vacío\n\n**Solución:**\n1. Intenta exportar el archivo a formato CSV\n2. O copia el contenido a un archivo de texto (.txt)\n3. Vuelve a subir el archivo`,
-        feedback: 'No se pudo leer el contenido del archivo. Por favor, intenta con otro formato.',
+        analysis: errorMessage,
+        feedback: errorFeedback,
         score: 0,
-        suggestions: ['Exporta el archivo a CSV', 'Verifica que el archivo no esté corrupto', 'Prueba con un archivo de texto']
+        suggestions: errorSuggestions
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
