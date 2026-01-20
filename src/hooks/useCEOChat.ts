@@ -544,6 +544,17 @@ export function useCEOChat() {
     }
   }, [user?.id, profile]);
 
+  // Truncate content to avoid token limits (max ~15000 words / ~60000 chars)
+  const MAX_CONTENT_LENGTH = 60000;
+  
+  const truncateContent = (content: string): string => {
+    if (content.length <= MAX_CONTENT_LENGTH) return content;
+    
+    console.log(`📝 Content too long (${content.length} chars), truncating to ${MAX_CONTENT_LENGTH}...`);
+    const truncated = content.substring(0, MAX_CONTENT_LENGTH);
+    return truncated + `\n\n[... CONTENIDO TRUNCADO - El documento tiene ${content.length.toLocaleString()} caracteres, se muestran los primeros ${MAX_CONTENT_LENGTH.toLocaleString()} para el análisis ...]`;
+  };
+
   // Parse file content in the browser
   const parseFileContent = async (file: File): Promise<string> => {
     const fileName = file.name.toLowerCase();
@@ -608,7 +619,7 @@ export function useCEOChat() {
           return `[Archivo Excel "${file.name}" parece estar vacío o corrupto. Tamaño: ${file.size} bytes]`;
         }
         
-        return content;
+        return truncateContent(content);
       } catch (error) {
         console.error('❌ Error parsing Excel:', error);
         return `[Error al parsear Excel "${file.name}": ${error instanceof Error ? error.message : 'Unknown'}. Por favor, intenta exportar a CSV.]`;
@@ -619,7 +630,7 @@ export function useCEOChat() {
     if (fileName.endsWith('.csv')) {
       try {
         const text = await file.text();
-        return `=== CONTENIDO CSV ===\n\n${text}`;
+        return truncateContent(`=== CONTENIDO CSV ===\n\n${text}`);
       } catch (error) {
         return `[Error al leer CSV]`;
       }
@@ -629,14 +640,45 @@ export function useCEOChat() {
     if (fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.json')) {
       try {
         const text = await file.text();
-        return text;
+        return truncateContent(text);
       } catch (error) {
         return `[Error al leer archivo de texto]`;
       }
     }
     
+    // Handle PDF files - extract text using pdf.js approach
+    if (fileName.endsWith('.pdf')) {
+      console.log('📄 Processing PDF file...');
+      try {
+        // For PDFs, we'll indicate to the backend that parsing is needed
+        // The backend edge function will use the Lovable document parser
+        return `[PDF_REQUIRES_PARSING:${file.name}:${file.size}]`;
+      } catch (error) {
+        console.error('❌ Error with PDF:', error);
+        return `[Error al procesar PDF "${file.name}". Intente copiar el texto del documento.]`;
+      }
+    }
+    
+    // Handle Word documents (.docx, .doc)
+    if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      console.log('📄 Processing Word file...');
+      try {
+        // For Word docs, indicate to backend that parsing is needed
+        return `[WORD_REQUIRES_PARSING:${file.name}:${file.size}]`;
+      } catch (error) {
+        console.error('❌ Error with Word:', error);
+        return `[Error al procesar Word "${file.name}". Intente copiar el texto del documento.]`;
+      }
+    }
+    
+    // Handle PowerPoint files
+    if (fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) {
+      console.log('📄 Processing PowerPoint file...');
+      return `[PPT_REQUIRES_PARSING:${file.name}:${file.size}]`;
+    }
+    
     // For other files, return indication
-    return `[Archivo ${file.name} - tipo: ${file.type}]`;
+    return `[Archivo ${file.name} - tipo: ${file.type}. Formato no soportado para análisis de contenido.]`;
   };
 
   // Submit file/content from team for CEO analysis
