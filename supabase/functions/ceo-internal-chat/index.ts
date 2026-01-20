@@ -60,6 +60,51 @@ function truncateContent(content: string): string {
   return truncated + `\n\n[... CONTENIDO TRUNCADO - El documento original tiene ${content.length.toLocaleString()} caracteres. Se analizan los primeros ${MAX_CONTENT_LENGTH.toLocaleString()} caracteres ...]`;
 }
 
+// Helper function to decode PDF string escapes
+function decodePDFString(str: string): string {
+  if (!str) return '';
+  
+  return str
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\(/g, '(')
+    .replace(/\\\)/g, ')')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\([0-7]{1,3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)))
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ') // Remove control characters
+    .trim();
+}
+
+// Check if extracted content appears corrupted (too many non-printable or garbage characters)
+function checkIfContentCorrupted(content: string): boolean {
+  if (!content || content.length < 100) return false;
+  
+  // Sample the first 2000 characters
+  const sample = content.substring(0, 2000);
+  
+  // Count readable characters (letters, numbers, common punctuation, spaces)
+  const readablePattern = /[A-Za-z0-9áéíóúñÁÉÍÓÚÑüÜàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛäëïöüÄËÏÖÜ\s.,;:!?¿¡$%\-@#&*+=\/'"()\[\]{}|<>\n\r\t]/g;
+  const readableChars = (sample.match(readablePattern) || []).length;
+  const readableRatio = readableChars / sample.length;
+  
+  // If less than 60% readable, consider it corrupted
+  if (readableRatio < 0.6) {
+    console.log(`Content corruption check: ${(readableRatio * 100).toFixed(1)}% readable (threshold: 60%)`);
+    return true;
+  }
+  
+  // Also check for common garbage patterns (sequences of escape characters, null bytes, etc.)
+  const garbagePatterns = /[\x00-\x08\x0B\x0C\x0E-\x1F]{5,}|\\[0-9]{2,}|[�]{3,}/g;
+  const garbageMatches = sample.match(garbagePatterns) || [];
+  if (garbageMatches.length > 5) {
+    console.log(`Content has ${garbageMatches.length} garbage patterns`);
+    return true;
+  }
+  
+  return false;
+}
+
 // Function to download and parse file content
 async function extractFileContent(fileUrl: string, fileType?: string): Promise<string> {
   try {
@@ -141,99 +186,178 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
       return truncateContent(`=== CONTENIDO JSON ===\n\n${JSON.stringify(json, null, 2)}`);
     }
 
-    // Handle PDF - try to extract text
+    // Handle PDF - use improved text extraction
     if (contentType.includes('pdf') || fileUrl.endsWith('.pdf')) {
-      console.log('PDF file detected - attempting text extraction...');
+      console.log('PDF file detected - attempting improved text extraction...');
       try {
         const arrayBuffer = await response.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
-        const decoder = new TextDecoder('utf-8', { fatal: false });
-        const rawText = decoder.decode(bytes);
         
-        // Try to extract readable text from PDF
-        // PDFs contain text streams, try to find them
-        const textMatches: string[] = [];
+        // Method 1: Extract text from PDF streams (improved approach)
+        const extractedTexts: string[] = [];
         
-        // Look for text between parentheses (common in PDF text streams)
-        const parenMatches = rawText.match(/\(([^)]{2,500})\)/g);
-        if (parenMatches) {
-          for (const match of parenMatches) {
-            const cleaned = match.slice(1, -1)
-              .replace(/\\[nrt]/g, ' ')
-              .replace(/\\/g, '')
-              .trim();
-            if (cleaned.length > 3 && /[a-záéíóúñA-ZÁÉÍÓÚÑ]{2,}/.test(cleaned)) {
-              textMatches.push(cleaned);
+        // Convert to string for pattern matching
+        const decoder = new TextDecoder('latin1'); // Use latin1 for binary data
+        const rawContent = decoder.decode(bytes);
+        
+        // Find all stream objects
+        const streamMatches = rawContent.matchAll(/stream\s*([\s\S]*?)\s*endstream/g);
+        for (const match of streamMatches) {
+          const streamData = match[1];
+          
+          // Try to decompress if FlateDecode (most common)
+          // For now, look for readable text patterns
+          
+          // Extract text from text showing operators
+          // Tj operator (show text)
+          const tjMatches = streamData.matchAll(/\(([^)]+)\)\s*Tj/g);
+          for (const tj of tjMatches) {
+            const text = decodePDFString(tj[1]);
+            if (text && text.length > 1) extractedTexts.push(text);
+          }
+          
+          // TJ operator (show text array)
+          const tjArrayMatches = streamData.matchAll(/\[(.*?)\]\s*TJ/gi);
+          for (const tja of tjArrayMatches) {
+            const parts = tja[1].matchAll(/\(([^)]*)\)/g);
+            for (const part of parts) {
+              const text = decodePDFString(part[1]);
+              if (text && text.length > 0) extractedTexts.push(text);
             }
           }
         }
         
-        // Also look for text in BT...ET blocks (text objects)
-        const btMatches = rawText.match(/BT[\s\S]*?ET/g);
-        if (btMatches) {
-          for (const block of btMatches) {
-            const tjMatches = block.match(/\(([^)]+)\)\s*Tj/g);
-            if (tjMatches) {
-              for (const tj of tjMatches) {
-                const text = tj.replace(/\)\s*Tj$/, '').replace(/^\(/, '').trim();
-                if (text.length > 2) textMatches.push(text);
-              }
-            }
+        // Also try to find text in object definitions
+        const textObjMatches = rawContent.matchAll(/\/Type\s*\/Page[\s\S]*?\/Contents/g);
+        
+        // Extract any readable text sequences
+        const readableMatches = rawContent.matchAll(/\(([A-Za-z0-9áéíóúñÁÉÍÓÚÑüÜ\s.,;:!?¿¡$%\-@#&*+=\/'"]+)\)/g);
+        for (const m of readableMatches) {
+          const text = decodePDFString(m[1]);
+          if (text && text.length > 3 && /[a-záéíóúñ]{2,}/i.test(text)) {
+            extractedTexts.push(text);
           }
         }
         
-        if (textMatches.length > 10) {
-          const extractedText = [...new Set(textMatches)].join(' ');
-          console.log(`Extracted ${textMatches.length} text fragments from PDF`);
-          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL PDF ===\n\nNota: Texto extraído automáticamente. Puede contener errores de formato.\n\n${extractedText}\n\n=== FIN DEL CONTENIDO ===`);
+        // Clean and deduplicate
+        const cleanedTexts = extractedTexts
+          .map(t => t.trim())
+          .filter(t => t.length > 1)
+          .filter(t => !/^[0-9\s.,]+$/.test(t)) // Remove number-only strings
+          .filter(t => !t.includes('\u0000')); // Remove null characters
+        
+        // Join consecutive texts with space
+        let finalText = '';
+        for (let i = 0; i < cleanedTexts.length; i++) {
+          const current = cleanedTexts[i];
+          const prev = cleanedTexts[i - 1] || '';
+          
+          // Add space between words, newline for sentences
+          if (prev.match(/[.!?]$/)) {
+            finalText += '\n' + current;
+          } else if (finalText && !finalText.endsWith(' ')) {
+            finalText += ' ' + current;
+          } else {
+            finalText += current;
+          }
         }
+        
+        console.log(`PDF extraction: Found ${cleanedTexts.length} text fragments, total ${finalText.length} chars`);
+        
+        if (finalText.length > 100) {
+          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL PDF ===\n\nNota: Texto extraído automáticamente del PDF.\n\n${finalText}\n\n=== FIN DEL CONTENIDO ===`);
+        }
+        
+        // Fallback: Look for any readable content
+        console.log('Primary extraction failed, trying fallback method...');
+        const fallbackText = rawContent
+          .replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\n]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Extract meaningful words
+        const words = fallbackText.match(/[A-Za-záéíóúñÁÉÍÓÚÑüÜ]{3,}/g) || [];
+        const meaningfulWords = words.filter(w => 
+          !['obj', 'endobj', 'stream', 'endstream', 'xref', 'trailer', 'startxref'].includes(w.toLowerCase())
+        );
+        
+        if (meaningfulWords.length > 50) {
+          const wordText = meaningfulWords.join(' ');
+          console.log(`Fallback extraction: ${meaningfulWords.length} words`);
+          return truncateContent(`=== CONTENIDO DEL PDF (extracción básica) ===\n\nNota: Extracción simplificada del PDF. Puede faltar formato.\n\n${wordText}\n\n=== FIN DEL CONTENIDO ===`);
+        }
+        
       } catch (e) {
         console.error('Error extracting PDF text:', e);
       }
       
-      return `[PDF detectado pero no se pudo extraer texto legible. Por favor, copie el contenido relevante del PDF y péguelo como texto, o exporte a formato .txt]`;
+      return `[PDF detectado pero no se pudo extraer texto legible. Este PDF puede estar protegido, ser una imagen escaneada, o tener formato no estándar. Por favor, copie el contenido relevante del PDF y péguelo como texto en el chat, o guarde el documento como archivo .txt]`;
     }
 
-    // Handle Word documents
+    // Handle Word documents (.docx is a ZIP containing XML)
     if (contentType.includes('word') || 
         contentType.includes('msword') ||
         contentType.includes('vnd.openxmlformats-officedocument.wordprocessingml') ||
         fileUrl.endsWith('.docx') || 
         fileUrl.endsWith('.doc')) {
-      console.log('Word document detected - attempting extraction...');
+      console.log('Word document detected - attempting improved extraction...');
       try {
         const arrayBuffer = await response.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
-        const decoder = new TextDecoder('utf-8', { fatal: false });
-        const rawText = decoder.decode(bytes);
         
-        // DOCX files are ZIP archives containing XML
-        // Try to extract text content
+        // Use latin1 for better binary compatibility
+        const decoder = new TextDecoder('latin1');
+        const rawContent = decoder.decode(bytes);
+        
         const textMatches: string[] = [];
         
-        // Look for text between XML tags
-        const xmlTextMatches = rawText.match(/>([^<]{3,500})</g);
-        if (xmlTextMatches) {
+        // DOCX: Look for text in w:t tags (Word text elements)
+        const wtMatches = rawContent.matchAll(/<w:t[^>]*>([^<]+)<\/w:t>/g);
+        for (const match of wtMatches) {
+          const text = match[1].trim();
+          if (text.length > 0) {
+            textMatches.push(text);
+          }
+        }
+        
+        // Also try generic XML text extraction
+        if (textMatches.length === 0) {
+          const xmlTextMatches = rawContent.matchAll(/>([A-Za-z0-9áéíóúñÁÉÍÓÚÑüÜ\s.,;:!?¿¡$%\-@#&*+=\/'"]{3,})</g);
           for (const match of xmlTextMatches) {
-            const cleaned = match.slice(1, -1).trim();
-            if (cleaned.length > 3 && 
-                /[a-záéíóúñA-ZÁÉÍÓÚÑ]{2,}/.test(cleaned) &&
-                !/^[\d\s.,-]+$/.test(cleaned)) {
-              textMatches.push(cleaned);
+            const text = match[1].trim();
+            // Filter out XML metadata
+            if (text.length > 2 && 
+                !/^(xml|xmlns|http|www|urn:|schema|content|type|version|encoding)/i.test(text) &&
+                /[a-záéíóúñ]/i.test(text)) {
+              textMatches.push(text);
             }
           }
         }
         
-        if (textMatches.length > 5) {
-          const extractedText = [...new Set(textMatches)].join(' ');
-          console.log(`Extracted ${textMatches.length} text fragments from Word doc`);
-          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL DOCUMENTO WORD ===\n\nNota: Texto extraído automáticamente. Puede contener errores de formato.\n\n${extractedText}\n\n=== FIN DEL CONTENIDO ===`);
+        // Join texts intelligently
+        let finalText = '';
+        for (const text of textMatches) {
+          if (finalText && !finalText.endsWith(' ') && !finalText.endsWith('\n')) {
+            // Add space or newline based on context
+            if (/[.!?]$/.test(finalText)) {
+              finalText += '\n';
+            } else {
+              finalText += ' ';
+            }
+          }
+          finalText += text;
+        }
+        
+        console.log(`Word extraction: ${textMatches.length} fragments, ${finalText.length} chars`);
+        
+        if (finalText.length > 50) {
+          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL DOCUMENTO WORD ===\n\nNota: Texto extraído automáticamente del documento Word.\n\n${finalText}\n\n=== FIN DEL CONTENIDO ===`);
         }
       } catch (e) {
         console.error('Error extracting Word text:', e);
       }
       
-      return `[Documento Word detectado pero no se pudo extraer texto legible. Por favor, copie el contenido del documento y péguelo como texto, o guarde como .txt]`;
+      return `[Documento Word detectado pero no se pudo extraer texto. El archivo puede estar protegido o en formato antiguo (.doc). Por favor, abra el documento, copie el contenido y péguelo como texto en el chat, o guarde como archivo .txt]`;
     }
 
     // For other files, try to read as text
@@ -480,6 +604,14 @@ async function handleAnalyzeSubmission(body: ChatRequest, apiKey: string) {
       extractedContent = fileContent;
       console.log(`Backend extracted content length: ${extractedContent.length}`);
     }
+  }
+  
+  // Check for corrupted content (too many non-printable characters)
+  const isCorrupted = extractedContent && checkIfContentCorrupted(extractedContent);
+  
+  if (isCorrupted) {
+    console.log('Content appears corrupted (too many non-printable characters), treating as error');
+    extractedContent = '';
   }
   
   // Check for various error conditions
