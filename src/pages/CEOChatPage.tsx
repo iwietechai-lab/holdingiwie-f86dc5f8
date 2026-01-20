@@ -595,17 +595,17 @@ export default function CEOChatPage() {
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png"
                   />
                   
-                  {/* Attach file button */}
+                  {/* Attach file button - visible for all users */}
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="shrink-0 self-end"
+                    className="shrink-0 self-end h-11 w-11 border-primary/30 hover:bg-primary/10 hover:border-primary"
                     onClick={() => chatFileInputRef.current?.click()}
                     disabled={isSending || isUploadingChatFile}
-                    title="Adjuntar documento para análisis rápido"
+                    title="Adjuntar documento para análisis por AI CEO"
                   >
-                    <FileUp className="w-4 h-4" />
+                    <FileUp className="w-5 h-5 text-primary" />
                   </Button>
                   
                   <Textarea
