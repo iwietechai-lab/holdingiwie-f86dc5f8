@@ -22,7 +22,7 @@ import {
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNav } from '@/components/MobileNav';
 import { KPICard } from '@/components/KPICard';
-import { CEOChatbot } from '@/components/CEOChatbot';
+import { CEOChatbotWidget } from '@/components/CEOChatbotWidget';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -494,7 +494,7 @@ export const Dashboard = () => {
         </div>
       </main>
 
-      <CEOChatbot />
+      <CEOChatbotWidget />
       
       <InDevelopmentModal 
         open={showDevelopmentModal} 
