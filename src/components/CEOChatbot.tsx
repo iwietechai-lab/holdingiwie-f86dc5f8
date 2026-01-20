@@ -1,52 +1,41 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Sparkles, Rocket } from 'lucide-react';
+import { MessageCircle, X, Send, Sparkles, Rocket, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-
-interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-}
+import { useCEOChatbot } from '@/hooks/useCEOChatbot';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 interface CEOChatbotProps {
   fullScreen?: boolean;
 }
 
-const CEO_RESPONSES = [
-  "¡Excelente pregunta! En IWIE siempre buscamos innovar. Déjame explicarte nuestra visión sobre esto...",
-  "Como CEO de IWIE, mi enfoque siempre ha sido la tecnología disruptiva. Los drones, la IA y la energía renovable son pilares fundamentales de nuestro holding.",
-  "La clave del éxito está en la ejecución. No basta con tener ideas brillantes, hay que materializarlas con precisión aeroespacial.",
-  "En IWIE creemos que el futuro es ahora. Cada una de nuestras empresas está diseñada para liderar en su sector.",
-  "La inteligencia artificial es el motor que impulsa todas nuestras operaciones. Desde IWIE Drones hasta AIPasajes, la IA está en nuestro ADN.",
-  "Mi filosofía es simple: innovar o quedarse atrás. Por eso invertimos constantemente en I+D.",
-  "El mercado agrícola tiene un potencial enorme. Con IWIE Agro y Beeflee estamos revolucionando la agricultura inteligente.",
-  "La movilidad del futuro es eléctrica y autónoma. IWIE Motors está en la vanguardia de esta transformación.",
-  "Cada decisión que tomamos está basada en datos. Los KPIs que ves en el dashboard son nuestra brújula.",
-];
-
 // Separate ChatContent component to prevent re-renders
 const ChatContentInner = ({
   messages,
   isTyping,
+  isLoading,
   inputValue,
   onInputChange,
   onSend,
   onKeyDown,
+  onClear,
   scrollRef,
   textareaRef,
+  error,
 }: {
-  messages: Message[];
+  messages: Array<{ id: string; content: string; role: 'user' | 'assistant'; created_at: string }>;
   isTyping: boolean;
+  isLoading: boolean;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
+  onClear: () => void;
   scrollRef: React.RefObject<HTMLDivElement>;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  error: string | null;
 }) => (
   <>
     <div className="p-4 bg-primary/10 border-b border-border flex items-center gap-3">
@@ -54,10 +43,19 @@ const ChatContentInner = ({
         <Rocket className="w-5 h-5 text-primary" />
       </div>
       <div>
-        <h3 className="font-semibold text-foreground">CEO Mauricio</h3>
-        <p className="text-xs text-muted-foreground">Asistente Ejecutivo IA</p>
+        <h3 className="font-semibold text-foreground">CEO AI Assistant</h3>
+        <p className="text-xs text-muted-foreground">Asistente Ejecutivo con IA</p>
       </div>
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClear}
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          title="Limpiar conversación"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
         <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
         <span className="text-xs text-muted-foreground">Online</span>
       </div>
@@ -65,34 +63,63 @@ const ChatContentInner = ({
 
     <ScrollArea className="flex-1 p-4" ref={scrollRef}>
       <div className="space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn("flex", message.role === 'user' ? "justify-end" : "justify-start")}
-          >
-            <div
-              className={cn(
-                "max-w-[80%] p-3 rounded-lg",
-                message.role === 'user'
-                  ? "bg-primary text-primary-foreground rounded-br-none"
-                  : "bg-muted text-foreground rounded-bl-none"
-              )}
-            >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              <p className="text-xs opacity-60 mt-1">
-                {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] p-3 rounded-lg bg-muted text-foreground rounded-bl-none">
+              <p className="text-sm whitespace-pre-wrap">
+                ¡Hola! Soy el Asistente CEO de IWIE Holding con inteligencia artificial. 
+                Puedo ayudarte con información sobre las empresas, solicitar reuniones, 
+                crear tickets de soporte, y responder preguntas sobre estrategias y operaciones. 
+                ¿En qué puedo ayudarte hoy? 🚀
               </p>
             </div>
           </div>
-        ))}
+        ) : (
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn("flex", message.role === 'user' ? "justify-end" : "justify-start")}
+            >
+              <div
+                className={cn(
+                  "max-w-[80%] p-3 rounded-lg",
+                  message.role === 'user'
+                    ? "bg-primary text-primary-foreground rounded-br-none"
+                    : "bg-muted text-foreground rounded-bl-none"
+                )}
+              >
+                {message.role === 'assistant' ? (
+                  <MarkdownRenderer content={message.content} className="text-sm" />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                )}
+                <p className="text-xs opacity-60 mt-1">
+                  {new Date(message.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
         
         {isTyping && (
           <div className="flex justify-start">
             <div className="bg-muted p-3 rounded-lg rounded-bl-none">
               <div className="flex items-center gap-1">
                 <Sparkles className="w-4 h-4 text-primary animate-spin" />
-                <span className="text-sm text-muted-foreground">Escribiendo...</span>
+                <span className="text-sm text-muted-foreground">Analizando...</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex justify-center">
+            <div className="bg-destructive/20 text-destructive p-3 rounded-lg text-sm">
+              {error}
             </div>
           </div>
         )}
@@ -109,6 +136,7 @@ const ChatContentInner = ({
           placeholder="Escribe tu mensaje..."
           className="flex-1 bg-input border-border focus:border-primary resize-none min-h-[44px] max-h-[120px] py-3"
           rows={1}
+          disabled={isTyping}
         />
         <Button 
           onClick={onSend} 
@@ -127,18 +155,11 @@ const ChatContentInner = ({
 
 export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
   const [isOpen, setIsOpen] = useState(fullScreen);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: '¡Hola! Soy Mauricio, CEO de IWIE Holding. ¿En qué puedo ayudarte hoy? Pregúntame sobre nuestras empresas, estrategias de innovación, o cualquier tema relacionado con drones, IA, energía o aeroespacial. 🚀',
-      role: 'assistant',
-      timestamp: new Date(),
-    },
-  ]);
   const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { messages, isLoading, isSending, error, sendMessage, clearConversation } = useCEOChatbot();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -156,32 +177,12 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
   }, [inputValue]);
 
   const handleSend = useCallback(async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      content: inputValue,
-      role: 'user',
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    if (!inputValue.trim() || isSending) return;
+    
+    const message = inputValue;
     setInputValue('');
-    setIsTyping(true);
-
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-
-    const responseIndex = Math.floor(Math.random() * CEO_RESPONSES.length);
-    const assistantMessage: Message = {
-      id: crypto.randomUUID(),
-      content: CEO_RESPONSES[responseIndex],
-      role: 'assistant',
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsTyping(false);
-  }, [inputValue]);
+    await sendMessage(message);
+  }, [inputValue, isSending, sendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -194,18 +195,25 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
     setInputValue(value);
   }, []);
 
+  const handleClear = useCallback(async () => {
+    await clearConversation();
+  }, [clearConversation]);
+
   if (fullScreen) {
     return (
       <div className="w-full h-full bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
         <ChatContentInner
           messages={messages}
-          isTyping={isTyping}
+          isTyping={isSending}
+          isLoading={isLoading}
           inputValue={inputValue}
           onInputChange={handleInputChange}
           onSend={handleSend}
           onKeyDown={handleKeyDown}
+          onClear={handleClear}
           scrollRef={scrollRef}
           textareaRef={textareaRef}
+          error={error}
         />
       </div>
     );
@@ -227,13 +235,16 @@ export const CEOChatbot = ({ fullScreen = false }: CEOChatbotProps) => {
         <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 animate-scale-in">
           <ChatContentInner
             messages={messages}
-            isTyping={isTyping}
+            isTyping={isSending}
+            isLoading={isLoading}
             inputValue={inputValue}
             onInputChange={handleInputChange}
             onSend={handleSend}
             onKeyDown={handleKeyDown}
+            onClear={handleClear}
             scrollRef={scrollRef}
             textareaRef={textareaRef}
+            error={error}
           />
         </div>
       )}
