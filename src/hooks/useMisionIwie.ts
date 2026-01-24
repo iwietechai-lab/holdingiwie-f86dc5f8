@@ -678,9 +678,9 @@ export function useMisionIwie() {
       isOverloaded: pendingTasks.length > 15,
       isHoursOverloaded: totalHours > 8,
       columnStatus: {
-        urgent: urgentCount > 5 ? 'danger' : urgentCount > 3 ? 'warning' : 'ok',
-        very_important: veryImportantCount > 5 ? 'danger' : veryImportantCount > 3 ? 'warning' : 'ok',
-        important: importantCount > 5 ? 'danger' : importantCount > 3 ? 'warning' : 'ok',
+        urgent: (urgentCount > 5 ? 'danger' : urgentCount > 3 ? 'warning' : 'ok') as 'danger' | 'warning' | 'ok',
+        very_important: (veryImportantCount > 5 ? 'danger' : veryImportantCount > 3 ? 'warning' : 'ok') as 'danger' | 'warning' | 'ok',
+        important: (importantCount > 5 ? 'danger' : importantCount > 3 ? 'warning' : 'ok') as 'danger' | 'warning' | 'ok',
       }
     };
   }, [tasks]);
