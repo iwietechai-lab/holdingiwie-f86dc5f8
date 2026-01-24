@@ -20,6 +20,7 @@ import {
   Network,
   DollarSign,
   TrendingUp,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -96,6 +97,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
 
   const globalMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
+    { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     { icon: Settings, label: 'Configuración', action: 'dev' },
