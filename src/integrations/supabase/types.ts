@@ -1665,6 +1665,537 @@ export type Database = {
           },
         ]
       }
+      mision_iwie_ai_suggestions: {
+        Row: {
+          content: string
+          context: Json | null
+          created_at: string
+          id: string
+          suggestion_type: string
+          user_id: string
+          was_accepted: boolean | null
+        }
+        Insert: {
+          content: string
+          context?: Json | null
+          created_at?: string
+          id?: string
+          suggestion_type: string
+          user_id: string
+          was_accepted?: boolean | null
+        }
+        Update: {
+          content?: string
+          context?: Json | null
+          created_at?: string
+          id?: string
+          suggestion_type?: string
+          user_id?: string
+          was_accepted?: boolean | null
+        }
+        Relationships: []
+      }
+      mision_iwie_areas: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mision_iwie_badges: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          description: string
+          description_es: string
+          icon: string
+          id: string
+          name: string
+          name_es: string
+          points_reward: number | null
+          requirements: Json | null
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string
+          description: string
+          description_es: string
+          icon: string
+          id?: string
+          name: string
+          name_es: string
+          points_reward?: number | null
+          requirements?: Json | null
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          description?: string
+          description_es?: string
+          icon?: string
+          id?: string
+          name?: string
+          name_es?: string
+          points_reward?: number | null
+          requirements?: Json | null
+        }
+        Relationships: []
+      }
+      mision_iwie_daily_stats: {
+        Row: {
+          avg_energy_level: number | null
+          created_at: string
+          date: string
+          decisions_made: number | null
+          focus_completed: boolean | null
+          id: string
+          important_count: number | null
+          points_earned: number | null
+          tasks_completed: number | null
+          tasks_created: number | null
+          total_actual_hours: number | null
+          total_estimated_hours: number | null
+          urgent_count: number | null
+          user_id: string
+          very_important_count: number | null
+        }
+        Insert: {
+          avg_energy_level?: number | null
+          created_at?: string
+          date: string
+          decisions_made?: number | null
+          focus_completed?: boolean | null
+          id?: string
+          important_count?: number | null
+          points_earned?: number | null
+          tasks_completed?: number | null
+          tasks_created?: number | null
+          total_actual_hours?: number | null
+          total_estimated_hours?: number | null
+          urgent_count?: number | null
+          user_id: string
+          very_important_count?: number | null
+        }
+        Update: {
+          avg_energy_level?: number | null
+          created_at?: string
+          date?: string
+          decisions_made?: number | null
+          focus_completed?: boolean | null
+          id?: string
+          important_count?: number | null
+          points_earned?: number | null
+          tasks_completed?: number | null
+          tasks_created?: number | null
+          total_actual_hours?: number | null
+          total_estimated_hours?: number | null
+          urgent_count?: number | null
+          user_id?: string
+          very_important_count?: number | null
+        }
+        Relationships: []
+      }
+      mision_iwie_decision_tasks: {
+        Row: {
+          created_at: string
+          decision_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          decision_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          decision_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mision_iwie_decision_tasks_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "mision_iwie_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mision_iwie_decision_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "mision_iwie_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mision_iwie_decisions: {
+        Row: {
+          associated_risks: string | null
+          category: string
+          completed_at: string | null
+          created_at: string
+          date_for: string
+          description: string | null
+          energy_level: number | null
+          expected_impact: string | null
+          focus_description: string | null
+          focus_solution: string | null
+          id: string
+          is_focus_mission: boolean | null
+          points_earned: number | null
+          real_result_detail: string | null
+          real_result_quantitative: number | null
+          real_result_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          associated_risks?: string | null
+          category: string
+          completed_at?: string | null
+          created_at?: string
+          date_for?: string
+          description?: string | null
+          energy_level?: number | null
+          expected_impact?: string | null
+          focus_description?: string | null
+          focus_solution?: string | null
+          id?: string
+          is_focus_mission?: boolean | null
+          points_earned?: number | null
+          real_result_detail?: string | null
+          real_result_quantitative?: number | null
+          real_result_type?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          associated_risks?: string | null
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          date_for?: string
+          description?: string | null
+          energy_level?: number | null
+          expected_impact?: string | null
+          focus_description?: string | null
+          focus_solution?: string | null
+          id?: string
+          is_focus_mission?: boolean | null
+          points_earned?: number | null
+          real_result_detail?: string | null
+          real_result_quantitative?: number | null
+          real_result_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mision_iwie_levels: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string
+          id: string
+          level_number: number
+          max_points: number | null
+          min_points: number
+          name: string
+          name_es: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          icon: string
+          id?: string
+          level_number: number
+          max_points?: number | null
+          min_points: number
+          name: string
+          name_es: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          level_number?: number
+          max_points?: number | null
+          min_points?: number
+          name?: string
+          name_es?: string
+        }
+        Relationships: []
+      }
+      mision_iwie_task_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          movement_from: string | null
+          movement_to: string | null
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          movement_from?: string | null
+          movement_to?: string | null
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          movement_from?: string | null
+          movement_to?: string | null
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mision_iwie_task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "mision_iwie_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mision_iwie_tasks: {
+        Row: {
+          area_id: string | null
+          completed_at: string | null
+          created_at: string
+          date_for: string
+          description: string | null
+          energy_level: number | null
+          estimated_hours: number | null
+          focus_description: string | null
+          focus_solution: string | null
+          id: string
+          is_focus_mission: boolean | null
+          original_date: string | null
+          planned_time: string | null
+          points_earned: number | null
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date_for?: string
+          description?: string | null
+          energy_level?: number | null
+          estimated_hours?: number | null
+          focus_description?: string | null
+          focus_solution?: string | null
+          id?: string
+          is_focus_mission?: boolean | null
+          original_date?: string | null
+          planned_time?: string | null
+          points_earned?: number | null
+          priority: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date_for?: string
+          description?: string | null
+          energy_level?: number | null
+          estimated_hours?: number | null
+          focus_description?: string | null
+          focus_solution?: string | null
+          id?: string
+          is_focus_mission?: boolean | null
+          original_date?: string | null
+          planned_time?: string | null
+          points_earned?: number | null
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mision_iwie_tasks_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "mision_iwie_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mision_iwie_user_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string
+          id: string
+          shared_in_hall_of_fame: boolean | null
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          id?: string
+          shared_in_hall_of_fame?: boolean | null
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          id?: string
+          shared_in_hall_of_fame?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mision_iwie_user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "mision_iwie_badges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mision_iwie_user_stats: {
+        Row: {
+          created_at: string
+          current_level: number | null
+          current_streak: number | null
+          decisions_made: number | null
+          focus_missions_completed: number | null
+          id: string
+          last_activity_date: string | null
+          longest_streak: number | null
+          monthly_points: number | null
+          tasks_completed: number | null
+          total_points: number | null
+          updated_at: string
+          user_id: string
+          weekly_points: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_level?: number | null
+          current_streak?: number | null
+          decisions_made?: number | null
+          focus_missions_completed?: number | null
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          monthly_points?: number | null
+          tasks_completed?: number | null
+          total_points?: number | null
+          updated_at?: string
+          user_id: string
+          weekly_points?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_level?: number | null
+          current_streak?: number | null
+          decisions_made?: number | null
+          focus_missions_completed?: number | null
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          monthly_points?: number | null
+          tasks_completed?: number | null
+          total_points?: number | null
+          updated_at?: string
+          user_id?: string
+          weekly_points?: number | null
+        }
+        Relationships: []
+      }
+      mision_iwie_weekly_missions: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          current_value: number | null
+          id: string
+          mission_type: string
+          points_reward: number
+          target_value: number
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number | null
+          id?: string
+          mission_type: string
+          points_reward: number
+          target_value: number
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number | null
+          id?: string
+          mission_type?: string
+          points_reward?: number
+          target_value?: number
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
