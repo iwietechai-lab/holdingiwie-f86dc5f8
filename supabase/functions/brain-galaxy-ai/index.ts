@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +77,33 @@ const BRAIN_CONFIGS: Record<string, BrainConfig> = {
     }),
   },
 };
+
+// Function to query collective memory
+async function queryCollectiveMemory(query: string, supabase: any): Promise<string> {
+  try {
+    // Simple text search on processed memory
+    const { data: memories } = await supabase
+      .from("holding_collective_memory")
+      .select("title, processed_summary, key_concepts, area_category, source_type")
+      .eq("is_processed", true)
+      .order("importance_score", { ascending: false })
+      .limit(5);
+
+    if (!memories || memories.length === 0) {
+      return "";
+    }
+
+    // Format memory context
+    const memoryContext = memories.map((m: any) => 
+      `[${m.source_type.toUpperCase()}${m.area_category ? ` - ${m.area_category}` : ''}] ${m.title}: ${m.processed_summary || ''} (Conceptos: ${(m.key_concepts || []).join(', ')})`
+    ).join('\n\n');
+
+    return `\n\n--- MEMORIA COLECTIVA DEL HOLDING ---\nEl siguiente conocimiento ha sido recopilado de documentos, chats y decisiones del holding:\n\n${memoryContext}\n\n--- FIN MEMORIA COLECTIVA ---\n`;
+  } catch (error) {
+    console.error("Error querying collective memory:", error);
+    return "";
+  }
+}
 
 const SYSTEM_PROMPTS: Record<string, string> = {
   default: `Eres Brain Galaxy, el asistente de aprendizaje del IWIE Holding. Tu misión es ayudar a los usuarios a aprender, crear cursos, resolver dudas y desarrollar conocimiento en diversas áreas.
@@ -168,6 +196,10 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const { 
       messages, 
       brainModel = 'brain-4',
@@ -180,6 +212,14 @@ serve(async (req) => {
       throw new Error(`Invalid brain model: ${brainModel}`);
     }
 
+    // Get last user message to query collective memory
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
+    let collectiveMemoryContext = "";
+    
+    if (lastUserMessage && action === 'chat') {
+      collectiveMemoryContext = await queryCollectiveMemory(lastUserMessage.content, supabase);
+    }
+
     const apiKey = Deno.env.get(config.keyEnv);
     if (!apiKey) {
       // Fallback to Brain 4 (Lovable AI) if specific key not available
@@ -190,7 +230,7 @@ serve(async (req) => {
       }
       
       const fallbackConfig = BRAIN_CONFIGS['brain-4'];
-      const systemPrompt = getSystemPrompt(action, context);
+      const systemPrompt = getSystemPrompt(action, context) + collectiveMemoryContext;
       
       const response = await fetch(fallbackConfig.endpoint, {
         method: 'POST',
@@ -222,7 +262,7 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = getSystemPrompt(action, context, brainModel);
+    const systemPrompt = getSystemPrompt(action, context, brainModel) + collectiveMemoryContext;
 
     const response = await fetch(config.endpoint, {
       method: 'POST',

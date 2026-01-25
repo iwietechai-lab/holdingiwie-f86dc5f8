@@ -2205,6 +2205,72 @@ export type Database = {
           },
         ]
       }
+      holding_collective_memory: {
+        Row: {
+          access_count: number | null
+          area_category: string | null
+          company_id: string | null
+          created_at: string
+          embeddings_text: string | null
+          id: string
+          importance_score: number | null
+          is_processed: boolean | null
+          key_concepts: Json | null
+          original_content: string | null
+          processed_at: string | null
+          processed_summary: string | null
+          source_id: string | null
+          source_table: string | null
+          source_type: string
+          tags: string[] | null
+          title: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          access_count?: number | null
+          area_category?: string | null
+          company_id?: string | null
+          created_at?: string
+          embeddings_text?: string | null
+          id?: string
+          importance_score?: number | null
+          is_processed?: boolean | null
+          key_concepts?: Json | null
+          original_content?: string | null
+          processed_at?: string | null
+          processed_summary?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          source_type: string
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          access_count?: number | null
+          area_category?: string | null
+          company_id?: string | null
+          created_at?: string
+          embeddings_text?: string | null
+          id?: string
+          importance_score?: number | null
+          is_processed?: boolean | null
+          key_concepts?: Json | null
+          original_content?: string | null
+          processed_at?: string | null
+          processed_summary?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          source_type?: string
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       meeting_requests: {
         Row: {
           created_at: string | null
@@ -3675,6 +3741,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_to_collective_memory: {
+        Args: {
+          p_area_category?: string
+          p_company_id: string
+          p_content: string
+          p_source_id: string
+          p_source_table: string
+          p_source_type: string
+          p_tags?: string[]
+          p_title: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       can_manage_users: { Args: { _user_id: string }; Returns: boolean }
       create_notification: {
         Args: {
