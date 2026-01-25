@@ -7,35 +7,7 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
-
-// Robust function to stop all camera streams - used as safety net
-const stopAllCameraStreams = () => {
-  try {
-    console.log('📹 FacialVerificationGuard: stopAllCameraStreams() called');
-    const allVideos = document.querySelectorAll('video');
-    console.log('📹 Found', allVideos.length, 'video elements');
-    
-    allVideos.forEach((video, index) => {
-      const stream = video.srcObject as MediaStream | null;
-      if (stream?.getTracks) {
-        const tracks = stream.getTracks();
-        console.log('📹 Video', index, 'has', tracks.length, 'tracks');
-        tracks.forEach((track) => {
-          console.log('📹 Stopping track:', track.kind, 'state:', track.readyState);
-          track.stop();
-        });
-      }
-      video.srcObject = null;
-      video.pause();
-      video.load(); // Force release camera
-    });
-    
-    console.log('📹 FacialVerificationGuard: All streams stopped');
-  } catch (e) {
-    console.warn('Error stopping camera streams:', e);
-  }
-};
-
+import cameraService from '@/utils/cameraService';
 interface FacialVerificationGuardProps {
   children: React.ReactNode;
 }
@@ -56,13 +28,13 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   const initRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clear timeout on unmount
+  // Clear timeout on unmount and cleanup camera
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      stopAllCameraStreams();
+      cameraService.scheduleCleanup();
     };
   }, []);
 
@@ -107,59 +79,41 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   // Cleanup camera when hiding face recognition
   useEffect(() => {
     if (!showFaceRecognition) {
-      stopAllCameraStreams();
+      console.log('📹 FacialVerificationGuard: showFaceRecognition changed to false - scheduling cleanup');
+      cameraService.scheduleCleanup();
     }
   }, [showFaceRecognition]);
 
   const handleFaceSuccess = useCallback(async () => {
     console.log('🎉 FacialVerificationGuard: ===== FACE SUCCESS =====');
     
-    // Stop cameras IMMEDIATELY and AGGRESSIVELY - multiple attempts
-    console.log('📹 FacialVerificationGuard: Stopping cameras BEFORE anything else');
-    stopAllCameraStreams();
+    // Use centralized camera service for cleanup
+    console.log('📹 FacialVerificationGuard: Scheduling camera cleanup');
+    cameraService.scheduleCleanup();
     
     // Hide component IMMEDIATELY (this unmounts RealFaceRecognition)
     console.log('📹 FacialVerificationGuard: Setting showFaceRecognition to false');
     setShowFaceRecognition(false);
     
-    // AGGRESSIVE cleanup with multiple delays as safety net
-    const cleanupIntervals = [0, 50, 100, 200, 300, 500, 1000];
-    cleanupIntervals.forEach(delay => {
-      setTimeout(() => {
-        console.log(`📹 FacialVerificationGuard: Running cleanup (${delay}ms)`);
-        stopAllCameraStreams();
-      }, delay);
-    });
-    
     // Update verification record (async, don't block)
     console.log('📹 FacialVerificationGuard: Recording verification');
     await recordVerification();
-    
-    // Final cleanup after verification is recorded
-    setTimeout(() => {
-      console.log('📹 FacialVerificationGuard: FINAL cleanup (1500ms)');
-      stopAllCameraStreams();
-    }, 1500);
     
     console.log('✅ FacialVerificationGuard: ===== SUCCESS HANDLING COMPLETE =====');
   }, [recordVerification]);
 
   const handleCancel = async () => {
     console.log('📹 FacialVerificationGuard: ===== CANCEL =====');
-    console.log('📹 FacialVerificationGuard: Stopping cameras before logout');
     
-    // Multiple cleanup attempts
-    stopAllCameraStreams();
-    setTimeout(() => stopAllCameraStreams(), 100);
-    setTimeout(() => stopAllCameraStreams(), 300);
+    // Use centralized camera service for cleanup
+    cameraService.scheduleCleanup();
     
-    // Delay before logout to ensure cleanup
+    // Small delay before logout to ensure cleanup starts
     setTimeout(async () => {
-      console.log('📹 FacialVerificationGuard: Running logout after delay');
-      stopAllCameraStreams(); // Final cleanup before logout
+      console.log('📹 FacialVerificationGuard: Running logout after cleanup scheduled');
       await logout();
       navigate('/login');
-    }, 150);
+    }, 100);
   };
 
   // Handle error state
