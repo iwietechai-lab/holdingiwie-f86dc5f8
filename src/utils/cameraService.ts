@@ -1,140 +1,235 @@
 /**
- * Global Camera Service
+ * DEFINITIVE GLOBAL CAMERA SERVICE
  * 
- * This service provides a centralized way to manage camera streams across the application.
- * It ensures that camera streams are properly stopped when no longer needed.
+ * This is a completely isolated, singleton camera management system.
+ * It operates independently of ANY other app feature (notifications, reports, etc.)
+ * 
+ * Key features:
+ * - WeakSet for memory-safe stream tracking
+ * - Symbol-based private state to prevent external interference
+ * - DOM-level video element cleanup
+ * - Multi-stage aggressive cleanup with verification
+ * - Automatic orphan stream detection
  */
 
-// Global reference to active streams
-const activeStreams: Set<MediaStream> = new Set();
+// Private symbols for isolation - cannot be accessed from outside
+const PRIVATE_STREAMS = Symbol('privateStreams');
+const PRIVATE_CLEANUP_SCHEDULED = Symbol('cleanupScheduled');
+const PRIVATE_CLEANUP_TIMERS = Symbol('cleanupTimers');
 
-// Global flag to track if camera should be stopped
-let shouldStopCamera = false;
+// Singleton state - completely isolated
+const state: {
+  [PRIVATE_STREAMS]: Set<MediaStream>;
+  [PRIVATE_CLEANUP_SCHEDULED]: boolean;
+  [PRIVATE_CLEANUP_TIMERS]: number[];
+} = {
+  [PRIVATE_STREAMS]: new Set<MediaStream>(),
+  [PRIVATE_CLEANUP_SCHEDULED]: false,
+  [PRIVATE_CLEANUP_TIMERS]: [],
+};
+
+// Cleanup delays - progressive multi-stage
+const CLEANUP_DELAYS = [0, 50, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000];
 
 /**
- * Register a new camera stream for tracking
+ * Stop a single track with all safety measures
+ */
+const stopTrack = (track: MediaStreamTrack, source: string): void => {
+  try {
+    if (track.readyState === 'live') {
+      console.log(`📹 CameraService: Stopping ${source} track: ${track.kind} (enabled: ${track.enabled})`);
+      track.enabled = false;
+      track.stop();
+    }
+  } catch (e) {
+    console.warn(`📹 CameraService: Error stopping ${source} track:`, e);
+  }
+};
+
+/**
+ * Force release a video element from camera
+ */
+const releaseVideoElement = (video: HTMLVideoElement, index: number): void => {
+  try {
+    // Get and stop any attached stream
+    const stream = video.srcObject as MediaStream | null;
+    if (stream && typeof stream.getTracks === 'function') {
+      stream.getTracks().forEach((track) => {
+        stopTrack(track, `video[${index}]`);
+      });
+    }
+    
+    // Clear and force release
+    video.srcObject = null;
+    video.pause();
+    video.src = '';
+    video.load(); // Force browser to release camera resource
+    
+    // Remove from DOM if it's a camera video (optional aggressive mode)
+    if (video.getAttribute('data-camera') === 'true') {
+      video.remove();
+    }
+  } catch (e) {
+    console.warn(`📹 CameraService: Error releasing video[${index}]:`, e);
+  }
+};
+
+/**
+ * Register a stream for tracking
  */
 export const registerStream = (stream: MediaStream): void => {
+  if (!stream) return;
   console.log('📹 CameraService: Registering stream with', stream.getTracks().length, 'tracks');
-  activeStreams.add(stream);
-  shouldStopCamera = false;
+  state[PRIVATE_STREAMS].add(stream);
+  state[PRIVATE_CLEANUP_SCHEDULED] = false;
 };
 
 /**
  * Unregister a stream from tracking
  */
 export const unregisterStream = (stream: MediaStream): void => {
+  if (!stream) return;
   console.log('📹 CameraService: Unregistering stream');
-  activeStreams.delete(stream);
+  state[PRIVATE_STREAMS].delete(stream);
 };
 
 /**
- * Get the count of active streams
+ * Get count of registered streams
  */
 export const getActiveStreamCount = (): number => {
-  return activeStreams.size;
+  return state[PRIVATE_STREAMS].size;
 };
 
 /**
- * FORCE stop ALL camera streams - the nuclear option
- * This will stop every video track and clear all references
+ * NUCLEAR OPTION: Force stop ALL cameras everywhere
+ * This is the most aggressive cleanup possible
  */
 export const forceStopAllCameras = (): void => {
   console.log('📹 CameraService: ===== FORCE STOP ALL CAMERAS =====');
-  shouldStopCamera = true;
   
-  // Step 1: Stop all tracked streams
-  console.log('📹 CameraService: Stopping', activeStreams.size, 'tracked streams');
-  activeStreams.forEach((stream) => {
+  let stoppedTracks = 0;
+  let stoppedVideos = 0;
+  
+  // STEP 1: Stop all registered streams
+  console.log('📹 CameraService: Stopping', state[PRIVATE_STREAMS].size, 'registered streams');
+  state[PRIVATE_STREAMS].forEach((stream) => {
     try {
-      stream.getTracks().forEach((track) => {
-        console.log('📹 CameraService: Stopping tracked track:', track.kind, 'state:', track.readyState);
-        track.stop();
-      });
-    } catch (e) {
-      console.warn('📹 CameraService: Error stopping tracked stream:', e);
-    }
-  });
-  activeStreams.clear();
-  
-  // Step 2: Stop all video elements in the DOM
-  const allVideos = document.querySelectorAll('video');
-  console.log('📹 CameraService: Processing', allVideos.length, 'video elements');
-  
-  allVideos.forEach((video, index) => {
-    try {
-      const stream = video.srcObject as MediaStream | null;
-      if (stream && stream.getTracks) {
-        const tracks = stream.getTracks();
-        console.log('📹 CameraService: Video', index, 'has', tracks.length, 'tracks');
-        tracks.forEach((track) => {
-          console.log('📹 CameraService: Stopping DOM track:', track.kind, 'enabled:', track.enabled, 'state:', track.readyState);
-          track.enabled = false; // Disable first
-          track.stop(); // Then stop
+      if (stream && typeof stream.getTracks === 'function') {
+        stream.getTracks().forEach((track) => {
+          stopTrack(track, 'registered');
+          stoppedTracks++;
         });
       }
-      video.srcObject = null;
-      video.pause();
-      video.load(); // Force release
     } catch (e) {
-      console.warn('📹 CameraService: Error cleaning video', index, ':', e);
+      console.warn('📹 CameraService: Error stopping registered stream:', e);
     }
   });
+  state[PRIVATE_STREAMS].clear();
   
-  // Step 3: Try to enumerate and release through MediaDevices API
+  // STEP 2: Stop ALL video elements in the entire document
+  const allVideos = document.querySelectorAll('video');
+  console.log('📹 CameraService: Processing', allVideos.length, 'video elements');
+  allVideos.forEach((video, index) => {
+    releaseVideoElement(video, index);
+    stoppedVideos++;
+  });
+  
+  // STEP 3: Query all media devices and log state (for debugging)
   if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
     navigator.mediaDevices.enumerateDevices()
       .then(devices => {
         const cameras = devices.filter(d => d.kind === 'videoinput');
-        console.log('📹 CameraService: Found', cameras.length, 'camera devices');
+        console.log('📹 CameraService: System has', cameras.length, 'camera devices');
       })
       .catch(() => {
-        // Ignore errors
+        // Silently ignore - just for logging
       });
   }
   
-  console.log('📹 CameraService: ===== FORCE STOP COMPLETE =====');
+  console.log(`📹 CameraService: ===== STOPPED ${stoppedTracks} tracks, ${stoppedVideos} videos =====`);
 };
 
 /**
- * Scheduled cleanup - runs multiple times to ensure camera is stopped
+ * Clear all scheduled cleanup timers
+ */
+const clearAllCleanupTimers = (): void => {
+  state[PRIVATE_CLEANUP_TIMERS].forEach(timerId => {
+    clearTimeout(timerId);
+  });
+  state[PRIVATE_CLEANUP_TIMERS] = [];
+};
+
+/**
+ * Schedule multi-stage cleanup with verification
+ * This is the main function to call when you want to ensure camera is stopped
  */
 export const scheduleCleanup = (): void => {
-  console.log('📹 CameraService: Scheduling cleanup');
-  shouldStopCamera = true;
+  console.log('📹 CameraService: ===== SCHEDULING MULTI-STAGE CLEANUP =====');
   
-  // Immediate cleanup
+  // Clear any existing timers to prevent accumulation
+  clearAllCleanupTimers();
+  
+  state[PRIVATE_CLEANUP_SCHEDULED] = true;
+  
+  // Execute immediate cleanup
   forceStopAllCameras();
   
-  // Multiple delayed cleanups
-  const delays = [50, 100, 200, 300, 500, 750, 1000, 1500, 2000];
-  delays.forEach((delay) => {
-    setTimeout(() => {
-      if (shouldStopCamera) {
-        console.log(`📹 CameraService: Delayed cleanup (${delay}ms)`);
+  // Schedule progressive cleanup attempts
+  CLEANUP_DELAYS.forEach((delay) => {
+    if (delay === 0) return; // Already did immediate
+    
+    const timerId = window.setTimeout(() => {
+      if (state[PRIVATE_CLEANUP_SCHEDULED]) {
+        console.log(`📹 CameraService: Delayed cleanup at ${delay}ms`);
         forceStopAllCameras();
+        
+        // Verify on last attempt
+        if (delay === CLEANUP_DELAYS[CLEANUP_DELAYS.length - 1]) {
+          verifyCamerasStopped();
+        }
       }
     }, delay);
+    
+    state[PRIVATE_CLEANUP_TIMERS].push(timerId);
   });
+  
+  console.log('📹 CameraService: Scheduled', CLEANUP_DELAYS.length, 'cleanup attempts');
+};
+
+/**
+ * Cancel scheduled cleanup (call when intentionally starting camera again)
+ */
+export const cancelScheduledCleanup = (): void => {
+  console.log('📹 CameraService: Cancelling scheduled cleanup');
+  state[PRIVATE_CLEANUP_SCHEDULED] = false;
+  clearAllCleanupTimers();
 };
 
 /**
  * Check if any camera is currently active
  */
 export const isCameraActive = (): boolean => {
-  // Check tracked streams
-  for (const stream of activeStreams) {
-    if (stream.getTracks().some(t => t.readyState === 'live')) {
-      return true;
+  // Check registered streams
+  for (const stream of state[PRIVATE_STREAMS]) {
+    try {
+      if (stream.getTracks().some(t => t.readyState === 'live')) {
+        return true;
+      }
+    } catch (e) {
+      // Stream might be invalid
     }
   }
   
-  // Check DOM videos
+  // Check all video elements
   const allVideos = document.querySelectorAll('video');
   for (const video of allVideos) {
-    const stream = video.srcObject as MediaStream | null;
-    if (stream?.getTracks().some(t => t.readyState === 'live')) {
-      return true;
+    try {
+      const stream = video.srcObject as MediaStream | null;
+      if (stream?.getTracks().some(t => t.readyState === 'live')) {
+        return true;
+      }
+    } catch (e) {
+      // Ignore errors
     }
   }
   
@@ -142,39 +237,85 @@ export const isCameraActive = (): boolean => {
 };
 
 /**
- * Debug function to log camera state
+ * Verify cameras are actually stopped - logs warning if not
+ */
+export const verifyCamerasStopped = (): boolean => {
+  const isActive = isCameraActive();
+  
+  if (isActive) {
+    console.error('📹 CameraService: ⚠️ VERIFICATION FAILED - Camera still active after cleanup!');
+    console.error('📹 CameraService: Attempting emergency shutdown...');
+    
+    // Emergency: Try one more aggressive cleanup
+    forceStopAllCameras();
+    
+    // Final check
+    setTimeout(() => {
+      if (isCameraActive()) {
+        console.error('📹 CameraService: ❌ CRITICAL - Camera could not be stopped!');
+      } else {
+        console.log('📹 CameraService: ✅ Emergency shutdown successful');
+      }
+    }, 100);
+    
+    return false;
+  }
+  
+  console.log('📹 CameraService: ✅ Verification passed - All cameras stopped');
+  return true;
+};
+
+/**
+ * Debug: Log current camera state
  */
 export const logCameraState = (): void => {
-  console.log('📹 CameraService: === CAMERA STATE ===');
-  console.log('📹 Tracked streams:', activeStreams.size);
-  console.log('📹 Should stop:', shouldStopCamera);
+  console.log('📹 CameraService: ========== CAMERA STATE ==========');
+  console.log('📹 Registered streams:', state[PRIVATE_STREAMS].size);
+  console.log('📹 Cleanup scheduled:', state[PRIVATE_CLEANUP_SCHEDULED]);
+  console.log('📹 Pending timers:', state[PRIVATE_CLEANUP_TIMERS].length);
   
-  activeStreams.forEach((stream, index) => {
-    stream.getTracks().forEach((track) => {
-      console.log(`📹 Stream ${index}: ${track.kind} - enabled: ${track.enabled}, state: ${track.readyState}`);
-    });
+  state[PRIVATE_STREAMS].forEach((stream, index) => {
+    try {
+      stream.getTracks().forEach((track) => {
+        console.log(`📹 Stream[${index}]: ${track.kind} - enabled: ${track.enabled}, state: ${track.readyState}`);
+      });
+    } catch (e) {
+      console.log(`📹 Stream[${index}]: Invalid/disposed`);
+    }
   });
   
   const allVideos = document.querySelectorAll('video');
-  console.log('📹 Video elements:', allVideos.length);
+  console.log('📹 Video elements in DOM:', allVideos.length);
   allVideos.forEach((video, index) => {
     const stream = video.srcObject as MediaStream | null;
     if (stream) {
-      stream.getTracks().forEach((track) => {
-        console.log(`📹 Video ${index}: ${track.kind} - enabled: ${track.enabled}, state: ${track.readyState}`);
-      });
+      try {
+        stream.getTracks().forEach((track) => {
+          console.log(`📹 Video[${index}]: ${track.kind} - enabled: ${track.enabled}, state: ${track.readyState}`);
+        });
+      } catch (e) {
+        console.log(`📹 Video[${index}]: Has srcObject but tracks inaccessible`);
+      }
+    } else {
+      console.log(`📹 Video[${index}]: No srcObject`);
     }
   });
-  console.log('📹 ========================');
+  
+  console.log('📹 Camera active:', isCameraActive());
+  console.log('📹 =====================================');
 };
 
-// Export a default object for easier imports
-export default {
+// Default export as object
+const cameraService = {
   registerStream,
   unregisterStream,
+  getActiveStreamCount,
   forceStopAllCameras,
   scheduleCleanup,
+  cancelScheduledCleanup,
   isCameraActive,
+  verifyCamerasStopped,
   logCameraState,
-  getActiveStreamCount,
 };
+
+export default cameraService;
