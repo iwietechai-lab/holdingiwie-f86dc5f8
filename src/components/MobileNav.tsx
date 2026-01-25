@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Users,
   BarChart3,
-  Settings,
   LogOut,
   Rocket,
   FolderOpen,
@@ -21,6 +20,7 @@ import {
   DollarSign,
   TrendingUp,
   Target,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies } from '@/data/companies';
@@ -97,10 +97,11 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
 
   const globalMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
+    { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
     { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
+    { icon: Bell, label: 'Gestor Notificaciones', action: 'navigate', path: '/configuracion' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
-    { icon: Settings, label: 'Configuración', action: 'navigate', path: '/configuracion' },
     ...(isSuperadmin
       ? [{ icon: ShieldAlert, label: 'Super Admin', action: 'navigate' as const, path: '/superadmin' }]
       : []),

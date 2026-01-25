@@ -134,11 +134,11 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
 
   const globalMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
-    { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
     { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
+    { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
+    { icon: Bell, label: 'Gestor Notificaciones', action: 'navigate', path: '/configuracion' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
-    { icon: Settings, label: 'Configuración', action: 'navigate', path: '/configuracion' },
     // Only show superadmin panel to the superadmin user
     ...(isSuperadmin ? [{ 
       icon: ShieldAlert, 
