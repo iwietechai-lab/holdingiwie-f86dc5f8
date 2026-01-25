@@ -210,6 +210,7 @@ Presenta estas opciones de forma clara y amigable.`,
       ? areas.find(a => a.id === selectedArea)?.name 
       : undefined;
 
+    // Use FUSION mode by default - combines all available AI brains
     const response = await fetch(CHAT_URL, {
       method: 'POST',
       headers: {
@@ -221,11 +222,37 @@ Presenta estas opciones de forma clara y amigable.`,
         brainModel: selectedModel,
         action: 'chat',
         context: { area: areaContext },
+        mode: 'fusion', // Multi-Brain Fusion: queries all AIs and synthesizes best response
       }),
     });
 
-    if (!response.ok || !response.body) {
-      throw new Error('Failed to start stream');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to get response');
+    }
+
+    // Check if it's a fusion response (JSON) or stream
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType?.includes('application/json')) {
+      // Fusion mode returns complete JSON response
+      const data = await response.json();
+      const assistantContent = data.choices?.[0]?.message?.content || '';
+      
+      const assistantMessage: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: assistantContent,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      return assistantContent;
+    }
+
+    // Stream mode fallback
+    if (!response.body) {
+      throw new Error('No response body');
     }
 
     const reader = response.body.getReader();
