@@ -214,7 +214,9 @@ export interface ChatMessage {
 export interface ChatAttachment {
   type: 'file' | 'url';
   name: string;
-  url: string;
+  url?: string;
+  mimeType?: string;
+  previewUrl?: string;
   content_id?: string;
 }
 

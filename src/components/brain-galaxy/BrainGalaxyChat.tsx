@@ -13,15 +13,21 @@ import {
   Brain,
   X,
   FileText,
+  Link as LinkIcon,
+  FileImage,
+  FileVideo,
+  File,
 } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import type { BrainModel, ChatMessage, BrainGalaxyArea } from '@/types/brain-galaxy';
 import { BRAIN_MODELS as MODELS } from '@/types/brain-galaxy';
+import { toast } from 'sonner';
 
 interface AttachedFile {
   file: File;
   name: string;
   type: string;
+  previewUrl?: string;
 }
 
 interface BrainGalaxyChatProps {
@@ -31,6 +37,24 @@ interface BrainGalaxyChatProps {
   onSaveSession?: (messages: ChatMessage[]) => void;
   onUploadFile?: (file: File) => Promise<string | null>;
 }
+
+const getFileIcon = (type: string) => {
+  if (type.startsWith('image/')) return <FileImage className="h-4 w-4 text-primary" />;
+  if (type.startsWith('video/')) return <FileVideo className="h-4 w-4 text-accent-foreground" />;
+  if (type.includes('pdf')) return <FileText className="h-4 w-4 text-destructive" />;
+  return <File className="h-4 w-4 text-muted-foreground" />;
+};
+
+const getFileTypeLabel = (type: string, name: string): string => {
+  if (type.startsWith('image/')) return 'Imagen';
+  if (type.startsWith('video/')) return 'Video';
+  if (type.includes('pdf')) return 'PDF';
+  if (type.includes('word') || name.endsWith('.docx') || name.endsWith('.doc')) return 'Documento Word';
+  if (type.includes('excel') || type.includes('spreadsheet') || name.endsWith('.xlsx')) return 'Hoja de cálculo';
+  if (type.includes('presentation') || name.endsWith('.pptx')) return 'Presentación';
+  if (type.includes('audio') || name.endsWith('.mp3')) return 'Audio';
+  return 'Archivo';
+};
 
 export function BrainGalaxyChat({
   sessionId,
@@ -45,32 +69,122 @@ export function BrainGalaxyChat({
   const [selectedModel, setSelectedModel] = useState<BrainModel>(initialModel);
   const [selectedArea, setSelectedArea] = useState<string>('none');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [processingFiles, setProcessingFiles] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedModelInfo = MODELS.find(m => m.id === selectedModel);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
     
     const newFiles: AttachedFile[] = [];
     for (let i = 0; i < files.length && attachedFiles.length + newFiles.length < 5; i++) {
       const file = files[i];
       if (file.size <= 20 * 1024 * 1024) { // 20MB limit
+        const previewUrl = file.type.startsWith('image/') 
+          ? URL.createObjectURL(file) 
+          : undefined;
         newFiles.push({
           file,
           name: file.name,
           type: file.type,
+          previewUrl,
         });
+      } else {
+        toast.error(`${file.name} excede el límite de 20MB`);
       }
     }
-    setAttachedFiles([...attachedFiles, ...newFiles]);
-    e.target.value = ''; // Reset input
+    
+    if (newFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    setAttachedFiles(prev => [...prev, ...newFiles]);
+    e.target.value = '';
+    
+    // Automatically send files to chat for AI to analyze
+    await processFilesForChat(newFiles);
+  };
+
+  const processFilesForChat = async (files: AttachedFile[]) => {
+    if (files.length === 0) return;
+    
+    setProcessingFiles(true);
+    
+    try {
+      // Upload files if handler provided
+      const uploadedUrls: string[] = [];
+      if (onUploadFile) {
+        for (const file of files) {
+          const url = await onUploadFile(file.file);
+          if (url) uploadedUrls.push(url);
+        }
+      }
+
+      // Create file summary for AI
+      const fileDescriptions = files.map((f, i) => {
+        const typeLabel = getFileTypeLabel(f.type, f.name);
+        const url = uploadedUrls[i] || 'archivo local';
+        return `- **${f.name}** (${typeLabel})`;
+      }).join('\n');
+
+      // Create user message with file info
+      const fileMessage: ChatMessage = {
+        id: `msg-file-${Date.now()}`,
+        role: 'user',
+        content: `He adjuntado los siguientes archivos:\n\n${fileDescriptions}`,
+        timestamp: new Date().toISOString(),
+        attachments: files.map((f, i) => ({
+          type: 'file' as const,
+          name: f.name,
+          mimeType: f.type,
+          url: uploadedUrls[i] || undefined,
+          previewUrl: f.previewUrl,
+        })),
+      };
+
+      const updatedMessages = [...messages, fileMessage];
+      setMessages(updatedMessages);
+
+      // Send to AI with context about the files
+      const aiContextMessage = {
+        role: 'user' as const,
+        content: `El usuario ha subido ${files.length} archivo(s): ${files.map(f => `"${f.name}" (${getFileTypeLabel(f.type, f.name)})`).join(', ')}. 
+
+Por favor:
+1. Reconoce los archivos recibidos
+2. Pregunta al usuario qué acción desea realizar con ellos. Las opciones son:
+   - 📊 **Analizar**: Examinar el contenido y proporcionar un resumen detallado
+   - 📚 **Usar como contenido de curso**: Extraer información para crear módulos de aprendizaje
+   - 🔍 **Extraer puntos clave**: Identificar los conceptos más importantes
+   - 💡 **Generar preguntas de evaluación**: Crear un quiz basado en el contenido
+   - 📝 **Resumir**: Crear un resumen ejecutivo del documento
+   
+Presenta estas opciones de forma clara y amigable.`,
+      };
+
+      // Make AI respond about the files
+      setIsLoading(true);
+      await streamChat([...updatedMessages.map(m => ({ role: m.role, content: m.content })), aiContextMessage]);
+      
+    } catch (error) {
+      console.error('Error processing files:', error);
+      toast.error('Error al procesar los archivos');
+    } finally {
+      setProcessingFiles(false);
+      setIsLoading(false);
+    }
   };
 
   const removeAttachedFile = (index: number) => {
+    const file = attachedFiles[index];
+    if (file.previewUrl) {
+      URL.revokeObjectURL(file.previewUrl);
+    }
     setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
   };
 
@@ -80,7 +194,16 @@ export function BrainGalaxyChat({
     }
   }, [messages]);
 
-  const streamChat = useCallback(async (userMessages: ChatMessage[]) => {
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      attachedFiles.forEach(f => {
+        if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+      });
+    };
+  }, []);
+
+  const streamChat = useCallback(async (userMessages: { role: string; content: string }[]) => {
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-galaxy-ai`;
 
     const areaContext = selectedArea && selectedArea !== 'none'
@@ -162,7 +285,46 @@ export function BrainGalaxyChat({
   }, [selectedModel, selectedArea, areas]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
+
+    // If there are pending files that haven't been processed, process them first
+    if (attachedFiles.length > 0 && input.trim()) {
+      const userMessage: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: 'user',
+        content: input.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+      setInput('');
+      setAttachedFiles([]);
+      setIsLoading(true);
+
+      try {
+        await streamChat(updatedMessages.map(m => ({ role: m.role, content: m.content })));
+        if (onSaveSession) {
+          onSaveSession(updatedMessages);
+        }
+      } catch (error) {
+        console.error('Chat error:', error);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `msg-error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (!input.trim()) return;
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -177,7 +339,7 @@ export function BrainGalaxyChat({
     setIsLoading(true);
 
     try {
-      await streamChat(updatedMessages);
+      await streamChat(updatedMessages.map(m => ({ role: m.role, content: m.content })));
       if (onSaveSession) {
         onSaveSession(updatedMessages);
       }
@@ -204,12 +366,43 @@ export function BrainGalaxyChat({
     }
   };
 
+  const renderMessageAttachments = (attachments?: ChatMessage['attachments']) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {attachments.map((attachment, idx) => (
+          <div
+            key={idx}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border text-sm"
+          >
+            {attachment.previewUrl ? (
+              <img 
+                src={attachment.previewUrl} 
+                alt={attachment.name}
+                className="h-8 w-8 object-cover rounded"
+              />
+            ) : (
+              getFileIcon(attachment.mimeType || '')
+            )}
+            <div className="flex flex-col">
+              <span className="font-medium truncate max-w-[150px]">{attachment.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {getFileTypeLabel(attachment.mimeType || '', attachment.name)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Card className="flex flex-col h-[calc(100vh-12rem)]">
       <CardHeader className="pb-3 border-b">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Brain className="h-5 w-5 text-purple-500" />
+            <Brain className="h-5 w-5 text-primary" />
             Chat con Brain Galaxy
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -262,7 +455,7 @@ export function BrainGalaxyChat({
               <p className="text-sm mt-2">
                 Tu asistente de aprendizaje. Pregúntame lo que quieras aprender,
                 <br />
-                puedo ayudarte a crear cursos, resolver dudas y más.
+                o adjunta archivos para analizarlos y convertirlos en conocimiento.
               </p>
               <div className="flex flex-wrap justify-center gap-2 mt-4">
                 <Badge 
@@ -275,16 +468,16 @@ export function BrainGalaxyChat({
                 <Badge 
                   variant="outline" 
                   className="cursor-pointer hover:bg-muted"
-                  onClick={() => setInput('Explícame cómo funciona la inteligencia artificial')}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  🤖 Aprender IA
+                  📎 Subir archivo
                 </Badge>
                 <Badge 
                   variant="outline" 
                   className="cursor-pointer hover:bg-muted"
-                  onClick={() => setInput('¿Cuáles son las mejores prácticas en gestión financiera?')}
+                  onClick={() => setInput('Explícame cómo funciona la inteligencia artificial')}
                 >
-                  💰 Finanzas
+                  🤖 Aprender IA
                 </Badge>
               </div>
             </div>
@@ -305,16 +498,22 @@ export function BrainGalaxyChat({
                 {message.role === 'assistant' ? (
                   <MarkdownRenderer content={message.content} />
                 ) : (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  <>
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {renderMessageAttachments(message.attachments)}
+                  </>
                 )}
               </div>
             </div>
           ))}
 
-          {isLoading && messages[messages.length - 1]?.role === 'user' && (
+          {(isLoading || processingFiles) && messages[messages.length - 1]?.role === 'user' && (
             <div className="flex justify-start">
-              <div className="bg-muted rounded-lg px-4 py-2">
+              <div className="bg-muted rounded-lg px-4 py-2 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">
+                  {processingFiles ? 'Analizando archivos...' : 'Pensando...'}
+                </span>
               </div>
             </div>
           )}
@@ -322,19 +521,32 @@ export function BrainGalaxyChat({
       </ScrollArea>
 
       <div className="p-4 border-t space-y-2">
-        {/* Attached files preview */}
+        {/* Attached files preview - before sending */}
         {attachedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 p-2 bg-muted/50 rounded-lg">
             {attachedFiles.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border text-sm group"
               >
-                <FileText className="h-3 w-3" />
-                <span className="truncate max-w-[150px]">{file.name}</span>
+                {file.previewUrl ? (
+                  <img 
+                    src={file.previewUrl} 
+                    alt={file.name}
+                    className="h-8 w-8 object-cover rounded"
+                  />
+                ) : (
+                  getFileIcon(file.type)
+                )}
+                <div className="flex flex-col">
+                  <span className="font-medium truncate max-w-[120px]">{file.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {getFileTypeLabel(file.type, file.name)}
+                  </span>
+                </div>
                 <button
                   onClick={() => removeAttachedFile(index)}
-                  className="hover:text-destructive"
+                  className="ml-1 p-1 hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -358,8 +570,8 @@ export function BrainGalaxyChat({
             size="icon"
             className="h-[60px] shrink-0"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || attachedFiles.length >= 5}
-            title="Adjuntar archivo"
+            disabled={isLoading || processingFiles || attachedFiles.length >= 5}
+            title="Adjuntar archivo (máx. 5)"
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -369,17 +581,17 @@ export function BrainGalaxyChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe tu mensaje..."
+            placeholder="Escribe tu mensaje o adjunta un archivo..."
             className="min-h-[60px] resize-none"
-            disabled={isLoading}
+            disabled={isLoading || processingFiles}
           />
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || processingFiles}
             size="icon"
             className="h-[60px] shrink-0"
           >
-            {isLoading ? (
+            {isLoading || processingFiles ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
