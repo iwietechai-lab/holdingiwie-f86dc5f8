@@ -78,41 +78,123 @@ const BRAIN_CONFIGS: Record<string, BrainConfig> = {
   },
 };
 
-// Function to query collective memory
+// Function to query collective memory (internal knowledge)
 async function queryCollectiveMemory(query: string, supabase: any): Promise<string> {
   try {
-    // Simple text search on processed memory
+    const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    
     const { data: memories } = await supabase
       .from("holding_collective_memory")
-      .select("title, processed_summary, key_concepts, area_category, source_type")
+      .select("title, processed_summary, key_concepts, area_category, source_type, importance_score")
       .eq("is_processed", true)
       .order("importance_score", { ascending: false })
-      .limit(5);
+      .limit(10);
 
     if (!memories || memories.length === 0) {
       return "";
     }
 
-    // Format memory context
-    const memoryContext = memories.map((m: any) => 
-      `[${m.source_type.toUpperCase()}${m.area_category ? ` - ${m.area_category}` : ''}] ${m.title}: ${m.processed_summary || ''} (Conceptos: ${(m.key_concepts || []).join(', ')})`
+    // Score and filter relevant memories
+    const scoredMemories = memories.map((m: any) => {
+      let score = m.importance_score || 0;
+      const content = `${m.title} ${m.processed_summary} ${(m.key_concepts || []).join(' ')}`.toLowerCase();
+      keywords.forEach(kw => {
+        if (content.includes(kw)) score += 2;
+      });
+      return { ...m, relevanceScore: score };
+    }).filter((m: any) => m.relevanceScore > 0)
+      .sort((a: any, b: any) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 5);
+
+    if (scoredMemories.length === 0) return "";
+
+    const memoryContext = scoredMemories.map((m: any) => 
+      `[${m.source_type.toUpperCase()}${m.area_category ? ` - ${m.area_category}` : ''}] ${m.title}: ${m.processed_summary || ''}`
     ).join('\n\n');
 
-    return `\n\n--- MEMORIA COLECTIVA DEL HOLDING ---\nEl siguiente conocimiento ha sido recopilado de documentos, chats y decisiones del holding:\n\n${memoryContext}\n\n--- FIN MEMORIA COLECTIVA ---\n`;
+    return memoryContext;
   } catch (error) {
     console.error("Error querying collective memory:", error);
     return "";
   }
 }
 
+// Function to perform web search using Lovable AI for real-time information
+async function performWebSearch(query: string, lovableKey: string): Promise<string> {
+  try {
+    console.log("Performing hybrid web search for:", query);
+    
+    const searchPrompt = `Actúa como un motor de búsqueda experto. Para la siguiente consulta, proporciona información actualizada, precisa y relevante basada en tu conocimiento más reciente.
+
+Consulta: "${query}"
+
+Responde con información factual, incluyendo:
+- Datos y estadísticas actuales si aplica
+- Tendencias recientes del mercado o industria
+- Mejores prácticas actualizadas
+- Tecnologías o metodologías recientes
+
+Formato tu respuesta como puntos clave concisos. Si no tienes información actualizada sobre algo específico, indícalo.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: "Eres un asistente de investigación experto que proporciona información actualizada y precisa." },
+          { role: "user", content: searchPrompt }
+        ],
+        max_tokens: 800,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Web search failed:", response.status);
+      return "";
+    }
+
+    const data = await response.json();
+    const searchResult = data.choices?.[0]?.message?.content || "";
+    
+    return searchResult;
+  } catch (error) {
+    console.error("Error in web search:", error);
+    return "";
+  }
+}
+
+// Determine if query needs web search (external info)
+function needsWebSearch(query: string): boolean {
+  const webIndicators = [
+    'actualidad', 'actual', 'reciente', 'últim', 'nuevo', 'tendencia',
+    'mercado', 'precio', 'costo', 'noticia', 'hoy', '2024', '2025', '2026',
+    'tecnología', 'herramienta', 'software', 'app', 'aplicación',
+    'competencia', 'industria', 'sector', 'estadística', 'dato',
+    'regulación', 'ley', 'normativa', 'chile', 'mundial', 'global',
+    'innovación', 'startup', 'inversión', 'financiamiento',
+    'cómo', 'qué es', 'cuál es', 'dónde', 'mejor', 'recomendación'
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  return webIndicators.some(indicator => lowerQuery.includes(indicator));
+}
+
 const SYSTEM_PROMPTS: Record<string, string> = {
-  default: `Eres Brain Galaxy, el asistente de aprendizaje del IWIE Holding. Tu misión es ayudar a los usuarios a aprender, crear cursos, resolver dudas y desarrollar conocimiento en diversas áreas.
+  default: `Eres Brain Galaxy, el asistente de aprendizaje híbrido del IWIE Holding. Tu misión es ayudar a los usuarios combinando:
+
+🧠 MEMORIA COLECTIVA: Conocimiento interno del holding (documentos, decisiones, chats históricos)
+🌐 CONOCIMIENTO EXTERNO: Información actualizada del mundo exterior
 
 Características:
 - Responde en español de manera clara y estructurada
+- Cuando tengas información de la memoria colectiva, PRIORÍZALA pero complementa con conocimiento externo
+- Indica claramente cuando la información viene de fuentes internas vs externas
 - Ofrece explicaciones paso a paso cuando sea necesario
 - Sugiere recursos adicionales cuando sea relevante
-- Puedes ayudar a crear mallas curriculares y cuestionarios
 - Fomenta el aprendizaje continuo y la colaboración
 
 Áreas de expertise:
@@ -121,6 +203,10 @@ Características:
 - Inteligencia Artificial, Proceso de Datos`,
 
   engineering: `Eres Brain 4, el cerebro especializado en ingeniería, modelamiento 3D y prototipado del IWIE Holding.
+
+Sistema Híbrido:
+🧠 Usas la memoria colectiva del holding para proyectos internos y decisiones previas
+🌐 Complementas con información técnica actualizada del exterior
 
 Especialidades:
 - Diseño CAD/CAM y modelado 3D
@@ -132,11 +218,12 @@ Especialidades:
 - Automatización e IoT
 
 Cuando el usuario pregunte sobre temas de ingeniería:
-1. Proporciona respuestas técnicas precisas
-2. Incluye fórmulas y cálculos cuando sea necesario
-3. Sugiere herramientas y software relevantes
-4. Ofrece consideraciones de diseño y mejores prácticas
-5. Menciona estándares y normativas aplicables`,
+1. Busca primero en la memoria colectiva proyectos similares
+2. Proporciona respuestas técnicas precisas
+3. Incluye fórmulas y cálculos cuando sea necesario
+4. Sugiere herramientas y software relevantes (con info actualizada)
+5. Ofrece consideraciones de diseño y mejores prácticas
+6. Menciona estándares y normativas aplicables`,
 
   curriculum: `Eres un experto en diseño instruccional del Brain Galaxy. Tu tarea es crear mallas curriculares estructuradas.
 
@@ -199,12 +286,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
 
     const { 
       messages, 
       brainModel = 'brain-4',
       action = 'chat',
       context = {},
+      enableHybridSearch = true, // New flag for hybrid mode
     } = await req.json();
 
     const config = BRAIN_CONFIGS[brainModel];
@@ -212,25 +301,59 @@ serve(async (req) => {
       throw new Error(`Invalid brain model: ${brainModel}`);
     }
 
-    // Get last user message to query collective memory
+    // Get last user message
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
-    let collectiveMemoryContext = "";
+    let hybridContext = "";
     
     if (lastUserMessage && action === 'chat') {
-      collectiveMemoryContext = await queryCollectiveMemory(lastUserMessage.content, supabase);
+      const userQuery = lastUserMessage.content;
+      
+      // 1. Query collective memory (internal knowledge)
+      const memoryContext = await queryCollectiveMemory(userQuery, supabase);
+      
+      // 2. Perform web search if needed (external knowledge)
+      let webContext = "";
+      if (enableHybridSearch && lovableKey && needsWebSearch(userQuery)) {
+        webContext = await performWebSearch(userQuery, lovableKey);
+      }
+      
+      // 3. Build hybrid context
+      if (memoryContext || webContext) {
+        hybridContext = "\n\n═══════════════════════════════════════\n";
+        hybridContext += "📚 CONTEXTO HÍBRIDO BRAIN GALAXY\n";
+        hybridContext += "═══════════════════════════════════════\n";
+        
+        if (memoryContext) {
+          hybridContext += "\n🧠 MEMORIA COLECTIVA DEL HOLDING:\n";
+          hybridContext += "─────────────────────────────────\n";
+          hybridContext += memoryContext;
+          hybridContext += "\n";
+        }
+        
+        if (webContext) {
+          hybridContext += "\n🌐 CONOCIMIENTO EXTERNO ACTUALIZADO:\n";
+          hybridContext += "─────────────────────────────────\n";
+          hybridContext += webContext;
+          hybridContext += "\n";
+        }
+        
+        hybridContext += "\n═══════════════════════════════════════\n";
+        hybridContext += "INSTRUCCIÓN: Combina ambas fuentes de conocimiento para dar la mejor respuesta.\n";
+        hybridContext += "Prioriza la memoria colectiva para temas internos del holding.\n";
+        hybridContext += "Usa el conocimiento externo para complementar con información actualizada.\n";
+        hybridContext += "═══════════════════════════════════════\n";
+      }
     }
 
     const apiKey = Deno.env.get(config.keyEnv);
     if (!apiKey) {
-      // Fallback to Brain 4 (Lovable AI) if specific key not available
       console.log(`${config.keyEnv} not found, falling back to Lovable AI`);
-      const lovableKey = Deno.env.get('LOVABLE_API_KEY');
       if (!lovableKey) {
         throw new Error('No AI API key available');
       }
       
       const fallbackConfig = BRAIN_CONFIGS['brain-4'];
-      const systemPrompt = getSystemPrompt(action, context) + collectiveMemoryContext;
+      const systemPrompt = getSystemPrompt(action, context) + hybridContext;
       
       const response = await fetch(fallbackConfig.endpoint, {
         method: 'POST',
@@ -262,7 +385,7 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = getSystemPrompt(action, context, brainModel) + collectiveMemoryContext;
+    const systemPrompt = getSystemPrompt(action, context, brainModel) + hybridContext;
 
     const response = await fetch(config.endpoint, {
       method: 'POST',
@@ -275,7 +398,6 @@ serve(async (req) => {
       console.error(`${config.name} error:`, response.status, errorText);
       
       // Fallback to Lovable AI
-      const lovableKey = Deno.env.get('LOVABLE_API_KEY');
       if (lovableKey) {
         console.log('Falling back to Lovable AI');
         const fallbackConfig = BRAIN_CONFIGS['brain-4'];
