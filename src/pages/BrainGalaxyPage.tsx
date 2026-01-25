@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking, UploadContentDialog } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
 import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
@@ -38,7 +38,7 @@ export default function BrainGalaxyPage() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCreateArea, setShowCreateArea] = useState(false);
-  const [showCourseBuilder, setShowCourseBuilder] = useState(false);
+  
   const [showUploadContent, setShowUploadContent] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(true);
   const [currentSession, setCurrentSession] = useState<BrainGalaxyChatSession | null>(null);
@@ -117,22 +117,6 @@ export default function BrainGalaxyPage() {
     );
   }
 
-  // Show course builder if active
-  if (showCourseBuilder) {
-    return (
-      <ResponsiveLayout>
-        <div className="p-4 md:p-6">
-          <CourseBuilder
-            areas={areas}
-            existingContent={myContent}
-            onBack={() => setShowCourseBuilder(false)}
-            onSaveCourse={createCourse}
-          />
-        </div>
-      </ResponsiveLayout>
-    );
-  }
-
   return (
     <ResponsiveLayout>
       <div className="p-4 md:p-6 space-y-6">
@@ -157,10 +141,14 @@ export default function BrainGalaxyPage() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 md:w-auto md:inline-grid">
             <TabsTrigger value="dashboard" className="gap-2">
               <BookOpen className="h-4 w-4" />
               <span className="hidden md:inline">Mi Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="studio" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden md:inline">Studio</span>
             </TabsTrigger>
             <TabsTrigger value="chat" className="gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -185,10 +173,19 @@ export default function BrainGalaxyPage() {
                 levelProgress={getLevelProgress()}
                 myCourses={myCourses}
                 activeMissions={activeMissions}
-                onCreateCourse={() => setShowCourseBuilder(true)}
+                onCreateCourse={() => setActiveTab('studio')}
                 onUploadContent={() => setShowUploadContent(true)}
                 onOpenChat={() => setActiveTab('chat')}
                 onViewMissions={() => setActiveTab('missions')}
+              />
+            </TabsContent>
+
+            <TabsContent value="studio" className="m-0">
+              <CourseBuilder
+                areas={areas}
+                existingContent={myContent}
+                onBack={() => setActiveTab('dashboard')}
+                onSaveCourse={createCourse}
               />
             </TabsContent>
 
