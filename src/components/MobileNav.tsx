@@ -100,7 +100,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
     { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
-    { icon: Settings, label: 'Configuración', action: 'dev' },
+    { icon: Settings, label: 'Configuración', action: 'navigate', path: '/configuracion' },
     ...(isSuperadmin
       ? [{ icon: ShieldAlert, label: 'Super Admin', action: 'navigate' as const, path: '/superadmin' }]
       : []),

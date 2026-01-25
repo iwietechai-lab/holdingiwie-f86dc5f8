@@ -25,6 +25,7 @@ import CompanyChatbotPage from "./pages/CompanyChatbotPage";
 import BudgetPage from "./pages/BudgetPage";
 import IwieChat from "./pages/IwieChat";
 import MisionIwiePage from "./pages/MisionIwiePage";
+import ConfiguracionPage from "./pages/ConfiguracionPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 import { IncomingCallAlert } from "./components/meetings/IncomingCallAlert";
@@ -77,7 +78,7 @@ function AppContent() {
         <Route path="/mision-iwie" element={<ProtectedRoute><MisionIwiePage /></ProtectedRoute>} />
         <Route path="/iwiechat" element={<ProtectedRoute><IwieChat /></ProtectedRoute>} />
         <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
-        <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
+        <Route path="/configuracion" element={<ProtectedRoute><ConfiguracionPage /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>

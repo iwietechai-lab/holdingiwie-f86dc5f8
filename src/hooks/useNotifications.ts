@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Notification } from '@/types/organization';
 import { useSupabaseAuth } from './useSupabaseAuth';
@@ -13,11 +13,111 @@ interface UseNotificationsReturn {
   markAllAsRead: () => Promise<void>;
 }
 
+// Audio cache for notification sounds
+const audioCache = new Map<string, HTMLAudioElement>();
+
+const getNotificationAudio = (soundPath: string): HTMLAudioElement => {
+  if (audioCache.has(soundPath)) {
+    return audioCache.get(soundPath)!;
+  }
+  const audio = new Audio(soundPath);
+  audio.preload = 'auto';
+  audioCache.set(soundPath, audio);
+  return audio;
+};
+
 export function useNotifications(): UseNotificationsReturn {
   const { user } = useSupabaseAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const userPreferencesRef = useRef<Map<string, { sound_id: string | null; is_enabled: boolean; volume: number }>>(new Map());
+  const soundsRef = useRef<Map<string, { file_path: string; is_default: boolean }>>(new Map());
+
+  // Fetch user preferences and sounds
+  useEffect(() => {
+    const fetchPreferencesAndSounds = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch sounds
+        const { data: sounds } = await supabase
+          .from('notification_sounds')
+          .select('id, file_path, is_default');
+        
+        if (sounds) {
+          soundsRef.current.clear();
+          sounds.forEach((s: { id: string; file_path: string; is_default: boolean }) => {
+            soundsRef.current.set(s.id, { file_path: s.file_path, is_default: s.is_default });
+          });
+        }
+
+        // Fetch user preferences
+        const { data: prefs } = await supabase
+          .from('user_notification_preferences')
+          .select('notification_type, sound_id, is_enabled, volume')
+          .eq('user_id', user.id);
+
+        if (prefs) {
+          userPreferencesRef.current.clear();
+          prefs.forEach((p: { notification_type: string; sound_id: string | null; is_enabled: boolean; volume: number }) => {
+            userPreferencesRef.current.set(p.notification_type, {
+              sound_id: p.sound_id,
+              is_enabled: p.is_enabled,
+              volume: p.volume,
+            });
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching notification preferences:', err);
+      }
+    };
+
+    fetchPreferencesAndSounds();
+  }, [user]);
+
+  // Function to play notification sound based on type
+  const playNotificationSound = useCallback((notificationType?: string) => {
+    const type = notificationType || 'general';
+    const pref = userPreferencesRef.current.get(type) || userPreferencesRef.current.get('general');
+    
+    // Check if sound is enabled (default to true if no preference)
+    if (pref && pref.is_enabled === false) {
+      return;
+    }
+
+    let soundPath: string | null = null;
+    const volume = pref?.volume ?? 70;
+
+    // Get sound path from preference or default
+    if (pref?.sound_id && soundsRef.current.has(pref.sound_id)) {
+      soundPath = soundsRef.current.get(pref.sound_id)!.file_path;
+    } else {
+      // Find default sound
+      for (const [, sound] of soundsRef.current) {
+        if (sound.is_default) {
+          soundPath = sound.file_path;
+          break;
+        }
+      }
+    }
+
+    // Fallback to a basic sound if nothing is configured
+    if (!soundPath) {
+      soundPath = '/sounds/Ping_iwie.mp3';
+    }
+
+    try {
+      const audio = getNotificationAudio(soundPath);
+      audio.volume = volume / 100;
+      audio.currentTime = 0;
+      audio.play().catch((err) => {
+        console.warn('Could not play notification sound:', err);
+      });
+    } catch (err) {
+      console.error('Error playing notification sound:', err);
+    }
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -89,7 +189,10 @@ export function useNotifications(): UseNotificationsReturn {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev]);
+          const newNotification = payload.new as Notification;
+          setNotifications(prev => [newNotification, ...prev]);
+          // Play notification sound based on notification type
+          playNotificationSound(newNotification.type);
         }
       )
       .subscribe();
@@ -97,7 +200,7 @@ export function useNotifications(): UseNotificationsReturn {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, playNotificationSound]);
 
   // Initial fetch
   useEffect(() => {
