@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Book } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, Book, Sparkles, Upload, History, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SourcesPanel } from './SourcesPanel';
@@ -24,6 +26,21 @@ interface CourseProposal {
   suggestedTopics?: string[];
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  lastMessage: string;
+  createdAt: string;
+  messages: ChatMessage[];
+}
+
+interface CreatedCourse {
+  id: string;
+  title: string;
+  createdAt: string;
+  mode: 'manual' | 'ai';
+}
+
 interface StudioBuilderProps {
   areas: BrainGalaxyArea[];
   existingContent: BrainGalaxyContent[];
@@ -38,6 +55,8 @@ interface StudioBuilderProps {
     isPublic: boolean;
   }) => Promise<boolean>;
 }
+
+type CreationMode = 'manual' | 'ai';
 
 // Course creation detection patterns
 const COURSE_CREATION_PATTERNS = [
@@ -63,6 +82,7 @@ export function StudioBuilder({
   onBack,
   onSaveCourse,
 }: StudioBuilderProps) {
+  const [creationMode, setCreationMode] = useState<CreationMode>('ai');
   const [sources, setSources] = useState<Source[]>([]);
   const [outputs, setOutputs] = useState<StudioOutput[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -74,6 +94,11 @@ export function StudioBuilder({
   const [courseProposal, setCourseProposal] = useState<CourseProposal | null>(null);
   const [foundSources, setFoundSources] = useState<FoundSource[]>([]);
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+  
+  // Historial
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [createdCourses, setCreatedCourses] = useState<CreatedCourse[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   const addSource = useCallback((sourceData: Omit<Source, 'id' | 'addedAt'>) => {
     const newSource: Source = {
@@ -469,57 +494,175 @@ Responde de manera clara, útil y en español.`,
 
   const hasSourcesReady = sources.some(s => s.status === 'ready');
 
+  const handleModeChange = (mode: string) => {
+    setCreationMode(mode as CreationMode);
+    // Clear state when switching modes
+    setChatMessages([]);
+    setSources([]);
+    setCourseProposal(null);
+    setFoundSources([]);
+    setCurrentOutput(undefined);
+  };
+
+  const startNewChat = () => {
+    // Save current session if has messages
+    if (chatMessages.length > 0) {
+      const session: ChatSession = {
+        id: `session-${Date.now()}`,
+        title: chatMessages[0]?.content.substring(0, 50) || 'Nueva conversación',
+        lastMessage: chatMessages[chatMessages.length - 1]?.content.substring(0, 100) || '',
+        createdAt: new Date().toISOString(),
+        messages: [...chatMessages],
+      };
+      setChatSessions(prev => [session, ...prev]);
+    }
+    setChatMessages([]);
+    setCourseProposal(null);
+    setFoundSources([]);
+  };
+
+  const loadChatSession = (session: ChatSession) => {
+    setChatMessages(session.messages);
+    setShowHistory(false);
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Book className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Brain Galaxy Studio</h2>
+      {/* Header with Tabs */}
+      <div className="border-b">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Book className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold">Brain Galaxy Studio</h2>
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={() => setShowHistory(!showHistory)}
+          >
+            <History className="h-4 w-4" />
+            Historial
+          </Button>
         </div>
+        
+        {/* Mode Tabs */}
+        <Tabs value={creationMode} onValueChange={handleModeChange} className="px-4">
+          <TabsList className="w-full max-w-md">
+            <TabsTrigger value="ai" className="flex-1 gap-2">
+              <Sparkles className="h-4 w-4" />
+              Crear Curso con IA
+            </TabsTrigger>
+            <TabsTrigger value="manual" className="flex-1 gap-2">
+              <Upload className="h-4 w-4" />
+              Crear Curso Manual
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Three Column Layout */}
-      <div className="flex-1 grid grid-cols-[280px_1fr_280px] overflow-hidden">
-        {/* Sources Panel */}
-        <SourcesPanel
-          sources={sources}
-          onAddSource={addSource}
-          onRemoveSource={removeSource}
-          onScrapeUrl={scrapeUrl}
-          existingContent={existingContent}
-          isScrapingUrl={isScrapingUrl}
-        />
+      {/* Main Content with optional History Sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* History Sidebar */}
+        {showHistory && (
+          <div className="w-64 border-r flex flex-col bg-muted/30">
+            <div className="p-3 border-b">
+              <h3 className="font-medium text-sm">Historial</h3>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {/* Chat Sessions */}
+                {chatSessions.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Conversaciones</p>
+                    {chatSessions.map(session => (
+                      <button
+                        key={session.id}
+                        onClick={() => loadChatSession(session)}
+                        className="w-full text-left p-2 rounded hover:bg-muted text-sm truncate"
+                      >
+                        <p className="font-medium truncate">{session.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{session.lastMessage}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Created Courses */}
+                {createdCourses.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Cursos creados</p>
+                    {createdCourses.map(course => (
+                      <div
+                        key={course.id}
+                        className="p-2 rounded hover:bg-muted text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="h-4 w-4 text-primary" />
+                          <p className="font-medium truncate">{course.title}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground ml-6">
+                          {course.mode === 'ai' ? 'Con IA' : 'Manual'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {chatSessions.length === 0 && createdCourses.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No hay historial aún
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
 
-        {/* Chat Panel */}
-        <StudioChat
-          messages={chatMessages}
-          onSendMessage={sendChatMessage}
-          isLoading={isLoading || isCreatingCourse}
-          sources={sources}
-          currentOutput={currentOutput}
-          onClearOutput={() => setCurrentOutput(undefined)}
-          onAddSourceFromSuggestion={handleAddSourceFromSuggestion}
-          courseProposal={courseProposal}
-          onClearProposal={() => setCourseProposal(null)}
-          foundSources={foundSources}
-          isCreatingCourse={isCreatingCourse}
-        />
+        {/* Three Column Layout */}
+        <div className={`flex-1 grid ${showHistory ? 'grid-cols-[240px_1fr_240px]' : 'grid-cols-[280px_1fr_280px]'} overflow-hidden`}>
+          {/* Sources Panel */}
+          <SourcesPanel
+            sources={sources}
+            onAddSource={addSource}
+            onRemoveSource={removeSource}
+            onScrapeUrl={scrapeUrl}
+            existingContent={existingContent}
+            isScrapingUrl={isScrapingUrl}
+          />
 
-        {/* Studio Tools Panel */}
-        <StudioToolsPanel
-          outputs={outputs}
-          onGenerateOutput={generateOutput}
-          onViewOutput={setCurrentOutput}
-          isGenerating={isGenerating}
-          generatingTool={generatingTool}
-          hasSourcesReady={hasSourcesReady || !!courseProposal}
-        />
+          {/* Chat Panel */}
+          <StudioChat
+            messages={chatMessages}
+            onSendMessage={sendChatMessage}
+            isLoading={isLoading || isCreatingCourse}
+            sources={sources}
+            currentOutput={currentOutput}
+            onClearOutput={() => setCurrentOutput(undefined)}
+            onAddSourceFromSuggestion={handleAddSourceFromSuggestion}
+            courseProposal={courseProposal}
+            onClearProposal={() => setCourseProposal(null)}
+            foundSources={foundSources}
+            isCreatingCourse={isCreatingCourse}
+            creationMode={creationMode}
+            onStartNewChat={startNewChat}
+          />
+
+          {/* Studio Tools Panel */}
+          <StudioToolsPanel
+            outputs={outputs}
+            onGenerateOutput={generateOutput}
+            onViewOutput={setCurrentOutput}
+            isGenerating={isGenerating}
+            generatingTool={generatingTool}
+            hasSourcesReady={hasSourcesReady || !!courseProposal}
+          />
+        </div>
       </div>
     </div>
   );
