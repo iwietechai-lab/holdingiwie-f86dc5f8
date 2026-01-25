@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Bell, MessageSquare, Video, Ticket, FileText, Volume2, Play, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,8 +46,22 @@ export function NotificationSoundSettings() {
   } = useNotificationPreferences();
   const { previewSound } = useNotificationSound();
   const [openDialogType, setOpenDialogType] = useState<NotificationType | null>(null);
+  
+  // Local volume state for smooth slider interaction
+  const [localVolumes, setLocalVolumes] = useState<Record<NotificationType, number>>({} as Record<NotificationType, number>);
+  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const notificationTypes: NotificationType[] = ['message', 'meeting', 'ticket', 'document', 'general'];
+
+  // Initialize local volumes from preferences
+  useEffect(() => {
+    const volumes: Record<NotificationType, number> = {} as Record<NotificationType, number>;
+    notificationTypes.forEach((type) => {
+      const pref = getPreferenceForType(type);
+      volumes[type] = pref?.volume ?? 70;
+    });
+    setLocalVolumes(volumes);
+  }, [preferences]);
 
   const handleToggleEnabled = async (type: NotificationType, enabled: boolean) => {
     try {
@@ -58,13 +72,23 @@ export function NotificationSoundSettings() {
     }
   };
 
-  const handleVolumeChange = async (type: NotificationType, volume: number) => {
-    try {
-      await updatePreference(type, { volume });
-    } catch {
-      toast.error('Error al actualizar volumen');
+  const handleVolumeChange = useCallback((type: NotificationType, volume: number) => {
+    // Update local state immediately for smooth slider
+    setLocalVolumes((prev) => ({ ...prev, [type]: volume }));
+
+    // Debounce the database update
+    if (debounceTimers.current[type]) {
+      clearTimeout(debounceTimers.current[type]);
     }
-  };
+
+    debounceTimers.current[type] = setTimeout(async () => {
+      try {
+        await updatePreference(type, { volume });
+      } catch {
+        toast.error('Error al actualizar volumen');
+      }
+    }, 300);
+  }, [updatePreference]);
 
   const handleSelectSound = async (type: NotificationType, soundId: string) => {
     try {
@@ -110,7 +134,7 @@ export function NotificationSoundSettings() {
           const pref = getPreferenceForType(type);
           const sound = getSoundForType(type);
           const isEnabled = pref?.is_enabled ?? true;
-          const volume = pref?.volume ?? 70;
+          const volume = localVolumes[type] ?? pref?.volume ?? 70;
 
           return (
             <Card key={type} className={!isEnabled ? 'opacity-60' : ''}>
