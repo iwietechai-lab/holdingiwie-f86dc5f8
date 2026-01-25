@@ -83,19 +83,15 @@ export function BrainGalaxyChat({
     const newFiles: AttachedFile[] = [];
     for (let i = 0; i < files.length && attachedFiles.length + newFiles.length < 5; i++) {
       const file = files[i];
-      if (file.size <= 20 * 1024 * 1024) { // 20MB limit
-        const previewUrl = file.type.startsWith('image/') 
-          ? URL.createObjectURL(file) 
-          : undefined;
-        newFiles.push({
-          file,
-          name: file.name,
-          type: file.type,
-          previewUrl,
-        });
-      } else {
-        toast.error(`${file.name} excede el límite de 20MB`);
-      }
+      const previewUrl = file.type.startsWith('image/') 
+        ? URL.createObjectURL(file) 
+        : undefined;
+      newFiles.push({
+        file,
+        name: file.name,
+        type: file.type,
+        previewUrl,
+      });
     }
     
     if (newFiles.length === 0) {
