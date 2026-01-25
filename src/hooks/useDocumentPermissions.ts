@@ -26,6 +26,7 @@ interface UserInfo {
   full_name: string | null;
   email: string | null;
   company_id: string | null;
+  role: string | null;
 }
 
 export function useDocumentPermissions() {
@@ -39,7 +40,7 @@ export function useDocumentPermissions() {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, full_name, email, company_id')
+        .select('id, full_name, email, company_id, role')
         .order('full_name');
 
       if (error) throw error;
