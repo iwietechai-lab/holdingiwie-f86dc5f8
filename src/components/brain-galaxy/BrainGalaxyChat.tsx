@@ -35,7 +35,7 @@ export function BrainGalaxyChat({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<BrainModel>(initialModel);
-  const [selectedArea, setSelectedArea] = useState<string>('');
+  const [selectedArea, setSelectedArea] = useState<string>('none');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -50,7 +50,7 @@ export function BrainGalaxyChat({
   const streamChat = useCallback(async (userMessages: ChatMessage[]) => {
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-galaxy-ai`;
 
-    const areaContext = selectedArea 
+    const areaContext = selectedArea && selectedArea !== 'none'
       ? areas.find(a => a.id === selectedArea)?.name 
       : undefined;
 
@@ -203,7 +203,7 @@ export function BrainGalaxyChat({
                 <SelectValue placeholder="Área (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin área específica</SelectItem>
+                <SelectItem value="none">Sin área específica</SelectItem>
                 {areas.map(area => (
                   <SelectItem key={area.id} value={area.id}>
                     {area.name}
