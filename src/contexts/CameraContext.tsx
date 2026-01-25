@@ -1,18 +1,16 @@
 /**
- * CAMERA CONTEXT PROVIDER - DEFINITIVE VERSION
+ * CAMERA CONTEXT PROVIDER v2
  * 
- * Provides application-wide camera state management and cleanup.
- * This context is injected at the App root level and:
- * - Listens to route changes to force cleanup on navigation
- * - Listens to window events (visibility, beforeunload, pagehide)
- * - Exposes camera service methods to any component
- * - Runs periodic verification checks when needed
- * - Uses aggressive cleanup to ensure camera is released
+ * Key changes:
+ * - Simplified verification loop (max 5 checks, not 10+)
+ * - No aggressive re-cleaning after success
+ * - Uses global verification state to avoid redundant checks
  */
 
 import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import cameraService from '@/utils/cameraService';
+import { isGlobalVerificationComplete } from '@/utils/verificationState';
 
 interface CameraContextValue {
   registerStream: (stream: MediaStream) => void;
@@ -51,158 +49,83 @@ const CAMERA_FREE_ROUTES = [
   '/configuracion',
 ];
 
-// Track if cleanup is in progress globally
-let globalCleanupInProgress = false;
-let globalLastCleanupTime = 0;
-const MIN_CLEANUP_INTERVAL = 500; // Don't cleanup more than once per 500ms
-
 export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const lastPathRef = useRef<string>(location.pathname);
-  const cleanupVerificationRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isCleaningRef = useRef(false);
-  const mountedRef = useRef(true);
+  const lastPathRef = useRef<string>('');
+  const verificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasCleanedOnRouteRef = useRef(false);
 
   // ===== ROUTE CHANGE HANDLER =====
-  // Force camera cleanup on ANY route change to camera-free routes
   useEffect(() => {
     const currentPath = location.pathname;
     const previousPath = lastPathRef.current;
     
-    if (currentPath !== previousPath) {
-      console.log(`📹 CameraContext: Route changed from ${previousPath} to ${currentPath}`);
-      lastPathRef.current = currentPath;
+    // Skip if same path
+    if (currentPath === previousPath) return;
+    
+    lastPathRef.current = currentPath;
+    
+    // Check if navigating to a camera-free route
+    const isCameraFreeRoute = CAMERA_FREE_ROUTES.some(route => 
+      currentPath.startsWith(route) || currentPath === route
+    );
+    
+    if (isCameraFreeRoute && !hasCleanedOnRouteRef.current) {
+      console.log('📹 CameraContext: Navigating to', currentPath, '- scheduling cleanup');
+      hasCleanedOnRouteRef.current = true;
       
-      // Check if navigating to a camera-free route
-      const isCameraFreeRoute = CAMERA_FREE_ROUTES.some(route => 
-        currentPath.startsWith(route) || currentPath === route
-      );
+      // Single cleanup - don't keep hammering
+      cameraService.forceStopAllCameras();
+      cameraService.scheduleCleanup();
       
-      if (isCameraFreeRoute) {
-        console.log('📹 CameraContext: Navigated to camera-free route - forcing cleanup');
-        
-        // Throttle cleanup calls
-        const now = Date.now();
-        if (!isCleaningRef.current && (now - globalLastCleanupTime > MIN_CLEANUP_INTERVAL)) {
-          isCleaningRef.current = true;
-          globalCleanupInProgress = true;
-          globalLastCleanupTime = now;
-          
-          // Immediate force stop
+      // One-time verification after 2 seconds
+      if (verificationTimeoutRef.current) {
+        clearTimeout(verificationTimeoutRef.current);
+      }
+      
+      verificationTimeoutRef.current = setTimeout(() => {
+        if (cameraService.isCameraActive()) {
+          console.log('📹 CameraContext: Post-navigation camera still active, forcing stop');
           cameraService.forceStopAllCameras();
-          
-          // Schedule progressive cleanup
-          cameraService.scheduleCleanup();
-          
-          // Reset flag after cleanup chain completes
-          setTimeout(() => {
-            isCleaningRef.current = false;
-            globalCleanupInProgress = false;
-          }, 5000);
-        }
-        
-        // Start verification loop
-        startVerificationLoop();
-      }
-    }
-  }, [location.pathname]);
-
-  // ===== VERIFICATION LOOP =====
-  // Runs multiple checks after navigation to ensure camera is off
-  const startVerificationLoop = useCallback(() => {
-    // Don't start if not mounted
-    if (!mountedRef.current) return;
-    
-    // Clear any existing verification
-    if (cleanupVerificationRef.current) {
-      clearInterval(cleanupVerificationRef.current);
-      cleanupVerificationRef.current = null;
-    }
-    
-    let checkCount = 0;
-    const MAX_CHECKS = 10; // Check for up to 10 seconds
-    
-    cleanupVerificationRef.current = setInterval(() => {
-      if (!mountedRef.current) {
-        if (cleanupVerificationRef.current) {
-          clearInterval(cleanupVerificationRef.current);
-          cleanupVerificationRef.current = null;
-        }
-        return;
-      }
-      
-      checkCount++;
-      
-      const isActive = cameraService.isCameraActive();
-      console.log(`📹 CameraContext: Verification check ${checkCount}/${MAX_CHECKS} - Camera active: ${isActive}`);
-      
-      if (isActive && checkCount <= MAX_CHECKS) {
-        console.warn('📹 CameraContext: Camera still active! Forcing additional cleanup...');
-        cameraService.forceStopAllCameras();
-      } else if (!isActive || checkCount >= MAX_CHECKS) {
-        // Stop verification loop
-        if (cleanupVerificationRef.current) {
-          clearInterval(cleanupVerificationRef.current);
-          cleanupVerificationRef.current = null;
-        }
-        
-        if (isActive) {
-          console.error('📹 CameraContext: ❌ CRITICAL - Camera could not be stopped after max attempts!');
         } else {
           console.log('📹 CameraContext: ✅ Camera verified stopped');
         }
-      }
-    }, 1000);
-  }, []);
+        hasCleanedOnRouteRef.current = false;
+      }, 2000);
+    }
+    
+    // Reset flag when leaving camera-free routes
+    if (!isCameraFreeRoute) {
+      hasCleanedOnRouteRef.current = false;
+    }
+  }, [location.pathname]);
 
   // ===== WINDOW EVENT HANDLERS =====
   useEffect(() => {
-    mountedRef.current = true;
-    
-    // Handle visibility change (tab switch, minimize)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        console.log('📹 CameraContext: Tab hidden - scheduling camera cleanup');
         cameraService.scheduleCleanup();
       }
     };
 
-    // Handle before unload (page close/refresh)
     const handleBeforeUnload = () => {
-      console.log('📹 CameraContext: Page unloading - forcing camera stop');
       cameraService.forceStopAllCameras();
     };
 
-    // Handle page hide (more reliable on mobile)
-    const handlePageHide = () => {
-      console.log('📹 CameraContext: Page hide - forcing camera stop');
-      cameraService.forceStopAllCameras();
-    };
-
-    // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pagehide', handleBeforeUnload);
 
-    console.log('📹 CameraContext: Window event listeners attached');
-
-    // Cleanup on unmount
     return () => {
-      mountedRef.current = false;
-      
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pagehide', handleBeforeUnload);
       
-      if (cleanupVerificationRef.current) {
-        clearInterval(cleanupVerificationRef.current);
-        cleanupVerificationRef.current = null;
+      if (verificationTimeoutRef.current) {
+        clearTimeout(verificationTimeoutRef.current);
       }
       
-      // Final cleanup on unmount
       cameraService.forceStopAllCameras();
-      
-      console.log('📹 CameraContext: Window event listeners removed');
     };
   }, []);
 
@@ -230,8 +153,7 @@ export const useCamera = (): CameraContextValue => {
   const context = useContext(CameraContext);
   
   if (!context) {
-    // If used outside provider, return direct service calls (fallback)
-    console.warn('📹 useCamera: Used outside CameraProvider, using direct service');
+    // Fallback for use outside provider
     return {
       registerStream: cameraService.registerStream,
       unregisterStream: cameraService.unregisterStream,

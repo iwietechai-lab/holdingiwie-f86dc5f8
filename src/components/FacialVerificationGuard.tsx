@@ -7,7 +7,7 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
-import { useCamera } from '@/contexts/CameraContext';
+import cameraService from '@/utils/cameraService';
 import { isGlobalVerificationComplete, setGlobalVerificationComplete } from '@/utils/verificationState';
 
 interface FacialVerificationGuardProps {
@@ -17,55 +17,31 @@ interface FacialVerificationGuardProps {
 export const FacialVerificationGuard = ({ children }: FacialVerificationGuardProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const camera = useCamera();
   const { user, isAuthenticated, isLoading: authLoading, logout } = useSupabaseAuth();
   const {
     isVerified,
     isLoading: verificationLoading,
     recordVerification,
-    getTimeSinceVerification,
   } = useFacialVerification(user?.id);
 
   const [showFaceRecognition, setShowFaceRecognition] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [verificationCompleteLocal, setVerificationCompleteLocal] = useState(isGlobalVerificationComplete());
+  const [verificationComplete, setVerificationComplete] = useState(isGlobalVerificationComplete());
   
-  const initRef = useRef(false);
-  const faceRecognitionMountedRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastLocationRef = useRef(location.pathname);
   const successHandledRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync with global state on mount
+  // Check global state on mount
   useEffect(() => {
     if (isGlobalVerificationComplete()) {
-      setVerificationCompleteLocal(true);
-      camera.scheduleCleanup();
+      setVerificationComplete(true);
     }
-  }, [camera]);
+  }, []);
 
-  // Force cleanup on route change
-  useEffect(() => {
-    if (location.pathname !== lastLocationRef.current) {
-      lastLocationRef.current = location.pathname;
-      if (!showFaceRecognition) {
-        camera.scheduleCleanup();
-      }
-    }
-  }, [location.pathname, showFaceRecognition, camera]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      camera.scheduleCleanup();
-    };
-  }, [camera]);
-
-  // Safety timeout
+  // Safety timeout for loading states
   useEffect(() => {
     if (authLoading || verificationLoading) {
-      timeoutRef.current = setTimeout(() => setHasError(true), 8000);
+      timeoutRef.current = setTimeout(() => setHasError(true), 10000);
     } else if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -82,49 +58,55 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
 
   // Show face recognition when needed
   useEffect(() => {
-    if (verificationCompleteLocal || initRef.current) return;
+    if (verificationComplete) return;
     if (authLoading || verificationLoading) return;
-    if (isAuthenticated && user && !isVerified) {
-      initRef.current = true;
-      faceRecognitionMountedRef.current = true;
+    if (isAuthenticated && user && !isVerified && !showFaceRecognition) {
       setShowFaceRecognition(true);
     }
-  }, [authLoading, verificationLoading, isAuthenticated, user, isVerified, verificationCompleteLocal]);
+  }, [authLoading, verificationLoading, isAuthenticated, user, isVerified, verificationComplete, showFaceRecognition]);
 
-  // Cleanup camera when hiding face recognition
+  // Cleanup on component unmount
   useEffect(() => {
-    if (!showFaceRecognition && faceRecognitionMountedRef.current) {
-      faceRecognitionMountedRef.current = false;
-      camera.forceStopAll();
-      camera.scheduleCleanup();
-    }
-  }, [showFaceRecognition, camera]);
+    return () => {
+      if (!showFaceRecognition) {
+        cameraService.forceStopAllCameras();
+      }
+    };
+  }, [showFaceRecognition]);
 
   const handleFaceSuccess = useCallback(async () => {
     if (successHandledRef.current) return;
     successHandledRef.current = true;
     
+    console.log('✅ FacialVerificationGuard: Face recognition success');
+    
+    // Update global state
     setGlobalVerificationComplete(true);
-    setVerificationCompleteLocal(true);
-    camera.forceStopAll();
-    camera.scheduleCleanup();
+    setVerificationComplete(true);
+    
+    // Stop camera immediately
+    cameraService.forceStopAllCameras();
+    cameraService.scheduleCleanup();
+    
+    // Hide face recognition
     setShowFaceRecognition(false);
     
+    // Record in database (async, don't wait)
     try { await recordVerification(); } catch (e) { console.error(e); }
-    
-    setTimeout(() => camera.verifyStopped(), 3000);
-  }, [recordVerification, camera]);
+  }, [recordVerification]);
 
-  const handleCancel = async () => {
-    camera.forceStopAll();
-    camera.scheduleCleanup();
+  const handleCancel = useCallback(async () => {
+    cameraService.forceStopAllCameras();
+    cameraService.scheduleCleanup();
     setShowFaceRecognition(false);
-    setTimeout(async () => {
-      await logout();
-      navigate('/login');
-    }, 200);
-  };
+    
+    // Small delay before logout to ensure cleanup
+    await new Promise(r => setTimeout(r, 200));
+    await logout();
+    navigate('/login', { replace: true });
+  }, [logout, navigate]);
 
+  // Error state
   if (hasError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -139,8 +121,12 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
           <CardContent className="space-y-4 text-center">
             <p className="text-muted-foreground">La verificación está tardando demasiado.</p>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={async () => { await logout(); navigate('/login', { replace: true }); }}>Cerrar Sesión</Button>
-              <Button className="flex-1" onClick={() => window.location.reload()}>Reintentar</Button>
+              <Button variant="outline" className="flex-1" onClick={async () => { await logout(); navigate('/login', { replace: true }); }}>
+                Cerrar Sesión
+              </Button>
+              <Button className="flex-1" onClick={() => window.location.reload()}>
+                Reintentar
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -148,24 +134,56 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     );
   }
 
+  // Auth loading
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><SpaceBackground /><div className="text-center space-y-4"><div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /><p className="text-muted-foreground">Verificando sesión...</p></div></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Verificando sesión...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Not authenticated
   if (!isAuthenticated || !user) {
-    return <div className="min-h-screen flex items-center justify-center"><SpaceBackground /><div className="text-center space-y-4"><div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /><p className="text-muted-foreground">Redirigiendo...</p></div></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Redirigiendo...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (verificationCompleteLocal) return <>{children}</>;
+  // Already verified - render children
+  if (verificationComplete) {
+    return <>{children}</>;
+  }
 
+  // Verification loading
   if (verificationLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><SpaceBackground /><div className="text-center space-y-4"><div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /><p className="text-muted-foreground">Verificando identidad...</p></div></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <SpaceBackground />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Verificando identidad...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Show face recognition
   if (showFaceRecognition) {
     return <RealFaceRecognition userId={user.id} onSuccess={handleFaceSuccess} onCancel={handleCancel} />;
   }
 
+  // Verification required prompt
   if (!isVerified) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -186,9 +204,12 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
               </div>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={handleCancel}>Cancelar</Button>
-              <Button className="flex-1" onClick={() => { faceRecognitionMountedRef.current = true; setShowFaceRecognition(true); }}>
-                <Fingerprint className="w-4 h-4 mr-2" />Verificar
+              <Button variant="outline" className="flex-1" onClick={handleCancel}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={() => setShowFaceRecognition(true)}>
+                <Fingerprint className="w-4 h-4 mr-2" />
+                Verificar
               </Button>
             </div>
           </CardContent>
@@ -212,11 +233,18 @@ export const VerificationStatusBadge = ({ userId }: { userId: string | undefined
           <Fingerprint className="w-4 h-4" />
           <div className="flex flex-col">
             <span className="font-medium">Verificación facial activa</span>
-            {timeSince && <span className="text-[10px] opacity-80 flex items-center gap-1"><Clock className="w-3 h-3" />Último: {timeSince}</span>}
+            {timeSince && (
+              <span className="text-[10px] opacity-80 flex items-center gap-1">
+                <Clock className="w-3 h-3" />Último: {timeSince}
+              </span>
+            )}
           </div>
         </>
       ) : (
-        <><AlertTriangle className="w-4 h-4" /><span>Verificación requerida</span></>
+        <>
+          <AlertTriangle className="w-4 h-4" />
+          <span>Verificación requerida</span>
+        </>
       )}
     </div>
   );
