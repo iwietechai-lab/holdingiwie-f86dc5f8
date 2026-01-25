@@ -2,3 +2,6 @@ project_id = "svrrliskjlpmsofjjqrx"
 
 [functions.ceo-chatbot]
 verify_jwt = false
+
+[functions.brain-galaxy-ai]
+verify_jwt = false

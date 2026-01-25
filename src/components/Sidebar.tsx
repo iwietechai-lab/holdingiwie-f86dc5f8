@@ -24,7 +24,8 @@ import {
   TrendingUp,
   ArrowLeft,
   X,
-  Target
+  Target,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { companies, getCompanyById } from '@/data/companies';
@@ -137,6 +138,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
     { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
     { icon: Bell, label: 'Gestor Notificaciones', action: 'navigate', path: '/configuracion' },
+    { icon: Brain, label: 'Brain Galaxy', action: 'navigate', path: '/brain-galaxy' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     // Only show superadmin panel to the superadmin user
