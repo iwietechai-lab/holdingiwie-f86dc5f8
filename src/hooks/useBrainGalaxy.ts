@@ -245,6 +245,106 @@ export function useBrainGalaxy(userId: string | undefined) {
     }
   }, [userId, userStats, addPoints, toast]);
 
+  // Create a new area
+  const createArea = useCallback(async (area: {
+    name: string;
+    description: string;
+    icon: string;
+    color: string;
+  }) => {
+    try {
+      const { data, error } = await supabase
+        .from('brain_galaxy_areas')
+        .insert({
+          name: area.name,
+          description: area.description,
+          icon: area.icon,
+          color: area.color,
+          is_system_default: false,
+          order_index: areas.length + 1,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setAreas(prev => [...prev, data as BrainGalaxyArea]);
+      toast({
+        title: 'Área creada',
+        description: `El área "${area.name}" se ha creado correctamente`,
+      });
+      return true;
+    } catch (error) {
+      console.error('Error creating area:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear el área',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [areas.length, toast]);
+
+  // Create a new course
+  const createCourse = useCallback(async (course: {
+    title: string;
+    description: string;
+    areaId: string;
+    difficultyLevel: string;
+    estimatedHours: number;
+    modules: { id: string; title: string; description: string; estimatedMinutes: number }[];
+    isPublic: boolean;
+  }) => {
+    if (!userId) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('brain_galaxy_courses')
+        .insert({
+          user_id: userId,
+          title: course.title,
+          description: course.description,
+          area_id: course.areaId || null,
+          difficulty_level: course.difficultyLevel,
+          estimated_hours: course.estimatedHours,
+          curriculum_structure: course.modules,
+          is_public: course.isPublic,
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMyCourses(prev => [data as unknown as BrainGalaxyCourse, ...prev]);
+
+      // Update stats
+      await supabase
+        .from('brain_galaxy_user_stats')
+        .update({
+          courses_created: (userStats?.courses_created || 0) + 1,
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      await addPoints(75, 'Curso creado');
+
+      toast({
+        title: 'Curso creado',
+        description: `El curso "${course.title}" se ha guardado como borrador`,
+      });
+      return true;
+    } catch (error) {
+      console.error('Error creating course:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear el curso',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [userId, userStats, addPoints, toast]);
+
   return {
     isLoading,
     areas,
@@ -260,6 +360,8 @@ export function useBrainGalaxy(userId: string | undefined) {
     addPoints,
     createChatSession,
     uploadContent,
+    createArea,
+    createCourse,
     refetch: fetchData,
   };
 }

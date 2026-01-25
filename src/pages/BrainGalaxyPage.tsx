@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, BookOpen, Target, Trophy, MessageSquare, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking } from '@/components/brain-galaxy';
+import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
+import { CourseBuilder } from '@/components/brain-galaxy/CourseBuilder';
 import { useBrainGalaxy } from '@/hooks/useBrainGalaxy';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,9 +22,13 @@ export default function BrainGalaxyPage() {
     getCurrentLevel,
     getNextLevel,
     getLevelProgress,
+    createArea,
+    createCourse,
   } = useBrainGalaxy(user?.id);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showCreateArea, setShowCreateArea] = useState(false);
+  const [showCourseBuilder, setShowCourseBuilder] = useState(false);
 
   if (isLoading) {
     return (
@@ -35,6 +42,21 @@ export default function BrainGalaxyPage() {
             <Skeleton className="h-24" />
           </div>
           <Skeleton className="h-64" />
+        </div>
+      </ResponsiveLayout>
+    );
+  }
+
+  // Show course builder if active
+  if (showCourseBuilder) {
+    return (
+      <ResponsiveLayout>
+        <div className="p-4 md:p-6">
+          <CourseBuilder
+            areas={areas}
+            onBack={() => setShowCourseBuilder(false)}
+            onSaveCourse={createCourse}
+          />
         </div>
       </ResponsiveLayout>
     );
@@ -56,6 +78,10 @@ export default function BrainGalaxyPage() {
               </p>
             </div>
           </div>
+          <Button variant="outline" onClick={() => setShowCreateArea(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Área
+          </Button>
         </div>
 
         {/* Main Tabs */}
@@ -88,7 +114,7 @@ export default function BrainGalaxyPage() {
                 levelProgress={getLevelProgress()}
                 myCourses={myCourses}
                 activeMissions={activeMissions}
-                onCreateCourse={() => setActiveTab('courses')}
+                onCreateCourse={() => setShowCourseBuilder(true)}
                 onUploadContent={() => {}}
                 onOpenChat={() => setActiveTab('chat')}
                 onViewMissions={() => setActiveTab('missions')}
@@ -115,6 +141,13 @@ export default function BrainGalaxyPage() {
           </div>
         </Tabs>
       </div>
+
+      {/* Create Area Dialog */}
+      <CreateAreaDialog
+        open={showCreateArea}
+        onOpenChange={setShowCreateArea}
+        onCreateArea={createArea}
+      />
     </ResponsiveLayout>
   );
 }
