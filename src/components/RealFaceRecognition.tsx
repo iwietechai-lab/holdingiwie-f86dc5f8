@@ -4,16 +4,7 @@ import { Button } from '@/components/ui/button';
 import * as faceapi from 'face-api.js';
 import { supabase } from '@/lib/supabase';
 import cameraService from '@/utils/cameraService';
-
-// Session verification key (must match useFacialVerification hook)
-const SESSION_VERIFIED_KEY = 'facial_verification_done';
-const markSessionVerified = () => {
-  try {
-    sessionStorage.setItem(SESSION_VERIFIED_KEY, 'true');
-  } catch {
-    console.warn('Could not save to sessionStorage');
-  }
-};
+import { markSessionVerified } from '@/hooks/useFacialVerification';
 
 interface LocationData {
   latitude?: number;

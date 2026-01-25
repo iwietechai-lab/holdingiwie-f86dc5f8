@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { SUPERADMIN_USER_ID, DashboardVisibility, DEFAULT_DASHBOARD_VISIBILITY } from '@/types/superadmin';
+import { resetGlobalVerification, clearVerificationStorage } from '@/utils/verificationState';
 
 interface UserProfile {
   id: string;
@@ -372,6 +373,10 @@ export const useSupabaseAuth = () => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Reset global verification state
+    resetGlobalVerification();
+    clearVerificationStorage();
+    
     await supabase.auth.signOut();
     setAuthState({
       user: null,
