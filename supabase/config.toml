@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.brain-galaxy-ai]
 verify_jwt = false
+
+[functions.firecrawl-scrape]
+verify_jwt = false
+
+[functions.process-collective-memory]
+verify_jwt = false
+
+[functions.query-collective-memory]
+verify_jwt = false
