@@ -1,5 +1,5 @@
 /**
- * CAMERA CONTEXT PROVIDER
+ * CAMERA CONTEXT PROVIDER - DEFINITIVE VERSION
  * 
  * Provides application-wide camera state management and cleanup.
  * This context is injected at the App root level and:
@@ -7,6 +7,7 @@
  * - Listens to window events (visibility, beforeunload, pagehide)
  * - Exposes camera service methods to any component
  * - Runs periodic verification checks when needed
+ * - Uses aggressive cleanup to ensure camera is released
  */
 
 import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
@@ -50,14 +51,20 @@ const CAMERA_FREE_ROUTES = [
   '/configuracion',
 ];
 
+// Track if cleanup is in progress globally
+let globalCleanupInProgress = false;
+let globalLastCleanupTime = 0;
+const MIN_CLEANUP_INTERVAL = 500; // Don't cleanup more than once per 500ms
+
 export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const lastPathRef = useRef<string>(location.pathname);
-  const cleanupVerificationRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanupVerificationRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCleaningRef = useRef(false);
+  const mountedRef = useRef(true);
 
   // ===== ROUTE CHANGE HANDLER =====
-  // Force camera cleanup on ANY route change
+  // Force camera cleanup on ANY route change to camera-free routes
   useEffect(() => {
     const currentPath = location.pathname;
     const previousPath = lastPathRef.current;
@@ -74,14 +81,24 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (isCameraFreeRoute) {
         console.log('📹 CameraContext: Navigated to camera-free route - forcing cleanup');
         
-        if (!isCleaningRef.current) {
+        // Throttle cleanup calls
+        const now = Date.now();
+        if (!isCleaningRef.current && (now - globalLastCleanupTime > MIN_CLEANUP_INTERVAL)) {
           isCleaningRef.current = true;
+          globalCleanupInProgress = true;
+          globalLastCleanupTime = now;
+          
+          // Immediate force stop
+          cameraService.forceStopAllCameras();
+          
+          // Schedule progressive cleanup
           cameraService.scheduleCleanup();
           
           // Reset flag after cleanup chain completes
           setTimeout(() => {
             isCleaningRef.current = false;
-          }, 4000);
+            globalCleanupInProgress = false;
+          }, 5000);
         }
         
         // Start verification loop
@@ -93,15 +110,27 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // ===== VERIFICATION LOOP =====
   // Runs multiple checks after navigation to ensure camera is off
   const startVerificationLoop = useCallback(() => {
+    // Don't start if not mounted
+    if (!mountedRef.current) return;
+    
     // Clear any existing verification
     if (cleanupVerificationRef.current) {
       clearInterval(cleanupVerificationRef.current);
+      cleanupVerificationRef.current = null;
     }
     
     let checkCount = 0;
-    const MAX_CHECKS = 15; // Check for up to 15 seconds
+    const MAX_CHECKS = 10; // Check for up to 10 seconds
     
     cleanupVerificationRef.current = setInterval(() => {
+      if (!mountedRef.current) {
+        if (cleanupVerificationRef.current) {
+          clearInterval(cleanupVerificationRef.current);
+          cleanupVerificationRef.current = null;
+        }
+        return;
+      }
+      
       checkCount++;
       
       const isActive = cameraService.isCameraActive();
@@ -128,6 +157,8 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // ===== WINDOW EVENT HANDLERS =====
   useEffect(() => {
+    mountedRef.current = true;
+    
     // Handle visibility change (tab switch, minimize)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -157,13 +188,19 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Cleanup on unmount
     return () => {
+      mountedRef.current = false;
+      
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handlePageHide);
       
       if (cleanupVerificationRef.current) {
         clearInterval(cleanupVerificationRef.current);
+        cleanupVerificationRef.current = null;
       }
+      
+      // Final cleanup on unmount
+      cameraService.forceStopAllCameras();
       
       console.log('📹 CameraContext: Window event listeners removed');
     };
