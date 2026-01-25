@@ -146,6 +146,7 @@ export function useBrainGalaxy(userId: string | undefined) {
           brain_model: brainModel,
           context_area_id: areaId || null,
           messages: [],
+          title: 'Nueva conversación',
         })
         .select()
         .single();
@@ -163,6 +164,106 @@ export function useBrainGalaxy(userId: string | undefined) {
         variant: 'destructive',
       });
       return null;
+    }
+  }, [userId, toast]);
+
+  // Save chat session messages
+  const saveChatSession = useCallback(async (
+    sessionId: string, 
+    messages: any[], 
+    title?: string,
+    brainModel?: BrainModel,
+    areaId?: string
+  ) => {
+    if (!userId) return false;
+
+    try {
+      const updateData: any = {
+        messages,
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (title) updateData.title = title;
+      if (brainModel) updateData.brain_model = brainModel;
+      if (areaId !== undefined) updateData.context_area_id = areaId || null;
+
+      const { error } = await supabase
+        .from('brain_galaxy_chat_sessions')
+        .update(updateData)
+        .eq('id', sessionId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      setChatSessions(prev => prev.map(s => 
+        s.id === sessionId 
+          ? { ...s, ...updateData, messages } 
+          : s
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving chat session:', error);
+      return false;
+    }
+  }, [userId]);
+
+  // Load a specific chat session
+  const loadChatSession = useCallback(async (sessionId: string) => {
+    if (!userId) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('brain_galaxy_chat_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+      
+      return data as unknown as BrainGalaxyChatSession;
+    } catch (error) {
+      console.error('Error loading chat session:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo cargar la sesión de chat',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }, [userId, toast]);
+
+  // Delete a chat session
+  const deleteChatSession = useCallback(async (sessionId: string) => {
+    if (!userId) return false;
+
+    try {
+      const { error } = await supabase
+        .from('brain_galaxy_chat_sessions')
+        .delete()
+        .eq('id', sessionId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+      
+      toast({
+        title: 'Conversación eliminada',
+        description: 'La conversación se ha eliminado correctamente',
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar la conversación',
+        variant: 'destructive',
+      });
+      return false;
     }
   }, [userId, toast]);
 
@@ -359,6 +460,9 @@ export function useBrainGalaxy(userId: string | undefined) {
     getLevelProgress,
     addPoints,
     createChatSession,
+    saveChatSession,
+    loadChatSession,
+    deleteChatSession,
     uploadContent,
     createArea,
     createCourse,

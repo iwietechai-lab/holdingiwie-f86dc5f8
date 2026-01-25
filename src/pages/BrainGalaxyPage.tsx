@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus } from 'lucide-react';
+import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
+import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
 import { CourseBuilder } from '@/components/brain-galaxy/CourseBuilder';
 import { useBrainGalaxy } from '@/hooks/useBrainGalaxy';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { BrainGalaxyChatSession, ChatMessage, BrainModel } from '@/types/brain-galaxy';
+import { toast } from 'sonner';
 
 export default function BrainGalaxyPage() {
   const { user } = useSupabaseAuth();
@@ -19,16 +22,80 @@ export default function BrainGalaxyPage() {
     userStats,
     myCourses,
     activeMissions,
+    chatSessions,
     getCurrentLevel,
     getNextLevel,
     getLevelProgress,
     createArea,
     createCourse,
+    createChatSession,
+    saveChatSession,
+    loadChatSession,
+    deleteChatSession,
   } = useBrainGalaxy(user?.id);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCreateArea, setShowCreateArea] = useState(false);
   const [showCourseBuilder, setShowCourseBuilder] = useState(false);
+  const [showChatHistory, setShowChatHistory] = useState(true);
+  const [currentSession, setCurrentSession] = useState<BrainGalaxyChatSession | null>(null);
+  const [chatKey, setChatKey] = useState(0); // Force re-render chat component
+
+  // Handle selecting a session from history
+  const handleSelectSession = useCallback(async (session: BrainGalaxyChatSession) => {
+    const fullSession = await loadChatSession(session.id);
+    if (fullSession) {
+      setCurrentSession(fullSession);
+      setChatKey(prev => prev + 1); // Force chat component to reload
+    }
+  }, [loadChatSession]);
+
+  // Handle creating a new chat
+  const handleNewChat = useCallback(async () => {
+    const newSession = await createChatSession();
+    if (newSession) {
+      setCurrentSession(newSession);
+      setChatKey(prev => prev + 1);
+    }
+  }, [createChatSession]);
+
+  // Handle saving chat session
+  const handleSaveSession = useCallback(async (
+    messages: ChatMessage[], 
+    model?: BrainModel, 
+    areaId?: string
+  ) => {
+    if (!currentSession) {
+      // Create new session if none exists
+      const newSession = await createChatSession(model, areaId);
+      if (newSession) {
+        setCurrentSession(newSession);
+        // Generate title from first user message
+        const firstUserMsg = messages.find(m => m.role === 'user');
+        const title = firstUserMsg 
+          ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
+          : 'Nueva conversación';
+        await saveChatSession(newSession.id, messages, title, model, areaId);
+      }
+    } else {
+      // Update existing session
+      const firstUserMsg = messages.find(m => m.role === 'user');
+      const title = currentSession.title === 'Nueva conversación' && firstUserMsg
+        ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
+        : undefined;
+      await saveChatSession(currentSession.id, messages, title, model, areaId);
+    }
+  }, [currentSession, createChatSession, saveChatSession]);
+
+  // Handle deleting a session
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    const success = await deleteChatSession(sessionId);
+    if (success && currentSession?.id === sessionId) {
+      setCurrentSession(null);
+      setChatKey(prev => prev + 1);
+    }
+    return success;
+  }, [deleteChatSession, currentSession]);
 
   if (isLoading) {
     return (
@@ -68,7 +135,7 @@ export default function BrainGalaxyPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/60">
               <Brain className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -122,7 +189,58 @@ export default function BrainGalaxyPage() {
             </TabsContent>
 
             <TabsContent value="chat" className="m-0">
-              <BrainGalaxyChat areas={areas} />
+              <div className="flex gap-4 h-[calc(100vh-16rem)]">
+                {/* Chat History Sidebar */}
+                {showChatHistory && (
+                  <div className="w-72 border rounded-lg bg-card shrink-0 hidden md:flex flex-col">
+                    <div className="flex items-center justify-between p-3 border-b">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <History className="h-4 w-4" />
+                        Historial
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setShowChatHistory(false)}
+                      >
+                        <PanelLeftClose className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <ChatSessionsList
+                      sessions={chatSessions}
+                      currentSessionId={currentSession?.id}
+                      onSelectSession={handleSelectSession}
+                      onNewChat={handleNewChat}
+                      onDeleteSession={handleDeleteSession}
+                    />
+                  </div>
+                )}
+                
+                {/* Chat Area */}
+                <div className="flex-1 flex flex-col min-w-0">
+                  {!showChatHistory && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="self-start mb-2 gap-2"
+                      onClick={() => setShowChatHistory(true)}
+                    >
+                      <PanelLeft className="h-4 w-4" />
+                      Mostrar historial
+                    </Button>
+                  )}
+                  <BrainGalaxyChat 
+                    key={chatKey}
+                    sessionId={currentSession?.id}
+                    initialModel={currentSession?.brain_model || 'brain-4'}
+                    initialMessages={currentSession?.messages}
+                    initialAreaId={currentSession?.context_area_id || undefined}
+                    areas={areas} 
+                    onSaveSession={handleSaveSession}
+                  />
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="missions" className="m-0">

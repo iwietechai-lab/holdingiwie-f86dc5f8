@@ -33,8 +33,10 @@ interface AttachedFile {
 interface BrainGalaxyChatProps {
   sessionId?: string;
   initialModel?: BrainModel;
+  initialMessages?: ChatMessage[];
+  initialAreaId?: string;
   areas: BrainGalaxyArea[];
-  onSaveSession?: (messages: ChatMessage[]) => void;
+  onSaveSession?: (messages: ChatMessage[], model?: BrainModel, areaId?: string) => void;
   onUploadFile?: (file: File) => Promise<string | null>;
 }
 
@@ -59,15 +61,17 @@ const getFileTypeLabel = (type: string, name: string): string => {
 export function BrainGalaxyChat({
   sessionId,
   initialModel = 'brain-4',
+  initialMessages = [],
+  initialAreaId,
   areas,
   onSaveSession,
   onUploadFile,
 }: BrainGalaxyChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<BrainModel>(initialModel);
-  const [selectedArea, setSelectedArea] = useState<string>('none');
+  const [selectedArea, setSelectedArea] = useState<string>(initialAreaId || 'none');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [processingFiles, setProcessingFiles] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -280,6 +284,14 @@ Presenta estas opciones de forma clara y amigable.`,
     return assistantContent;
   }, [selectedModel, selectedArea, areas]);
 
+  // Auto-save session when messages change
+  const saveSession = useCallback((msgs: ChatMessage[]) => {
+    if (onSaveSession && msgs.length > 0) {
+      const areaId = selectedArea === 'none' ? undefined : selectedArea;
+      onSaveSession(msgs, selectedModel, areaId);
+    }
+  }, [onSaveSession, selectedModel, selectedArea]);
+
   const handleSend = async () => {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
 
@@ -300,9 +312,11 @@ Presenta estas opciones de forma clara y amigable.`,
 
       try {
         await streamChat(updatedMessages.map(m => ({ role: m.role, content: m.content })));
-        if (onSaveSession) {
-          onSaveSession(updatedMessages);
-        }
+        // Get final messages after streaming
+        setMessages(prev => {
+          saveSession(prev);
+          return prev;
+        });
       } catch (error) {
         console.error('Chat error:', error);
         setMessages(prev => [
@@ -336,9 +350,11 @@ Presenta estas opciones de forma clara y amigable.`,
 
     try {
       await streamChat(updatedMessages.map(m => ({ role: m.role, content: m.content })));
-      if (onSaveSession) {
-        onSaveSession(updatedMessages);
-      }
+      // Get final messages after streaming
+      setMessages(prev => {
+        saveSession(prev);
+        return prev;
+      });
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [
