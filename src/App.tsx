@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 import { IncomingCallAlert } from "./components/meetings/IncomingCallAlert";
 import { MobileBlocker } from "./components/MobileBlocker";
+import { CameraProvider } from "./contexts/CameraContext";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
 // QueryClient for React Query data fetching
@@ -86,13 +87,22 @@ function AppContent() {
   );
 }
 
+// Wrapper that provides CameraContext (needs to be inside BrowserRouter)
+function AppWithCameraProvider() {
+  return (
+    <CameraProvider>
+      <AppContent />
+    </CameraProvider>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppContent />
+        <AppWithCameraProvider />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
