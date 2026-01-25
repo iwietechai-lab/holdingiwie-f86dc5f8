@@ -49,6 +49,8 @@ interface StudioChatProps {
   onClearProposal?: () => void;
   foundSources?: FoundSource[];
   isCreatingCourse?: boolean;
+  creationMode?: 'manual' | 'ai';
+  onStartNewChat?: () => void;
 }
 
 const QUICK_PROMPTS = [
@@ -98,6 +100,8 @@ export function StudioChat({
   onClearProposal,
   foundSources = [],
   isCreatingCourse = false,
+  creationMode = 'ai',
+  onStartNewChat,
 }: StudioChatProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -147,11 +151,18 @@ export function StudioChat({
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold">Chat</h3>
+          <h3 className="font-semibold">
+            {creationMode === 'ai' ? 'Chat con IA' : 'Definir Estructura'}
+          </h3>
           {isCreatingCourse && (
             <Badge variant="secondary" className="gap-1">
               <GraduationCap className="h-3 w-3" />
               Creando curso...
+            </Badge>
+          )}
+          {creationMode === 'manual' && (
+            <Badge variant="outline" className="gap-1 text-xs">
+              Modo Manual
             </Badge>
           )}
         </div>
@@ -315,48 +326,82 @@ export function StudioChat({
             {showEmptyState && (
               <div className="text-center py-8 text-muted-foreground">
                 <div className="relative mx-auto w-16 h-16 mb-4">
-                  <Sparkles className="h-16 w-16 mx-auto opacity-50" />
-                  <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
+                  {creationMode === 'ai' ? (
+                    <>
+                      <Sparkles className="h-16 w-16 mx-auto opacity-50" />
+                      <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-16 w-16 mx-auto opacity-50" />
+                      <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
+                    </>
+                  )}
                 </div>
-                <p className="font-medium text-foreground">Brain Galaxy Studio</p>
+                <p className="font-medium text-foreground">
+                  {creationMode === 'ai' ? 'Crear Curso con IA' : 'Crear Curso Manual'}
+                </p>
                 <p className="text-sm mt-2 max-w-md mx-auto">
-                  {readySources.length > 0 
-                    ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. ¡Pregunta lo que quieras o pídeme que cree un curso!`
-                    : 'Puedo crear cursos completos desde cero. Dime sobre qué tema quieres aprender y buscaré las mejores fuentes.'
+                  {creationMode === 'ai' 
+                    ? (readySources.length > 0 
+                        ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. ¡Pregunta lo que quieras o pídeme que cree un curso!`
+                        : 'Dime sobre qué tema quieres aprender. Brain Galaxy buscará fuentes, estructurará el contenido y creará tu curso automáticamente.'
+                      )
+                    : 'Sube tu material en el panel de Fuentes. Luego puedes usar el chat para organizar el contenido y generar la estructura del curso.'
                   }
                 </p>
                 
                 {/* Quick actions */}
                 <div className="mt-6 space-y-3">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {readySources.length > 0 ? 'Acciones rápidas' : 'Empieza así'}
+                    {creationMode === 'ai' 
+                      ? (readySources.length > 0 ? 'Acciones rápidas' : 'Empieza así')
+                      : 'Pasos para crear tu curso'
+                    }
                   </p>
                   
-                  {readySources.length > 0 ? (
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {QUICK_PROMPTS.map((item, i) => (
-                        <Badge 
-                          key={i}
-                          variant="outline" 
-                          className="cursor-pointer hover:bg-muted py-1.5 px-3"
-                          onClick={() => handleQuickPrompt(item.prompt, item.placeholder)}
-                        >
-                          {item.icon} {item.label}
-                        </Badge>
-                      ))}
-                    </div>
+                  {creationMode === 'ai' ? (
+                    readySources.length > 0 ? (
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {QUICK_PROMPTS.map((item, i) => (
+                          <Badge 
+                            key={i}
+                            variant="outline" 
+                            className="cursor-pointer hover:bg-muted py-1.5 px-3"
+                            onClick={() => handleQuickPrompt(item.prompt, item.placeholder)}
+                          >
+                            {item.icon} {item.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-w-md mx-auto">
+                        {COURSE_CREATION_STARTERS.slice(0, 3).map((starter, i) => (
+                          <button
+                            key={i}
+                            className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors text-sm"
+                            onClick={() => onSendMessage(starter)}
+                          >
+                            <span className="text-primary mr-2">💡</span>
+                            {starter}
+                          </button>
+                        ))}
+                      </div>
+                    )
                   ) : (
-                    <div className="space-y-2 max-w-md mx-auto">
-                      {COURSE_CREATION_STARTERS.slice(0, 3).map((starter, i) => (
-                        <button
-                          key={i}
-                          className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors text-sm"
-                          onClick={() => onSendMessage(starter)}
-                        >
-                          <span className="text-primary mr-2">💡</span>
-                          {starter}
-                        </button>
-                      ))}
+                    <div className="space-y-2 max-w-md mx-auto text-left">
+                      <div className="p-3 rounded-lg border text-sm">
+                        <span className="text-primary font-medium mr-2">1.</span>
+                        Sube archivos PDF, documentos o URLs en el panel "Fuentes"
+                      </div>
+                      <div className="p-3 rounded-lg border text-sm">
+                        <span className="text-primary font-medium mr-2">2.</span>
+                        Define la estructura: módulos, duración y objetivos
+                      </div>
+                      <div className="p-3 rounded-lg border text-sm">
+                        <span className="text-primary font-medium mr-2">3.</span>
+                        Usa las herramientas Studio para generar contenido adicional
+                      </div>
                     </div>
                   )}
                 </div>
@@ -447,28 +492,39 @@ export function StudioChat({
         </div>
       )}
 
-      {/* Input */}
+      {/* Input - Fixed Height Textarea */}
       <div className="p-4 border-t">
+        {onStartNewChat && messages.length > 0 && (
+          <div className="flex justify-end mb-2">
+            <Button variant="ghost" size="sm" onClick={onStartNewChat} className="text-xs">
+              + Nueva conversación
+            </Button>
+          </div>
+        )}
         <div className="flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isCreatingCourse 
-                ? "Agrega más detalles o fuentes..." 
-                : readySources.length > 0 
-                  ? "Pregunta sobre tus documentos..." 
-                  : "Describe el curso que quieres crear o haz una pregunta..."
-            }
-            className="min-h-[60px] resize-none"
-            disabled={isLoading}
-          />
+          <div className="flex-1 relative">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                creationMode === 'manual'
+                  ? "Describe tu curso, sube materiales y estructura los módulos..."
+                  : isCreatingCourse 
+                    ? "Agrega más detalles o fuentes..." 
+                    : readySources.length > 0 
+                      ? "Pregunta sobre tus documentos..." 
+                      : "¿Qué curso quieres crear? Describe el tema y te ayudo a estructurarlo..."
+              }
+              className="min-h-[80px] max-h-[120px] resize-none pr-12"
+              disabled={isLoading}
+            />
+          </div>
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             size="icon"
-            className="h-[60px]"
+            className="h-20 w-12"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -478,7 +534,10 @@ export function StudioChat({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {readySources.length} fuente{readySources.length !== 1 ? 's' : ''} disponible{readySources.length !== 1 ? 's' : ''}
+          {creationMode === 'ai' 
+            ? `${readySources.length} fuente${readySources.length !== 1 ? 's' : ''} • La IA estructura tu curso automáticamente`
+            : `${readySources.length} fuente${readySources.length !== 1 ? 's' : ''} • Tú defines la estructura del curso`
+          }
         </p>
       </div>
     </div>
