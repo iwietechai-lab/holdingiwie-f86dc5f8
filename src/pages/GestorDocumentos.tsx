@@ -58,7 +58,7 @@ import {
 import { companies } from '@/data/companies';
 import { documentService } from '@/services/documentService';
 import { DocumentViewer } from '@/components/DocumentViewer';
-import { UserPermissionSelector } from '@/components/documents/UserPermissionSelector';
+import { HoldingUserSelector } from '@/components/documents/HoldingUserSelector';
 import { RequestAccessDialog } from '@/components/documents/RequestAccessDialog';
 import { EditPermissionsDialog } from '@/components/documents/EditPermissionsDialog';
 import {
@@ -772,8 +772,8 @@ export const GestorDocumentos = () => {
               </Label>
             </div>
 
-            {/* User Permissions Selector */}
-            <UserPermissionSelector
+            {/* User Permissions Selector - Shows all holding users */}
+            <HoldingUserSelector
               users={users}
               selectedUsers={selectedUserPermissions}
               onSelectionChange={setSelectedUserPermissions}
