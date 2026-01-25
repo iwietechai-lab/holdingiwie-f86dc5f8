@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck, X, AlertTriangle, Info, Calendar, Ticket, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,12 +24,24 @@ const TYPE_ICONS = {
 
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
 
   const handleNotificationClick = (notificationId: string, actionUrl?: string) => {
     markAsRead(notificationId);
     if (actionUrl) {
-      window.location.href = actionUrl;
+      // Use React Router navigate instead of window.location to preserve app state
+      setOpen(false);
+      // Handle both internal and external URLs
+      if (actionUrl.startsWith('/') || actionUrl.startsWith(window.location.origin)) {
+        const path = actionUrl.startsWith(window.location.origin) 
+          ? actionUrl.replace(window.location.origin, '') 
+          : actionUrl;
+        navigate(path);
+      } else {
+        // External URL - open in new tab
+        window.open(actionUrl, '_blank');
+      }
     }
   };
 
