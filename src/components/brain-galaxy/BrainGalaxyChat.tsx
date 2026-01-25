@@ -8,21 +8,28 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Send, 
   Loader2, 
-  Upload, 
-  Link, 
+  Paperclip, 
   Sparkles,
   Brain,
   X,
+  FileText,
 } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import type { BrainModel, ChatMessage, BrainGalaxyArea, BRAIN_MODELS } from '@/types/brain-galaxy';
+import type { BrainModel, ChatMessage, BrainGalaxyArea } from '@/types/brain-galaxy';
 import { BRAIN_MODELS as MODELS } from '@/types/brain-galaxy';
+
+interface AttachedFile {
+  file: File;
+  name: string;
+  type: string;
+}
 
 interface BrainGalaxyChatProps {
   sessionId?: string;
   initialModel?: BrainModel;
   areas: BrainGalaxyArea[];
   onSaveSession?: (messages: ChatMessage[]) => void;
+  onUploadFile?: (file: File) => Promise<string | null>;
 }
 
 export function BrainGalaxyChat({
@@ -30,16 +37,42 @@ export function BrainGalaxyChat({
   initialModel = 'brain-4',
   areas,
   onSaveSession,
+  onUploadFile,
 }: BrainGalaxyChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<BrainModel>(initialModel);
   const [selectedArea, setSelectedArea] = useState<string>('none');
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedModelInfo = MODELS.find(m => m.id === selectedModel);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const newFiles: AttachedFile[] = [];
+    for (let i = 0; i < files.length && attachedFiles.length + newFiles.length < 5; i++) {
+      const file = files[i];
+      if (file.size <= 20 * 1024 * 1024) { // 20MB limit
+        newFiles.push({
+          file,
+          name: file.name,
+          type: file.type,
+        });
+      }
+    }
+    setAttachedFiles([...attachedFiles, ...newFiles]);
+    e.target.value = ''; // Reset input
+  };
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -288,8 +321,49 @@ export function BrainGalaxyChat({
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t space-y-2">
+        {/* Attached files preview */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm"
+              >
+                <FileText className="h-3 w-3" />
+                <span className="truncate max-w-[150px]">{file.name}</span>
+                <button
+                  onClick={() => removeAttachedFile(index)}
+                  className="hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
         <div className="flex gap-2">
+          {/* File attachment button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.txt,.md,.xlsx,.xls,.pptx,.jpg,.jpeg,.png,.mp3,.mp4"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-[60px] shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || attachedFiles.length >= 5}
+            title="Adjuntar archivo"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          
           <Textarea
             ref={textareaRef}
             value={input}
@@ -299,20 +373,18 @@ export function BrainGalaxyChat({
             className="min-h-[60px] resize-none"
             disabled={isLoading}
           />
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="h-[60px]"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="h-[60px] shrink-0"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </div>
     </Card>
