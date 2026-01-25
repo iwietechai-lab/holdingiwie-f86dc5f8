@@ -130,40 +130,54 @@ export function useNotificationPreferences(): UseNotificationPreferencesReturn {
       try {
         const existingPref = getPreferenceForType(type);
 
-        if (existingPref) {
-          // Update existing preference
-          const { error: updateError } = await supabase
-            .from('user_notification_preferences')
-            .update({
-              ...updates,
+        // Use upsert to handle both insert and update cases
+        const { error: upsertError } = await supabase
+          .from('user_notification_preferences')
+          .upsert(
+            {
+              id: existingPref?.id,
+              user_id: user.id,
+              notification_type: type,
+              sound_id: updates.sound_id !== undefined ? updates.sound_id : (existingPref?.sound_id ?? null),
+              is_enabled: updates.is_enabled !== undefined ? updates.is_enabled : (existingPref?.is_enabled ?? true),
+              volume: updates.volume !== undefined ? updates.volume : (existingPref?.volume ?? 70),
               updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingPref.id);
+            },
+            { onConflict: 'user_id,notification_type' }
+          );
 
-          if (updateError) throw updateError;
-        } else {
-          // Create new preference
-          const { error: insertError } = await supabase
-            .from('user_notification_preferences')
-            .insert({
+        if (upsertError) throw upsertError;
+
+        // Update local state optimistically
+        setPreferences((prev) => {
+          const existing = prev.find((p) => p.notification_type === type);
+          if (existing) {
+            return prev.map((p) =>
+              p.notification_type === type
+                ? { ...p, ...updates, updated_at: new Date().toISOString() }
+                : p
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
               user_id: user.id,
               notification_type: type,
               sound_id: updates.sound_id ?? null,
               is_enabled: updates.is_enabled ?? true,
               volume: updates.volume ?? 70,
-            });
-
-          if (insertError) throw insertError;
-        }
-
-        // Refresh preferences
-        await fetchPreferences();
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as UserNotificationPreference,
+          ];
+        });
       } catch (err) {
         console.error('Error updating notification preference:', err);
         throw err;
       }
     },
-    [user, getPreferenceForType, fetchPreferences]
+    [user, getPreferenceForType]
   );
 
   return {
