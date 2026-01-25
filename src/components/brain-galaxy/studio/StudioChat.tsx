@@ -3,15 +3,39 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Send, 
   Loader2, 
   Sparkles,
   Settings2,
   Search,
+  BookOpen,
+  Plus,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  Globe,
+  Lightbulb,
+  GraduationCap,
 } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import type { ChatMessage, Source, StudioOutput } from './types';
+
+interface FoundSource {
+  title: string;
+  url?: string;
+  type: 'web' | 'internal' | 'suggested';
+  description?: string;
+}
+
+interface CourseProposal {
+  title: string;
+  description: string;
+  modules: { title: string; description: string; topics: string[] }[];
+  sources: FoundSource[];
+  suggestedTopics?: string[];
+}
 
 interface StudioChatProps {
   messages: ChatMessage[];
@@ -20,7 +44,47 @@ interface StudioChatProps {
   sources: Source[];
   currentOutput?: StudioOutput;
   onClearOutput: () => void;
+  onAddSourceFromSuggestion?: (suggestion: { type: 'url' | 'text'; name: string; content?: string; url?: string }) => void;
+  courseProposal?: CourseProposal | null;
+  onClearProposal?: () => void;
+  foundSources?: FoundSource[];
+  isCreatingCourse?: boolean;
 }
+
+const QUICK_PROMPTS = [
+  {
+    icon: '🎓',
+    label: 'Crear curso desde cero',
+    prompt: 'Quiero crear un curso sobre ',
+    placeholder: true,
+  },
+  {
+    icon: '📝',
+    label: 'Resumir',
+    prompt: 'Resume los puntos principales de mis documentos',
+    placeholder: false,
+  },
+  {
+    icon: '💡',
+    label: 'Ideas clave',
+    prompt: '¿Cuáles son las ideas más importantes?',
+    placeholder: false,
+  },
+  {
+    icon: '🎓',
+    label: 'Explicar simple',
+    prompt: 'Explícame esto como si fuera un principiante',
+    placeholder: false,
+  },
+];
+
+const COURSE_CREATION_STARTERS = [
+  'Quiero crear un curso sobre programación en Python para principiantes',
+  'Necesito un curso de marketing digital para emprendedores',
+  'Ayúdame a diseñar un curso de finanzas personales',
+  'Crear un curso de diseño 3D con Blender',
+  'Quiero un curso sobre inteligencia artificial aplicada a negocios',
+];
 
 export function StudioChat({
   messages,
@@ -29,6 +93,11 @@ export function StudioChat({
   sources,
   currentOutput,
   onClearOutput,
+  onAddSourceFromSuggestion,
+  courseProposal,
+  onClearProposal,
+  foundSources = [],
+  isCreatingCourse = false,
 }: StudioChatProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -37,7 +106,7 @@ export function StudioChat({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, currentOutput]);
+  }, [messages, currentOutput, courseProposal]);
 
   const handleSend = () => {
     if (!input.trim() || isLoading) return;
@@ -52,13 +121,40 @@ export function StudioChat({
     }
   };
 
+  const handleQuickPrompt = (prompt: string, hasPlaceholder: boolean) => {
+    if (hasPlaceholder) {
+      setInput(prompt);
+    } else {
+      onSendMessage(prompt);
+    }
+  };
+
+  const handleAddSource = (source: FoundSource) => {
+    if (onAddSourceFromSuggestion && source.url) {
+      onAddSourceFromSuggestion({
+        type: 'url',
+        name: source.title,
+        url: source.url,
+      });
+    }
+  };
+
   const readySources = sources.filter(s => s.status === 'ready');
+  const showEmptyState = messages.length === 0 && !currentOutput && !courseProposal;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col border-x">
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="font-semibold">Chat</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold">Chat</h3>
+          {isCreatingCourse && (
+            <Badge variant="secondary" className="gap-1">
+              <GraduationCap className="h-3 w-3" />
+              Creando curso...
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Settings2 className="h-4 w-4" />
@@ -66,7 +162,7 @@ export function StudioChat({
         </div>
       </div>
 
-      {/* Output Display or Chat */}
+      {/* Output Display, Course Proposal, or Chat */}
       <ScrollArea ref={scrollRef} className="flex-1">
         {currentOutput ? (
           <div className="p-4 space-y-4">
@@ -81,46 +177,193 @@ export function StudioChat({
               <MarkdownRenderer content={currentOutput.content} />
             </div>
           </div>
+        ) : courseProposal ? (
+          <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <Badge variant="default" className="gap-1">
+                <BookOpen className="h-3 w-3" />
+                Propuesta de Curso
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={onClearProposal}>
+                Volver al chat
+              </Button>
+            </div>
+            
+            {/* Course Preview */}
+            <Card className="border-primary/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">{courseProposal.title}</CardTitle>
+                <p className="text-sm text-muted-foreground">{courseProposal.description}</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-sm mb-2">Módulos propuestos</h4>
+                  <div className="space-y-2">
+                    {courseProposal.modules.map((module, i) => (
+                      <div key={i} className="p-2 rounded bg-muted/50 text-sm">
+                        <p className="font-medium">{i + 1}. {module.title}</p>
+                        <p className="text-muted-foreground text-xs">{module.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Found Sources */}
+            {courseProposal.sources.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Fuentes encontradas para tu curso
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Estas son las fuentes que utilizaré para crear el contenido. Puedes agregar más.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {courseProposal.sources.map((source, i) => (
+                    <div 
+                      key={i} 
+                      className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {source.type === 'web' ? (
+                          <Globe className="h-4 w-4 text-primary shrink-0" />
+                        ) : source.type === 'internal' ? (
+                          <FileText className="h-4 w-4 text-accent-foreground shrink-0" />
+                        ) : (
+                          <Lightbulb className="h-4 w-4 text-secondary-foreground shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{source.title}</p>
+                          {source.description && (
+                            <p className="text-xs text-muted-foreground truncate">{source.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {source.url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => window.open(source.url, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleAddSource(source)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Suggested Topics to Add */}
+            {courseProposal.suggestedTopics && courseProposal.suggestedTopics.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" />
+                    ¿Quieres agregar más temas?
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {courseProposal.suggestedTopics.map((topic, i) => (
+                      <Badge 
+                        key={i} 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-muted"
+                        onClick={() => setInput(`Agrega información sobre: ${topic}`)}
+                      >
+                        + {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1 gap-2"
+                onClick={() => onSendMessage('Procede a crear el curso con las fuentes actuales')}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Crear curso con estas fuentes
+              </Button>
+            </div>
+
+            <p className="text-xs text-center text-muted-foreground">
+              O escribe en el chat para agregar más fuentes o modificar la estructura
+            </p>
+          </div>
         ) : (
           <div className="p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Chat con tus documentos</p>
-                <p className="text-sm mt-2">
+            {showEmptyState && (
+              <div className="text-center py-8 text-muted-foreground">
+                <div className="relative mx-auto w-16 h-16 mb-4">
+                  <Sparkles className="h-16 w-16 mx-auto opacity-50" />
+                  <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
+                </div>
+                <p className="font-medium text-foreground">Brain Galaxy Studio</p>
+                <p className="text-sm mt-2 max-w-md mx-auto">
                   {readySources.length > 0 
-                    ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. ¡Pregunta lo que quieras!`
-                    : 'Añade fuentes para comenzar a chatear con ellas.'
+                    ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. ¡Pregunta lo que quieras o pídeme que cree un curso!`
+                    : 'Puedo crear cursos completos desde cero. Dime sobre qué tema quieres aprender y buscaré las mejores fuentes.'
                   }
                 </p>
-                {readySources.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    <Badge 
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-muted"
-                      onClick={() => setInput('Resume los puntos principales de mis documentos')}
-                    >
-                      📝 Resumir
-                    </Badge>
-                    <Badge 
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-muted"
-                      onClick={() => setInput('¿Cuáles son las ideas más importantes?')}
-                    >
-                      💡 Ideas clave
-                    </Badge>
-                    <Badge 
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-muted"
-                      onClick={() => setInput('Explícame esto como si fuera un principiante')}
-                    >
-                      🎓 Explicar simple
-                    </Badge>
-                  </div>
-                )}
+                
+                {/* Quick actions */}
+                <div className="mt-6 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {readySources.length > 0 ? 'Acciones rápidas' : 'Empieza así'}
+                  </p>
+                  
+                  {readySources.length > 0 ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {QUICK_PROMPTS.map((item, i) => (
+                        <Badge 
+                          key={i}
+                          variant="outline" 
+                          className="cursor-pointer hover:bg-muted py-1.5 px-3"
+                          onClick={() => handleQuickPrompt(item.prompt, item.placeholder)}
+                        >
+                          {item.icon} {item.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-w-md mx-auto">
+                      {COURSE_CREATION_STARTERS.slice(0, 3).map((starter, i) => (
+                        <button
+                          key={i}
+                          className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors text-sm"
+                          onClick={() => onSendMessage(starter)}
+                        >
+                          <span className="text-primary mr-2">💡</span>
+                          {starter}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
+            {/* Chat messages */}
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -142,12 +385,48 @@ export function StudioChat({
               </div>
             ))}
 
+            {/* Found sources inline */}
+            {foundSources.length > 0 && !courseProposal && (
+              <Card className="bg-muted/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Fuentes encontradas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {foundSources.map((source, i) => (
+                    <div 
+                      key={i} 
+                      className="flex items-center justify-between p-2 rounded border bg-background"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Globe className="h-4 w-4 text-primary shrink-0" />
+                        <p className="text-sm truncate">{source.title}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1"
+                        onClick={() => handleAddSource(source)}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Agregar
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Analizando fuentes...</span>
+                    <span className="text-sm text-muted-foreground">
+                      {isCreatingCourse ? 'Buscando fuentes y estructurando curso...' : 'Analizando fuentes...'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -157,9 +436,9 @@ export function StudioChat({
       </ScrollArea>
 
       {/* Deep Research Banner */}
-      {readySources.length > 0 && !currentOutput && (
+      {readySources.length > 0 && !currentOutput && !courseProposal && (
         <div className="px-4 py-2 border-t">
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 text-primary">
             <Search className="h-4 w-4" />
             <span className="text-xs">
               Prueba <strong>Deep Research</strong> para obtener un informe detallado y nuevas fuentes.
@@ -175,16 +454,19 @@ export function StudioChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={readySources.length > 0 
-              ? "Pregunta sobre tus documentos..." 
-              : "Sube una fuente para empezar"
+            placeholder={
+              isCreatingCourse 
+                ? "Agrega más detalles o fuentes..." 
+                : readySources.length > 0 
+                  ? "Pregunta sobre tus documentos..." 
+                  : "Describe el curso que quieres crear o haz una pregunta..."
             }
             className="min-h-[60px] resize-none"
-            disabled={isLoading || readySources.length === 0}
+            disabled={isLoading}
           />
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading || readySources.length === 0}
+            disabled={!input.trim() || isLoading}
             size="icon"
             className="h-[60px]"
           >
@@ -196,7 +478,7 @@ export function StudioChat({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {readySources.length} fuente{readySources.length !== 1 ? 's' : ''}
+          {readySources.length} fuente{readySources.length !== 1 ? 's' : ''} disponible{readySources.length !== 1 ? 's' : ''}
         </p>
       </div>
     </div>

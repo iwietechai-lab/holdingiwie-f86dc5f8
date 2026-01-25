@@ -9,6 +9,21 @@ import { StudioToolsPanel } from './StudioToolsPanel';
 import type { Source, StudioOutput, StudioToolType, ChatMessage } from './types';
 import type { BrainGalaxyArea, BrainGalaxyContent } from '@/types/brain-galaxy';
 
+interface FoundSource {
+  title: string;
+  url?: string;
+  type: 'web' | 'internal' | 'suggested';
+  description?: string;
+}
+
+interface CourseProposal {
+  title: string;
+  description: string;
+  modules: { title: string; description: string; topics: string[] }[];
+  sources: FoundSource[];
+  suggestedTopics?: string[];
+}
+
 interface StudioBuilderProps {
   areas: BrainGalaxyArea[];
   existingContent: BrainGalaxyContent[];
@@ -22,6 +37,24 @@ interface StudioBuilderProps {
     modules: { id: string; title: string; description: string; estimatedMinutes: number }[];
     isPublic: boolean;
   }) => Promise<boolean>;
+}
+
+// Course creation detection patterns
+const COURSE_CREATION_PATTERNS = [
+  /quiero (crear|hacer|diseñar|armar) un curso/i,
+  /crear un curso/i,
+  /diseñar un curso/i,
+  /necesito un curso/i,
+  /ayúdame a (crear|diseñar|hacer) un curso/i,
+  /curso sobre/i,
+  /curso de/i,
+  /curso para/i,
+  /crear capacitación/i,
+  /programa de aprendizaje/i,
+];
+
+function detectCourseCreationIntent(message: string): boolean {
+  return COURSE_CREATION_PATTERNS.some(pattern => pattern.test(message));
 }
 
 export function StudioBuilder({
@@ -38,6 +71,9 @@ export function StudioBuilder({
   const [generatingTool, setGeneratingTool] = useState<StudioToolType>();
   const [currentOutput, setCurrentOutput] = useState<StudioOutput>();
   const [isScrapingUrl, setIsScrapingUrl] = useState(false);
+  const [courseProposal, setCourseProposal] = useState<CourseProposal | null>(null);
+  const [foundSources, setFoundSources] = useState<FoundSource[]>([]);
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
 
   const addSource = useCallback((sourceData: Omit<Source, 'id' | 'addedAt'>) => {
     const newSource: Source = {
@@ -84,6 +120,151 @@ export function StudioBuilder({
     ).join('\n\n');
   }, [sources]);
 
+  const handleAddSourceFromSuggestion = useCallback(async (suggestion: { 
+    type: 'url' | 'text'; 
+    name: string; 
+    content?: string; 
+    url?: string 
+  }) => {
+    if (suggestion.type === 'url' && suggestion.url) {
+      try {
+        const content = await scrapeUrl(suggestion.url);
+        addSource({
+          type: 'url',
+          name: suggestion.name,
+          content,
+          metadata: { url: suggestion.url, scrapedAt: new Date().toISOString() },
+          status: 'ready',
+        });
+      } catch (error) {
+        // Error handled in scrapeUrl
+      }
+    } else if (suggestion.content) {
+      addSource({
+        type: 'text',
+        name: suggestion.name,
+        content: suggestion.content,
+        status: 'ready',
+      });
+    }
+  }, [addSource, scrapeUrl]);
+
+  const processCourseCreationRequest = useCallback(async (message: string, allMessages: ChatMessage[]) => {
+    setIsCreatingCourse(true);
+    
+    try {
+      const sourcesContext = getSourcesContext();
+      
+      // First, get a course proposal with sources
+      const proposalResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-galaxy-ai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `Eres un experto en diseño instruccional de Brain Galaxy Studio. El usuario quiere crear un curso.
+
+Tu tarea es:
+1. Analizar el tema solicitado
+2. Proponer una estructura de curso con módulos
+3. Identificar fuentes relevantes (URLs reales de internet, documentos internos, o temas sugeridos)
+4. Sugerir temas adicionales que el usuario podría querer incluir
+
+${sourcesContext ? `FUENTES DISPONIBLES DEL USUARIO:\n${sourcesContext}\n\nUsa estas fuentes si son relevantes para el curso.` : ''}
+
+RESPONDE SIEMPRE EN FORMATO JSON con esta estructura exacta:
+{
+  "title": "Título del curso",
+  "description": "Descripción breve del curso",
+  "modules": [
+    {
+      "title": "Módulo 1: Nombre",
+      "description": "Qué aprenderá el estudiante",
+      "topics": ["Tema 1", "Tema 2"]
+    }
+  ],
+  "sources": [
+    {
+      "title": "Nombre de la fuente",
+      "url": "https://...",
+      "type": "web",
+      "description": "Por qué es útil esta fuente"
+    }
+  ],
+  "suggestedTopics": ["Tema adicional 1", "Tema adicional 2"],
+  "explanation": "Breve explicación de la propuesta"
+}
+
+Para las fuentes tipo "web", usa URLs reales de sitios educativos conocidos (MDN, W3Schools, Khan Academy, Coursera, documentación oficial, etc.).
+Para fuentes tipo "internal", usa contenido de las fuentes del usuario.
+Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podría agregar.`,
+              },
+              ...allMessages.map(m => ({ role: m.role, content: m.content })),
+            ],
+            brainModel: 'brain-4',
+            action: 'chat',
+            mode: 'fusion',
+          }),
+        }
+      );
+
+      if (!proposalResponse.ok) throw new Error('Error generando propuesta');
+
+      const data = await proposalResponse.json();
+      const responseContent = data.choices?.[0]?.message?.content || '';
+      
+      // Try to parse JSON from response
+      try {
+        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const proposal = JSON.parse(jsonMatch[0]) as CourseProposal & { explanation?: string };
+          setCourseProposal(proposal);
+          setFoundSources(proposal.sources || []);
+          
+          // Add explanation as assistant message
+          const assistantMessage: ChatMessage = {
+            id: `msg-${Date.now()}`,
+            role: 'assistant',
+            content: proposal.explanation || `He analizado tu solicitud y preparado una propuesta de curso. Revisa la estructura y las fuentes que encontré. Puedes agregar más material o pedirme que modifique la estructura.`,
+            timestamp: new Date().toISOString(),
+          };
+          setChatMessages(prev => [...prev, assistantMessage]);
+          
+        } else {
+          // No JSON, treat as regular response
+          const assistantMessage: ChatMessage = {
+            id: `msg-${Date.now()}`,
+            role: 'assistant',
+            content: responseContent,
+            timestamp: new Date().toISOString(),
+          };
+          setChatMessages(prev => [...prev, assistantMessage]);
+        }
+      } catch (parseError) {
+        // JSON parse failed, use as regular message
+        const assistantMessage: ChatMessage = {
+          id: `msg-${Date.now()}`,
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date().toISOString(),
+        };
+        setChatMessages(prev => [...prev, assistantMessage]);
+      }
+      
+    } catch (error) {
+      console.error('Course creation error:', error);
+      toast.error('Error al crear la propuesta del curso');
+    } finally {
+      setIsCreatingCourse(false);
+    }
+  }, [getSourcesContext]);
+
   const sendChatMessage = useCallback(async (message: string) => {
     if (isLoading) return;
 
@@ -99,6 +280,20 @@ export function StudioBuilder({
     setIsLoading(true);
 
     try {
+      // Check if this is a course creation request
+      if (detectCourseCreationIntent(message) && sources.length === 0) {
+        await processCourseCreationRequest(message, updatedMessages);
+        return;
+      }
+
+      // Check if user wants to proceed with course creation
+      if (message.toLowerCase().includes('procede') && message.toLowerCase().includes('curso') && courseProposal) {
+        // Generate the actual course using the tool
+        await generateOutput('course');
+        setCourseProposal(null);
+        return;
+      }
+
       const sourcesContext = getSourcesContext();
       
       const response = await fetch(
@@ -113,7 +308,19 @@ export function StudioBuilder({
             messages: [
               {
                 role: 'system',
-                content: `Eres un asistente experto que analiza documentos. Tienes acceso a las siguientes fuentes:\n\n${sourcesContext}\n\nResponde las preguntas del usuario basándote en estas fuentes. Si la información no está en las fuentes, indícalo claramente.`,
+                content: `Eres Brain Galaxy Studio, un asistente experto en educación y creación de contenido.
+
+${sourcesContext ? `FUENTES DISPONIBLES:\n${sourcesContext}\n\nResponde basándote en estas fuentes cuando sea relevante.` : 'No hay fuentes cargadas aún.'}
+
+${courseProposal ? `PROPUESTA DE CURSO ACTUAL:\n${JSON.stringify(courseProposal, null, 2)}\n\nPuedes modificar esta propuesta según las indicaciones del usuario.` : ''}
+
+CAPACIDADES:
+- Puedo crear cursos completos desde cero
+- Busco y sugiero fuentes de información
+- Analizo documentos y extraigo conocimiento
+- Genero quizzes, flashcards, mapas mentales, etc.
+
+Responde de manera clara, útil y en español.`,
               },
               ...updatedMessages.map(m => ({ role: m.role, content: m.content })),
             ],
@@ -143,13 +350,15 @@ export function StudioBuilder({
     } finally {
       setIsLoading(false);
     }
-  }, [chatMessages, getSourcesContext, isLoading]);
+  }, [chatMessages, getSourcesContext, isLoading, courseProposal, sources.length, processCourseCreationRequest]);
 
   const generateOutput = useCallback(async (toolType: StudioToolType) => {
     if (isGenerating) return;
 
     const readySources = sources.filter(s => s.status === 'ready');
-    if (readySources.length === 0) {
+    
+    // Allow course generation even without sources if we have a proposal
+    if (readySources.length === 0 && toolType !== 'course') {
       toast.error('Añade al menos una fuente primero');
       return;
     }
@@ -171,7 +380,9 @@ export function StudioBuilder({
         'presentation': 'Crea slides para una presentación. Formato:\n\n**Slide 1: [Título]**\n- Punto 1\n- Punto 2\n[Nota del presentador]\n\nGenera al menos 10 slides.',
         'data-table': 'Extrae y organiza la información en tablas. Formato Markdown. Identifica datos estructurables como fechas, números, comparaciones.',
         'deep-research': 'Realiza una investigación profunda. Analiza las fuentes, identifica gaps de información, sugiere preguntas de investigación adicionales, y proporciona un análisis exhaustivo.',
-        'course': 'Genera una malla curricular completa en JSON con el formato:\n{\n  "title": "Título del curso",\n  "description": "Descripción",\n  "objectives": ["Objetivo 1"],\n  "difficulty": "beginner|intermediate|advanced",\n  "estimated_hours": 10,\n  "modules": [{"title": "Módulo 1", "description": "Desc", "estimated_minutes": 60, "topics": ["Tema 1"]}]\n}',
+        'course': courseProposal 
+          ? `Genera un curso completo basado en esta propuesta:\n${JSON.stringify(courseProposal, null, 2)}\n\nFormato JSON:\n{\n  "title": "Título",\n  "description": "Descripción",\n  "objectives": ["Objetivo 1"],\n  "difficulty": "beginner|intermediate|advanced",\n  "estimated_hours": 10,\n  "modules": [{"title": "Módulo 1", "description": "Desc", "estimated_minutes": 60, "topics": ["Tema 1"], "content": "Contenido completo del módulo..."}]\n}`
+          : 'Genera una malla curricular completa en JSON con el formato:\n{\n  "title": "Título del curso",\n  "description": "Descripción",\n  "objectives": ["Objetivo 1"],\n  "difficulty": "beginner|intermediate|advanced|expert",\n  "estimated_hours": 10,\n  "modules": [{"title": "Módulo 1", "description": "Desc", "estimated_minutes": 60, "topics": ["Tema 1"]}]\n}',
       };
 
       const response = await fetch(
@@ -186,7 +397,7 @@ export function StudioBuilder({
             messages: [
               {
                 role: 'system',
-                content: `Eres un experto en creación de contenido educativo. Analiza las siguientes fuentes y genera el contenido solicitado.\n\nFUENTES:\n${sourcesContext}`,
+                content: `Eres un experto en creación de contenido educativo. ${sourcesContext ? `Analiza las siguientes fuentes y genera el contenido solicitado.\n\nFUENTES:\n${sourcesContext}` : 'Genera contenido educativo de alta calidad.'}`,
               },
               {
                 role: 'user',
@@ -240,6 +451,7 @@ export function StudioBuilder({
           if (jsonMatch) {
             const courseData = JSON.parse(jsonMatch[0]);
             // Could auto-save or prompt user
+            console.log('Course data:', courseData);
           }
         } catch (e) {
           console.log('Could not parse course JSON');
@@ -253,7 +465,7 @@ export function StudioBuilder({
       setIsGenerating(false);
       setGeneratingTool(undefined);
     }
-  }, [getSourcesContext, isGenerating, sources]);
+  }, [getSourcesContext, isGenerating, sources, courseProposal]);
 
   const hasSourcesReady = sources.some(s => s.status === 'ready');
 
@@ -288,10 +500,15 @@ export function StudioBuilder({
         <StudioChat
           messages={chatMessages}
           onSendMessage={sendChatMessage}
-          isLoading={isLoading}
+          isLoading={isLoading || isCreatingCourse}
           sources={sources}
           currentOutput={currentOutput}
           onClearOutput={() => setCurrentOutput(undefined)}
+          onAddSourceFromSuggestion={handleAddSourceFromSuggestion}
+          courseProposal={courseProposal}
+          onClearProposal={() => setCourseProposal(null)}
+          foundSources={foundSources}
+          isCreatingCourse={isCreatingCourse}
         />
 
         {/* Studio Tools Panel */}
@@ -301,7 +518,7 @@ export function StudioBuilder({
           onViewOutput={setCurrentOutput}
           isGenerating={isGenerating}
           generatingTool={generatingTool}
-          hasSourcesReady={hasSourcesReady}
+          hasSourcesReady={hasSourcesReady || !!courseProposal}
         />
       </div>
     </div>
