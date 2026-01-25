@@ -138,7 +138,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
-    { icon: Settings, label: 'Configuración', action: 'dev' },
+    { icon: Settings, label: 'Configuración', action: 'navigate', path: '/configuracion' },
     // Only show superadmin panel to the superadmin user
     ...(isSuperadmin ? [{ 
       icon: ShieldAlert, 

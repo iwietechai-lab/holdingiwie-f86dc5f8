@@ -2196,6 +2196,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_sounds: {
+        Row: {
+          category: string
+          created_at: string | null
+          display_name: string
+          file_name: string
+          file_path: string
+          id: string
+          is_default: boolean | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          display_name: string
+          file_name: string
+          file_path: string
+          id?: string
+          is_default?: boolean | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          display_name?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          is_default?: boolean | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
@@ -2721,6 +2751,47 @@ export type Database = {
             columns: ["position_id"]
             isOneToOne: false
             referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_notification_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          notification_type: string
+          sound_id: string | null
+          updated_at: string | null
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          notification_type: string
+          sound_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          notification_type?: string
+          sound_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_preferences_sound_id_fkey"
+            columns: ["sound_id"]
+            isOneToOne: false
+            referencedRelation: "notification_sounds"
             referencedColumns: ["id"]
           },
         ]
