@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, AlertTriangle, Fingerprint, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,13 +7,16 @@ import { RealFaceRecognition } from '@/components/RealFaceRecognition';
 import { SpaceBackground } from '@/components/SpaceBackground';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useFacialVerification } from '@/hooks/useFacialVerification';
-import cameraService from '@/utils/cameraService';
+import { useCamera } from '@/contexts/CameraContext';
+
 interface FacialVerificationGuardProps {
   children: React.ReactNode;
 }
 
 export const FacialVerificationGuard = ({ children }: FacialVerificationGuardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const camera = useCamera();
   const { user, isAuthenticated, isLoading: authLoading, logout } = useSupabaseAuth();
   const {
     isVerified,
@@ -27,6 +30,19 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   const [hasError, setHasError] = useState(false);
   const initRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLocationRef = useRef(location.pathname);
+
+  // Force cleanup when navigating away from face recognition
+  useEffect(() => {
+    if (location.pathname !== lastLocationRef.current) {
+      console.log('📹 FacialVerificationGuard: Route changed, forcing camera cleanup');
+      lastLocationRef.current = location.pathname;
+      
+      if (!showFaceRecognition) {
+        camera.scheduleCleanup();
+      }
+    }
+  }, [location.pathname, showFaceRecognition, camera]);
 
   // Clear timeout on unmount and cleanup camera
   useEffect(() => {
@@ -34,9 +50,10 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      cameraService.scheduleCleanup();
+      console.log('📹 FacialVerificationGuard: Unmounting - scheduling cleanup');
+      camera.scheduleCleanup();
     };
-  }, []);
+  }, [camera]);
 
   // Safety timeout - if total loading exceeds 8 seconds, show error
   useEffect(() => {
@@ -80,15 +97,15 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   useEffect(() => {
     if (!showFaceRecognition) {
       console.log('📹 FacialVerificationGuard: showFaceRecognition is false - scheduling aggressive cleanup');
-      // Schedule cleanup via camera service
-      cameraService.scheduleCleanup();
+      // Schedule cleanup via camera context
+      camera.scheduleCleanup();
       
       // Also verify after a delay that camera is actually stopped
       const verifyTimeout = setTimeout(() => {
-        const isActive = cameraService.isCameraActive();
+        const isActive = camera.isCameraActive();
         if (isActive) {
           console.warn('📹 FacialVerificationGuard: Camera still active after hiding! Forcing additional cleanup...');
-          cameraService.forceStopAllCameras();
+          camera.forceStopAll();
         } else {
           console.log('📹 FacialVerificationGuard: ✅ Camera verified stopped');
         }
@@ -96,14 +113,14 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
       
       return () => clearTimeout(verifyTimeout);
     }
-  }, [showFaceRecognition]);
+  }, [showFaceRecognition, camera]);
 
   const handleFaceSuccess = useCallback(async () => {
     console.log('🎉 FacialVerificationGuard: ===== FACE SUCCESS =====');
     
     // Step 1: Schedule camera cleanup FIRST (before any state changes)
     console.log('📹 FacialVerificationGuard: Scheduling camera cleanup before state change');
-    cameraService.scheduleCleanup();
+    camera.scheduleCleanup();
     
     // Step 2: Hide component IMMEDIATELY (this unmounts RealFaceRecognition)
     console.log('📹 FacialVerificationGuard: Setting showFaceRecognition to false');
@@ -120,17 +137,17 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     // Step 4: Final verification that camera is stopped
     setTimeout(() => {
       console.log('📹 FacialVerificationGuard: Final camera state verification');
-      cameraService.verifyCamerasStopped();
+      camera.verifyStopped();
     }, 4000);
     
     console.log('✅ FacialVerificationGuard: ===== SUCCESS HANDLING COMPLETE =====');
-  }, [recordVerification]);
+  }, [recordVerification, camera]);
 
   const handleCancel = async () => {
     console.log('📹 FacialVerificationGuard: ===== CANCEL =====');
     
     // Step 1: Schedule camera cleanup FIRST
-    cameraService.scheduleCleanup();
+    camera.scheduleCleanup();
     
     // Step 2: Hide component immediately
     setShowFaceRecognition(false);
@@ -138,7 +155,7 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     // Step 3: Delay logout to ensure cleanup completes
     setTimeout(async () => {
       // Verify camera is stopped before logout
-      cameraService.verifyCamerasStopped();
+      camera.verifyStopped();
       
       console.log('📹 FacialVerificationGuard: Running logout after cleanup verified');
       await logout();
