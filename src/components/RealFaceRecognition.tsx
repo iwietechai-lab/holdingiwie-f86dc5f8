@@ -253,39 +253,64 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   }, []);
 
   // ===== DEFINITIVE CAMERA CLEANUP FUNCTION =====
+  // This function is ISOLATED and uses the centralized camera service
   const stopCameraStream = useCallback(() => {
-    console.log('📹 RealFaceRecognition: stopCameraStream() called');
+    // Prevent concurrent calls
+    if (isStoppingRef.current) {
+      console.log('📹 RealFaceRecognition: stopCameraStream already in progress, skipping');
+      return;
+    }
     
+    console.log('📹 RealFaceRecognition: ===== STOP CAMERA STREAM =====');
     isStoppingRef.current = true;
     cleanedUpRef.current = true;
     
-    // Step 1: Cancel animation frame FIRST
+    // Step 1: Cancel animation frame IMMEDIATELY
     if (animationRef.current) {
-      console.log('📹 Cancelling animation frame');
+      console.log('📹 Cancelling animation frame:', animationRef.current);
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     
-    // Step 2: Unregister and stop streamRef
+    // Step 2: Unregister our stream from the service
     if (streamRef.current) {
+      console.log('📹 Unregistering and stopping local stream');
       cameraService.unregisterStream(streamRef.current);
-      streamRef.current.getTracks().forEach(track => {
-        console.log('📹 Stopping streamRef track:', track.kind);
-        track.stop();
-      });
+      
+      // Stop tracks manually first
+      try {
+        streamRef.current.getTracks().forEach(track => {
+          console.log('📹 Stopping local track:', track.kind, 'state:', track.readyState);
+          track.enabled = false;
+          track.stop();
+        });
+      } catch (e) {
+        console.warn('📹 Error stopping local tracks:', e);
+      }
       streamRef.current = null;
     }
     
-    // Step 3: Use centralized camera service for complete cleanup
-    cameraService.forceStopAllCameras();
+    // Step 3: Clear video element directly
+    if (videoRef.current) {
+      console.log('📹 Clearing video element');
+      videoRef.current.srcObject = null;
+      videoRef.current.pause();
+      videoRef.current.load();
+    }
+    
+    // Step 4: Use centralized camera service for complete global cleanup
+    console.log('📹 Delegating to camera service for global cleanup');
+    cameraService.scheduleCleanup();
     
     // Set camera inactive state
     setIsCameraActive(false);
     
-    // Reset stopping flag after a delay
+    // Reset stopping flag after cleanup chain completes
     setTimeout(() => {
       isStoppingRef.current = false;
-    }, 200);
+    }, 500);
+    
+    console.log('📹 RealFaceRecognition: ===== STOP COMPLETE =====');
   }, []);
 
   // Calculate cosine similarity
@@ -760,24 +785,41 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     // CLEANUP ON UNMOUNT - Use centralized camera service
     return () => {
       mounted = false;
-      console.log('📹 RealFaceRecognition UNMOUNTING');
+      console.log('📹 RealFaceRecognition: ===== COMPONENT UNMOUNTING =====');
       
-      // Cancel animation FIRST
+      // Step 1: Cancel animation IMMEDIATELY
       if (animationRef.current) {
+        console.log('📹 Cancelling animation frame on unmount');
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
       
-      // Unregister stream from service
+      // Step 2: Stop local stream tracks directly
       if (streamRef.current) {
+        console.log('📹 Stopping local stream on unmount');
         cameraService.unregisterStream(streamRef.current);
+        try {
+          streamRef.current.getTracks().forEach(track => {
+            track.enabled = false;
+            track.stop();
+          });
+        } catch (e) {
+          console.warn('📹 Error stopping tracks on unmount:', e);
+        }
         streamRef.current = null;
       }
       
-      // Use centralized camera service for complete cleanup
+      // Step 3: Clear video element directly
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.pause();
+      }
+      
+      // Step 4: Use centralized camera service for complete global cleanup
+      console.log('📹 Scheduling global camera cleanup on unmount');
       cameraService.scheduleCleanup();
       
-      console.log('📹 RealFaceRecognition unmount cleanup scheduled');
+      console.log('📹 RealFaceRecognition: ===== UNMOUNT CLEANUP SCHEDULED =====');
     };
   }, [getLocation, loadModels, checkStoredEmbedding, startCamera]);
 
