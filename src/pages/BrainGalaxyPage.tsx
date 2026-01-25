@@ -3,7 +3,7 @@ import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft } from 'lucide-react';
-import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking } from '@/components/brain-galaxy';
+import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking, UploadContentDialog } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
 import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
 import { CourseBuilder } from '@/components/brain-galaxy/CourseBuilder';
@@ -32,11 +32,13 @@ export default function BrainGalaxyPage() {
     saveChatSession,
     loadChatSession,
     deleteChatSession,
+    uploadContent,
   } = useBrainGalaxy(user?.id);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCreateArea, setShowCreateArea] = useState(false);
   const [showCourseBuilder, setShowCourseBuilder] = useState(false);
+  const [showUploadContent, setShowUploadContent] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(true);
   const [currentSession, setCurrentSession] = useState<BrainGalaxyChatSession | null>(null);
   const [chatKey, setChatKey] = useState(0); // Force re-render chat component
@@ -182,7 +184,7 @@ export default function BrainGalaxyPage() {
                 myCourses={myCourses}
                 activeMissions={activeMissions}
                 onCreateCourse={() => setShowCourseBuilder(true)}
-                onUploadContent={() => {}}
+                onUploadContent={() => setShowUploadContent(true)}
                 onOpenChat={() => setActiveTab('chat')}
                 onViewMissions={() => setActiveTab('missions')}
               />
@@ -265,6 +267,14 @@ export default function BrainGalaxyPage() {
         open={showCreateArea}
         onOpenChange={setShowCreateArea}
         onCreateArea={createArea}
+      />
+
+      {/* Upload Content Dialog */}
+      <UploadContentDialog
+        open={showUploadContent}
+        onOpenChange={setShowUploadContent}
+        areas={areas}
+        onUpload={uploadContent}
       />
     </ResponsiveLayout>
   );
