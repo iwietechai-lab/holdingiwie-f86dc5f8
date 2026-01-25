@@ -112,6 +112,736 @@ export type Database = {
         }
         Relationships: []
       }
+      brain_galaxy_areas: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_system_default: boolean | null
+          name: string
+          order_index: number | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_system_default?: boolean | null
+          name: string
+          order_index?: number | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_system_default?: boolean | null
+          name?: string
+          order_index?: number | null
+        }
+        Relationships: []
+      }
+      brain_galaxy_badges: {
+        Row: {
+          category: string
+          code: string
+          created_at: string | null
+          description: string
+          description_es: string
+          icon: string
+          id: string
+          name: string
+          name_es: string
+          points_reward: number | null
+          requirements: Json | null
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string | null
+          description: string
+          description_es: string
+          icon: string
+          id?: string
+          name: string
+          name_es: string
+          points_reward?: number | null
+          requirements?: Json | null
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string | null
+          description?: string
+          description_es?: string
+          icon?: string
+          id?: string
+          name?: string
+          name_es?: string
+          points_reward?: number | null
+          requirements?: Json | null
+        }
+        Relationships: []
+      }
+      brain_galaxy_chat_sessions: {
+        Row: {
+          brain_model: string | null
+          context_area_id: string | null
+          created_at: string | null
+          id: string
+          messages: Json | null
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          brain_model?: string | null
+          context_area_id?: string | null
+          created_at?: string | null
+          id?: string
+          messages?: Json | null
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          brain_model?: string | null
+          context_area_id?: string | null
+          created_at?: string | null
+          id?: string
+          messages?: Json | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_chat_sessions_context_area_id_fkey"
+            columns: ["context_area_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_content: {
+        Row: {
+          ai_key_points: Json | null
+          ai_summary: string | null
+          area_id: string | null
+          content_text: string | null
+          content_type: string
+          created_at: string | null
+          description: string | null
+          external_url: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          is_processed: boolean | null
+          processed_at: string | null
+          source_metadata: Json | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          visibility: string | null
+        }
+        Insert: {
+          ai_key_points?: Json | null
+          ai_summary?: string | null
+          area_id?: string | null
+          content_text?: string | null
+          content_type: string
+          created_at?: string | null
+          description?: string | null
+          external_url?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_processed?: boolean | null
+          processed_at?: string | null
+          source_metadata?: Json | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          visibility?: string | null
+        }
+        Update: {
+          ai_key_points?: Json | null
+          ai_summary?: string | null
+          area_id?: string | null
+          content_text?: string | null
+          content_type?: string
+          created_at?: string | null
+          description?: string | null
+          external_url?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_processed?: boolean | null
+          processed_at?: string | null
+          source_metadata?: Json | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          visibility?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_content_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_course_modules: {
+        Row: {
+          content_ids: string[] | null
+          course_id: string
+          created_at: string | null
+          description: string | null
+          estimated_minutes: number | null
+          id: string
+          order_index: number
+          title: string
+        }
+        Insert: {
+          content_ids?: string[] | null
+          course_id: string
+          created_at?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          order_index: number
+          title: string
+        }
+        Update: {
+          content_ids?: string[] | null
+          course_id?: string
+          created_at?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_course_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_courses: {
+        Row: {
+          area_id: string | null
+          average_rating: number | null
+          cover_image_url: string | null
+          created_at: string | null
+          curriculum_structure: Json | null
+          description: string | null
+          difficulty_level: string | null
+          estimated_hours: number | null
+          id: string
+          is_public: boolean | null
+          learning_objectives: Json | null
+          status: string | null
+          title: string
+          total_enrollments: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          area_id?: string | null
+          average_rating?: number | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          curriculum_structure?: Json | null
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_hours?: number | null
+          id?: string
+          is_public?: boolean | null
+          learning_objectives?: Json | null
+          status?: string | null
+          title: string
+          total_enrollments?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          area_id?: string | null
+          average_rating?: number | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          curriculum_structure?: Json | null
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_hours?: number | null
+          id?: string
+          is_public?: boolean | null
+          learning_objectives?: Json | null
+          status?: string | null
+          title?: string
+          total_enrollments?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_courses_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_levels: {
+        Row: {
+          color: string
+          created_at: string | null
+          icon: string
+          id: string
+          level_number: number
+          max_points: number | null
+          min_points: number
+          name: string
+          name_es: string
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          icon: string
+          id?: string
+          level_number: number
+          max_points?: number | null
+          min_points: number
+          name: string
+          name_es: string
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          icon?: string
+          id?: string
+          level_number?: number
+          max_points?: number | null
+          min_points?: number
+          name?: string
+          name_es?: string
+        }
+        Relationships: []
+      }
+      brain_galaxy_mission_contributions: {
+        Row: {
+          content: string | null
+          content_id: string | null
+          contribution_type: string
+          created_at: string | null
+          external_url: string | null
+          id: string
+          mission_id: string
+          points_earned: number | null
+          title: string | null
+          user_id: string
+          votes: number | null
+        }
+        Insert: {
+          content?: string | null
+          content_id?: string | null
+          contribution_type: string
+          created_at?: string | null
+          external_url?: string | null
+          id?: string
+          mission_id: string
+          points_earned?: number | null
+          title?: string | null
+          user_id: string
+          votes?: number | null
+        }
+        Update: {
+          content?: string | null
+          content_id?: string | null
+          contribution_type?: string
+          created_at?: string | null
+          external_url?: string | null
+          id?: string
+          mission_id?: string
+          points_earned?: number | null
+          title?: string | null
+          user_id?: string
+          votes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_contributions_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_mission_contributions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_mission_participants: {
+        Row: {
+          id: string
+          joined_at: string | null
+          mission_id: string
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string | null
+          mission_id: string
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string | null
+          mission_id?: string
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_participants_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_missions: {
+        Row: {
+          ai_final_analysis: string | null
+          area_id: string | null
+          challenge_text: string
+          completed_at: string | null
+          created_at: string | null
+          creator_id: string
+          deadline: string | null
+          description: string | null
+          id: string
+          max_participants: number | null
+          min_participants: number | null
+          reward_points: number | null
+          solution_summary: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          visibility: string | null
+        }
+        Insert: {
+          ai_final_analysis?: string | null
+          area_id?: string | null
+          challenge_text: string
+          completed_at?: string | null
+          created_at?: string | null
+          creator_id: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          max_participants?: number | null
+          min_participants?: number | null
+          reward_points?: number | null
+          solution_summary?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          visibility?: string | null
+        }
+        Update: {
+          ai_final_analysis?: string | null
+          area_id?: string | null
+          challenge_text?: string
+          completed_at?: string | null
+          created_at?: string | null
+          creator_id?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          max_participants?: number | null
+          min_participants?: number | null
+          reward_points?: number | null
+          solution_summary?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          visibility?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_missions_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_quiz_results: {
+        Row: {
+          answers: Json | null
+          attempt_number: number | null
+          completed_at: string | null
+          id: string
+          passed: boolean
+          quiz_id: string
+          score: number
+          time_taken_minutes: number | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          attempt_number?: number | null
+          completed_at?: string | null
+          id?: string
+          passed: boolean
+          quiz_id: string
+          score: number
+          time_taken_minutes?: number | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          attempt_number?: number | null
+          completed_at?: string | null
+          id?: string
+          passed?: boolean
+          quiz_id?: string
+          score?: number
+          time_taken_minutes?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_quiz_results_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_quizzes: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          max_attempts: number | null
+          module_id: string | null
+          passing_score: number | null
+          questions: Json
+          time_limit_minutes: number | null
+          title: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          max_attempts?: number | null
+          module_id?: string | null
+          passing_score?: number | null
+          questions: Json
+          time_limit_minutes?: number | null
+          title: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          max_attempts?: number | null
+          module_id?: string | null
+          passing_score?: number | null
+          questions?: Json
+          time_limit_minutes?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_quizzes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_quizzes_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_user_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_badges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_user_progress: {
+        Row: {
+          completed_at: string | null
+          course_id: string
+          created_at: string | null
+          id: string
+          module_id: string | null
+          score: number | null
+          status: string | null
+          time_spent_minutes: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          course_id: string
+          created_at?: string | null
+          id?: string
+          module_id?: string | null
+          score?: number | null
+          status?: string | null
+          time_spent_minutes?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          module_id?: string | null
+          score?: number | null
+          status?: string | null
+          time_spent_minutes?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_user_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_user_progress_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_user_stats: {
+        Row: {
+          content_uploaded: number | null
+          courses_completed: number | null
+          courses_created: number | null
+          created_at: string | null
+          current_level: number | null
+          id: string
+          knowledge_points: number | null
+          last_activity_at: string | null
+          learning_streak: number | null
+          longest_streak: number | null
+          missions_completed: number | null
+          missions_contributed: number | null
+          missions_created: number | null
+          modules_completed: number | null
+          quizzes_passed: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content_uploaded?: number | null
+          courses_completed?: number | null
+          courses_created?: number | null
+          created_at?: string | null
+          current_level?: number | null
+          id?: string
+          knowledge_points?: number | null
+          last_activity_at?: string | null
+          learning_streak?: number | null
+          longest_streak?: number | null
+          missions_completed?: number | null
+          missions_contributed?: number | null
+          missions_created?: number | null
+          modules_completed?: number | null
+          quizzes_passed?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content_uploaded?: number | null
+          courses_completed?: number | null
+          courses_created?: number | null
+          created_at?: string | null
+          current_level?: number | null
+          id?: string
+          knowledge_points?: number | null
+          last_activity_at?: string | null
+          learning_streak?: number | null
+          longest_streak?: number | null
+          missions_completed?: number | null
+          missions_contributed?: number | null
+          missions_created?: number | null
+          modules_completed?: number | null
+          quizzes_passed?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       budget_categories: {
         Row: {
           company_id: string
