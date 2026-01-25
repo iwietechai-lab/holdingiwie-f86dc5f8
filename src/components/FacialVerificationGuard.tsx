@@ -308,11 +308,13 @@ export const VerificationStatusBadge = ({ userId }: { userId: string | undefined
   const timeSince = getTimeSinceVerification();
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-      isVerified 
-        ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-        : 'bg-destructive/10 text-destructive border border-destructive/20'
-    }`}>
+    <div 
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs pointer-events-none select-none ${
+        isVerified 
+          ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+          : 'bg-destructive/10 text-destructive border border-destructive/20'
+      }`}
+    >
       {isVerified ? (
         <>
           <Fingerprint className="w-4 h-4" />
