@@ -11,15 +11,26 @@ import { useFacialVerification } from '@/hooks/useFacialVerification';
 // Robust function to stop all camera streams - used as safety net
 const stopAllCameraStreams = () => {
   try {
+    console.log('📹 FacialVerificationGuard: stopAllCameraStreams() called');
     const allVideos = document.querySelectorAll('video');
-    allVideos.forEach((video) => {
+    console.log('📹 Found', allVideos.length, 'video elements');
+    
+    allVideos.forEach((video, index) => {
       const stream = video.srcObject as MediaStream | null;
       if (stream?.getTracks) {
-        stream.getTracks().forEach((track) => track.stop());
+        const tracks = stream.getTracks();
+        console.log('📹 Video', index, 'has', tracks.length, 'tracks');
+        tracks.forEach((track) => {
+          console.log('📹 Stopping track:', track.kind, 'state:', track.readyState);
+          track.stop();
+        });
       }
       video.srcObject = null;
       video.pause();
+      video.load(); // Force release camera
     });
+    
+    console.log('📹 FacialVerificationGuard: All streams stopped');
   } catch (e) {
     console.warn('Error stopping camera streams:', e);
   }
@@ -103,33 +114,32 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
   const handleFaceSuccess = useCallback(async () => {
     console.log('🎉 FacialVerificationGuard: ===== FACE SUCCESS =====');
     
-    // Stop cameras FIRST - multiple attempts
-    console.log('📹 FacialVerificationGuard: Stopping cameras before hiding component');
+    // Stop cameras IMMEDIATELY and AGGRESSIVELY - multiple attempts
+    console.log('📹 FacialVerificationGuard: Stopping cameras BEFORE anything else');
     stopAllCameraStreams();
     
-    // Hide component (this unmounts RealFaceRecognition)
+    // Hide component IMMEDIATELY (this unmounts RealFaceRecognition)
     console.log('📹 FacialVerificationGuard: Setting showFaceRecognition to false');
     setShowFaceRecognition(false);
     
-    // Extra cleanup with multiple delays as safety net
-    setTimeout(() => {
-      console.log('📹 FacialVerificationGuard: Running delayed cleanup (100ms)');
-      stopAllCameraStreams();
-    }, 100);
+    // AGGRESSIVE cleanup with multiple delays as safety net
+    const cleanupIntervals = [0, 50, 100, 200, 300, 500, 1000];
+    cleanupIntervals.forEach(delay => {
+      setTimeout(() => {
+        console.log(`📹 FacialVerificationGuard: Running cleanup (${delay}ms)`);
+        stopAllCameraStreams();
+      }, delay);
+    });
     
-    setTimeout(() => {
-      console.log('📹 FacialVerificationGuard: Running delayed cleanup (300ms)');
-      stopAllCameraStreams();
-    }, 300);
-    
-    setTimeout(() => {
-      console.log('📹 FacialVerificationGuard: Running final cleanup (500ms)');
-      stopAllCameraStreams();
-    }, 500);
-    
-    // Update verification record
+    // Update verification record (async, don't block)
     console.log('📹 FacialVerificationGuard: Recording verification');
     await recordVerification();
+    
+    // Final cleanup after verification is recorded
+    setTimeout(() => {
+      console.log('📹 FacialVerificationGuard: FINAL cleanup (1500ms)');
+      stopAllCameraStreams();
+    }, 1500);
     
     console.log('✅ FacialVerificationGuard: ===== SUCCESS HANDLING COMPLETE =====');
   }, [recordVerification]);
