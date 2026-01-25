@@ -21,6 +21,7 @@ export default function BrainGalaxyPage() {
     levels,
     userStats,
     myCourses,
+    myContent,
     activeMissions,
     chatSessions,
     getCurrentLevel,
@@ -123,6 +124,7 @@ export default function BrainGalaxyPage() {
         <div className="p-4 md:p-6">
           <CourseBuilder
             areas={areas}
+            existingContent={myContent}
             onBack={() => setShowCourseBuilder(false)}
             onSaveCourse={createCourse}
           />
