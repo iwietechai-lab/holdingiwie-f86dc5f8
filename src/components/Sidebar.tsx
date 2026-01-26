@@ -137,6 +137,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: LayoutDashboard, label: 'Dashboard Global', action: 'navigate', path: '/dashboard' },
     { icon: Bot, label: 'CEOChat', action: 'navigate', path: '/ceo-chat' },
     { icon: Target, label: 'Misión Iwie', action: 'navigate', path: '/mision-iwie' },
+    { icon: ClipboardList, label: 'AI Tareas', action: 'navigate', path: '/ai-tareas' },
     { icon: Bell, label: 'Gestor Notificaciones', action: 'navigate', path: '/configuracion' },
     { icon: Brain, label: 'Brain Galaxy', action: 'navigate', path: '/brain-galaxy' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
