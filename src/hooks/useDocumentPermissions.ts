@@ -89,7 +89,7 @@ export function useDocumentPermissions() {
   }, [user]);
 
   // Grant permissions to multiple users at once
-  const grantPermissions = useCallback(async (documentId: string, userIds: string[], documentName?: string): Promise<boolean> => {
+  const grantPermissions = useCallback(async (documentId: string, userIds: string[], documentName?: string, filePath?: string): Promise<boolean> => {
     if (!user || userIds.length === 0) return true;
     try {
       const permissions = userIds.map(userId => ({
@@ -103,6 +103,42 @@ export function useDocumentPermissions() {
         .insert(permissions);
 
       if (error) throw error;
+
+      // Check if CEO/superadmin is included - send to CEOChat
+      const { data: superadmins } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'superadmin');
+      
+      const superadminIds = (superadmins || []).map(s => s.user_id);
+      const ceoIncluded = userIds.some(id => superadminIds.includes(id));
+      
+      if (ceoIncluded && documentName) {
+        // Get document URL if available
+        let fileUrl = '';
+        if (filePath) {
+          const { data: urlData } = supabase.storage
+            .from('documentos')
+            .getPublicUrl(filePath);
+          fileUrl = urlData?.publicUrl || '';
+        }
+        
+        // Create CEO submission
+        await supabase.from('ceo_team_submissions').insert({
+          title: documentName,
+          content: `Documento compartido desde Gestor de Documentos`,
+          file_url: fileUrl,
+          file_name: documentName,
+          submission_type: 'documento',
+          submitted_by: user.id,
+          notify_ceo: true,
+          source_type: 'document_manager',
+          source_reference_id: documentId,
+        });
+        
+        // Notify user
+        console.log('Document sent to CEOChat for CEO review');
+      }
 
       // Create notifications for users who received access
       for (const userId of userIds) {

@@ -29,6 +29,80 @@ interface ChatRequest {
   };
 }
 
+// CEO System Prompt - Elocuente, Grato, Convincente, Imparcial
+const CEO_SYSTEM_PROMPT = `Eres Mauricio Ortiz, CEO de IWIE Holding.
+
+🧠 ACCESO A MÚLTIPLES INTELIGENCIAS:
+Combinas perspectivas de análisis crítico, razonamiento profundo, análisis técnico y síntesis multimodal para dar respuestas completas e imparciales.
+
+📝 TU ESTILO DE COMUNICACIÓN:
+- ELOCUENTE: Escribes con elegancia, claridad y precisión
+- GRATO: Tu tono es cercano, motivador y respetuoso
+- CONVINCENTE: Tus argumentos son sólidos y bien fundamentados
+- IMPARCIAL: Analizas objetivamente, sin favoritismos ni sesgos
+- CLARO: Tus respuestas son estructuradas y fáciles de seguir
+
+📊 AL ANALIZAR DOCUMENTOS:
+1. RESUMEN EJECUTIVO (3-4 líneas claras)
+2. PUNTOS CLAVE (máximo 5, los más importantes)
+3. ANÁLISIS DETALLADO (perspectiva financiera, operativa, estratégica)
+4. OPORTUNIDADES DE MEJORA (constructivo, no crítico)
+5. RECOMENDACIONES CONCRETAS (acciones específicas con responsables)
+6. MENSAJE MOTIVADOR (reconocimiento del esfuerzo del equipo)
+
+⚠️ REGLAS INQUEBRANTABLES:
+- NUNCA incluyas campos JSON (score, feedback) en el texto de análisis
+- NUNCA seas condescendiente o paternalista
+- SIEMPRE sé específico y concreto en las recomendaciones
+- SIEMPRE reconoce el trabajo bien hecho antes de sugerir mejoras
+- ANALIZA SOLO el contenido REAL del documento, no inventes datos`;
+
+// Function to call Brain Galaxy Multi-Brain Fusion
+async function callBrainGalaxyFusion(
+  messages: { role: string; content: string }[],
+  systemPrompt: string
+): Promise<string> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.log('Missing Supabase credentials for Brain Galaxy Fusion');
+    return '';
+  }
+  
+  try {
+    console.log('Calling Brain Galaxy Multi-Brain Fusion...');
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/brain-galaxy-ai`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+          mode: 'fusion',
+          action: 'chat',
+          brainModel: 'brain-4'
+        })
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('Brain Galaxy Fusion error:', response.status);
+      return '';
+    }
+    
+    const data = await response.json();
+    console.log('Brain Galaxy Fusion response received');
+    return data.choices?.[0]?.message?.content || data.response || '';
+  } catch (error) {
+    console.error('Error calling Brain Galaxy Fusion:', error);
+    return '';
+  }
+}
+
 // Function to parse CSV content
 function parseCSV(text: string): string {
   const lines = text.split('\n');

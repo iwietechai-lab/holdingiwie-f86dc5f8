@@ -21,6 +21,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 import { Mission, CONTEXT_CONFIG, MISSION_TYPE_CONFIG, ConversationContext, PanelType } from '@/types/mision-iwie';
 import { useMissionWorkspace } from '@/hooks/useMissionWorkspace';
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { WorkspacePanels } from './workspace/WorkspacePanels';
+import { toast } from 'sonner';
 
 interface MissionWorkspaceProps {
   mission: Mission;
@@ -46,12 +48,21 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
     participants,
     sendMessage,
     insertLocalMessage,
+    exportToCEOChat,
   } = useMissionWorkspace({ mission });
 
   const [inputValue, setInputValue] = useState('');
   const [showPanels, setShowPanels] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+
+  const handleExportToCEOChat = async () => {
+    setIsExporting(true);
+    await exportToCEOChat();
+    setIsExporting(false);
+  };
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -110,6 +121,17 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Export to CEOChat button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportToCEOChat}
+            disabled={isExporting || chatMessages.length === 0}
+            className="gap-1"
+          >
+            {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+            Enviar a CEOChat
+          </Button>
           {/* Context Indicator */}
           {currentContext && (
             <Badge
