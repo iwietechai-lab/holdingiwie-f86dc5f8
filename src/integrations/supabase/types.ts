@@ -4136,7 +4136,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_profiles_public: {
+        Row: {
+          area_id: string | null
+          can_upload_documents: boolean | null
+          company_id: string | null
+          created_at: string | null
+          department_id: string | null
+          full_name: string | null
+          gerencia_id: string | null
+          id: string | null
+          position_id: string | null
+          role: string | null
+          sub_gerencia_id: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          can_upload_documents?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          department_id?: string | null
+          full_name?: string | null
+          gerencia_id?: string | null
+          id?: string | null
+          position_id?: string | null
+          role?: string | null
+          sub_gerencia_id?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          can_upload_documents?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          department_id?: string | null
+          full_name?: string | null
+          gerencia_id?: string | null
+          id?: string | null
+          position_id?: string | null
+          role?: string | null
+          sub_gerencia_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_gerencia_id_fkey"
+            columns: ["gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "gerencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_sub_gerencia_id_fkey"
+            columns: ["sub_gerencia_id"]
+            isOneToOne: false
+            referencedRelation: "sub_gerencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_to_collective_memory: {
