@@ -30,7 +30,7 @@ const castMission = (m: any): Mission => ({
   completed_at: m.completed_at,
   participants: (m.participants || []).map((p: any) => ({
     ...p,
-    role: (p.role || 'collaborator') as 'owner' | 'collaborator' | 'viewer',
+    role: (p.role || 'contributor') as 'creator' | 'contributor' | 'reviewer',
   })),
 });
 
@@ -170,7 +170,7 @@ export function useMissions() {
           .map(userId => ({
             mission_id: data.id,
             user_id: userId,
-            role: 'collaborator',
+            role: 'contributor',
           }));
 
         if (participantsToInsert.length > 0) {
@@ -284,7 +284,7 @@ export function useMissions() {
   };
 
   // Add participant to mission
-  const addParticipant = async (missionId: string, userId: string, role: 'collaborator' | 'viewer' = 'collaborator') => {
+  const addParticipant = async (missionId: string, userId: string, role: 'contributor' | 'reviewer' = 'contributor') => {
     try {
       const { data, error } = await supabase
         .from('brain_galaxy_mission_participants')
@@ -300,7 +300,7 @@ export function useMissions() {
 
       const newParticipant: MissionParticipant = {
         ...data,
-        role: (data.role || 'collaborator') as 'owner' | 'collaborator' | 'viewer',
+        role: (data.role || 'contributor') as 'creator' | 'contributor' | 'reviewer',
       };
 
       setMissions(prev => prev.map(m => {

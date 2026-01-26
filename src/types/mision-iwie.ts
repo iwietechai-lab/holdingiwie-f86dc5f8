@@ -227,8 +227,8 @@ export interface MissionParticipant {
   id: string;
   mission_id: string;
   user_id: string;
-  role: 'owner' | 'collaborator' | 'viewer';
-  joined_at: string;
+  role: 'creator' | 'contributor' | 'reviewer';
+  joined_at?: string;
   // Joined data
   user?: {
     id: string;
