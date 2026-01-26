@@ -187,7 +187,7 @@ Responde siempre en español y sé amigable pero profesional.`;
             <Wand2 className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground">Studio Brain</h2>
+            <h2 className="text-xl font-bold text-foreground">Studio Prompt</h2>
             <p className="text-sm text-muted-foreground">
               Mejora tus prompts para obtener mejores respuestas de la IA
             </p>
