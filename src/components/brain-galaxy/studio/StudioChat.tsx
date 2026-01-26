@@ -153,7 +153,7 @@ export function StudioChat({
   // Ensure input is always visible by using a proper flex layout
   // Key: shrink-0 for header/footer, flex-1 + overflow for scrollable middle
   return (
-    <div className="h-full flex flex-col border-x overflow-hidden">
+    <div className="flex-1 flex flex-col border-x overflow-hidden min-h-0">
       {/* Header - fixed height, never shrinks */}
       <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
