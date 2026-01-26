@@ -260,51 +260,84 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
       return truncateContent(`=== CONTENIDO JSON ===\n\n${JSON.stringify(json, null, 2)}`);
     }
 
-    // Handle PDF - use improved text extraction
+    // Handle PDF - use OCR for reliable extraction
     if (contentType.includes('pdf') || fileUrl.endsWith('.pdf')) {
-      console.log('PDF file detected - attempting improved text extraction...');
+      console.log('PDF file detected - attempting OCR extraction via Google Vision...');
+      
+      const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+      
+      if (GOOGLE_AI_API_KEY) {
+        try {
+          // Download PDF as base64
+          const arrayBuffer = await response.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const base64Content = btoa(String.fromCharCode.apply(null, [...bytes]));
+          
+          console.log('Calling Google Vision API for PDF OCR...');
+          
+          // Use Google Vision API for document text detection
+          const visionResponse = await fetch(
+            `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_AI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                requests: [{
+                  image: { content: base64Content },
+                  features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }]
+                }]
+              })
+            }
+          );
+          
+          if (visionResponse.ok) {
+            const visionData = await visionResponse.json();
+            const fullText = visionData.responses?.[0]?.fullTextAnnotation?.text;
+            
+            if (fullText && fullText.length > 50) {
+              console.log(`Google Vision OCR extracted ${fullText.length} characters`);
+              return truncateContent(`=== CONTENIDO EXTRAÍDO DEL PDF (OCR) ===\n\n${fullText}\n\n=== FIN DEL CONTENIDO ===`);
+            }
+          } else {
+            console.error('Google Vision API error:', visionResponse.status);
+          }
+        } catch (ocrError) {
+          console.error('OCR extraction failed:', ocrError);
+        }
+      }
+      
+      // Fallback to basic text extraction
+      console.log('OCR not available or failed, trying basic extraction...');
       try {
-        const arrayBuffer = await response.arrayBuffer();
+        // Re-fetch since we consumed the response
+        const reFetch = await fetch(fileUrl);
+        const arrayBuffer = await reFetch.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
         
-        // Method 1: Extract text from PDF streams (improved approach)
-        const extractedTexts: string[] = [];
-        
-        // Convert to string for pattern matching
-        const decoder = new TextDecoder('latin1'); // Use latin1 for binary data
+        const decoder = new TextDecoder('latin1');
         const rawContent = decoder.decode(bytes);
         
-        // Find all stream objects
-        const streamMatches = rawContent.matchAll(/stream\s*([\s\S]*?)\s*endstream/g);
-        for (const match of streamMatches) {
-          const streamData = match[1];
-          
-          // Try to decompress if FlateDecode (most common)
-          // For now, look for readable text patterns
-          
-          // Extract text from text showing operators
-          // Tj operator (show text)
-          const tjMatches = streamData.matchAll(/\(([^)]+)\)\s*Tj/g);
-          for (const tj of tjMatches) {
-            const text = decodePDFString(tj[1]);
-            if (text && text.length > 1) extractedTexts.push(text);
-          }
-          
-          // TJ operator (show text array)
-          const tjArrayMatches = streamData.matchAll(/\[(.*?)\]\s*TJ/gi);
-          for (const tja of tjArrayMatches) {
-            const parts = tja[1].matchAll(/\(([^)]*)\)/g);
-            for (const part of parts) {
-              const text = decodePDFString(part[1]);
-              if (text && text.length > 0) extractedTexts.push(text);
-            }
+        // Extract text from PDF streams
+        const extractedTexts: string[] = [];
+        
+        // Extract text from text showing operators
+        const tjMatches = rawContent.matchAll(/\(([^)]+)\)\s*Tj/g);
+        for (const tj of tjMatches) {
+          const text = decodePDFString(tj[1]);
+          if (text && text.length > 1) extractedTexts.push(text);
+        }
+        
+        // TJ operator (show text array)
+        const tjArrayMatches = rawContent.matchAll(/\[(.*?)\]\s*TJ/gi);
+        for (const tja of tjArrayMatches) {
+          const parts = tja[1].matchAll(/\(([^)]*)\)/g);
+          for (const part of parts) {
+            const text = decodePDFString(part[1]);
+            if (text && text.length > 0) extractedTexts.push(text);
           }
         }
         
-        // Also try to find text in object definitions
-        const textObjMatches = rawContent.matchAll(/\/Type\s*\/Page[\s\S]*?\/Contents/g);
-        
-        // Extract any readable text sequences
+        // Extract readable text sequences
         const readableMatches = rawContent.matchAll(/\(([A-Za-z0-9áéíóúñÁÉÍÓÚÑüÜ\s.,;:!?¿¡$%\-@#&*+=\/'"]+)\)/g);
         for (const m of readableMatches) {
           const text = decodePDFString(m[1]);
@@ -313,59 +346,24 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
           }
         }
         
-        // Clean and deduplicate
+        // Clean and join
         const cleanedTexts = extractedTexts
           .map(t => t.trim())
           .filter(t => t.length > 1)
-          .filter(t => !/^[0-9\s.,]+$/.test(t)) // Remove number-only strings
-          .filter(t => !t.includes('\u0000')); // Remove null characters
+          .filter(t => !/^[0-9\s.,]+$/.test(t))
+          .filter(t => !t.includes('\u0000'));
         
-        // Join consecutive texts with space
-        let finalText = '';
-        for (let i = 0; i < cleanedTexts.length; i++) {
-          const current = cleanedTexts[i];
-          const prev = cleanedTexts[i - 1] || '';
-          
-          // Add space between words, newline for sentences
-          if (prev.match(/[.!?]$/)) {
-            finalText += '\n' + current;
-          } else if (finalText && !finalText.endsWith(' ')) {
-            finalText += ' ' + current;
-          } else {
-            finalText += current;
-          }
-        }
-        
-        console.log(`PDF extraction: Found ${cleanedTexts.length} text fragments, total ${finalText.length} chars`);
+        let finalText = cleanedTexts.join(' ').replace(/\s+/g, ' ');
         
         if (finalText.length > 100) {
-          return truncateContent(`=== CONTENIDO EXTRAÍDO DEL PDF ===\n\nNota: Texto extraído automáticamente del PDF.\n\n${finalText}\n\n=== FIN DEL CONTENIDO ===`);
+          console.log(`Basic PDF extraction: ${finalText.length} chars`);
+          return truncateContent(`=== CONTENIDO DEL PDF (extracción básica) ===\n\n${finalText}\n\n=== FIN ===`);
         }
-        
-        // Fallback: Look for any readable content
-        console.log('Primary extraction failed, trying fallback method...');
-        const fallbackText = rawContent
-          .replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\n]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        // Extract meaningful words
-        const words = fallbackText.match(/[A-Za-záéíóúñÁÉÍÓÚÑüÜ]{3,}/g) || [];
-        const meaningfulWords = words.filter(w => 
-          !['obj', 'endobj', 'stream', 'endstream', 'xref', 'trailer', 'startxref'].includes(w.toLowerCase())
-        );
-        
-        if (meaningfulWords.length > 50) {
-          const wordText = meaningfulWords.join(' ');
-          console.log(`Fallback extraction: ${meaningfulWords.length} words`);
-          return truncateContent(`=== CONTENIDO DEL PDF (extracción básica) ===\n\nNota: Extracción simplificada del PDF. Puede faltar formato.\n\n${wordText}\n\n=== FIN DEL CONTENIDO ===`);
-        }
-        
       } catch (e) {
-        console.error('Error extracting PDF text:', e);
+        console.error('Basic PDF extraction failed:', e);
       }
       
-      return `[PDF detectado pero no se pudo extraer texto legible. Este PDF puede estar protegido, ser una imagen escaneada, o tener formato no estándar. Por favor, copie el contenido relevante del PDF y péguelo como texto en el chat, o guarde el documento como archivo .txt]`;
+      return `[PDF detectado pero no se pudo extraer texto. Por favor, copie el contenido del PDF y péguelo como texto en el chat.]`;
     }
 
     // Handle Word documents (.docx is a ZIP containing XML)
