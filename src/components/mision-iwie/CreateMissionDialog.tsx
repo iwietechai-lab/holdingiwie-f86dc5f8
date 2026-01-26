@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,13 +19,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { HoldingUserSelector } from '@/components/documents/HoldingUserSelector';
 import { Mission, MISSION_TYPE_CONFIG, MissionType } from '@/types/mision-iwie';
 import { Rocket, Bot, Calendar, DollarSign } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+
+interface UserInfo {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  company_id: string | null;
+  role?: string | null;
+}
 
 interface CreateMissionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateMission: (data: Partial<Mission>) => Promise<Mission | null>;
+  onCreateMission: (data: Partial<Mission>, participantIds?: string[]) => Promise<Mission | null>;
 }
 
 export function CreateMissionDialog({
@@ -33,7 +44,12 @@ export function CreateMissionDialog({
   onOpenChange,
   onCreateMission,
 }: CreateMissionDialogProps) {
+  const { user } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -46,54 +62,99 @@ export function CreateMissionDialog({
     visibility: 'private' as 'private' | 'team' | 'company' | 'public',
   });
 
+  // Fetch all holding users when dialog opens
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, email, company_id, role');
+
+        if (error) throw error;
+        if (data) {
+          setUsers(data);
+        }
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, [open]);
+
+  // Reset participants when visibility changes
+  useEffect(() => {
+    if (formData.visibility !== 'team') {
+      setSelectedParticipants([]);
+    }
+  }, [formData.visibility]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
 
+    // Validate team visibility requires participants
+    if (formData.visibility === 'team' && selectedParticipants.length === 0) {
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await onCreateMission({
-        title: formData.title,
-        description: formData.description,
-        challenge_text: formData.description,
-        mission_type: formData.mission_type,
-        priority: formData.priority,
-        ai_enabled: formData.ai_enabled,
-        ai_intervention_level: formData.ai_intervention_level,
-        estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : undefined,
-        target_end_date: formData.target_end_date || undefined,
-        visibility: formData.visibility,
-      });
+      const result = await onCreateMission(
+        {
+          title: formData.title,
+          description: formData.description,
+          challenge_text: formData.description,
+          mission_type: formData.mission_type,
+          priority: formData.priority,
+          ai_enabled: formData.ai_enabled,
+          ai_intervention_level: formData.ai_intervention_level,
+          estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : undefined,
+          target_end_date: formData.target_end_date || undefined,
+          visibility: formData.visibility,
+        },
+        formData.visibility === 'team' ? selectedParticipants : undefined
+      );
 
       if (result) {
         onOpenChange(false);
-        setFormData({
-          title: '',
-          description: '',
-          mission_type: 'general',
-          priority: 'medium',
-          ai_enabled: true,
-          ai_intervention_level: 'proactive',
-          estimated_budget: '',
-          target_end_date: '',
-          visibility: 'private',
-        });
+        resetForm();
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      mission_type: 'general',
+      priority: 'medium',
+      ai_enabled: true,
+      ai_intervention_level: 'proactive',
+      estimated_budget: '',
+      target_end_date: '',
+      visibility: 'private',
+    });
+    setSelectedParticipants([]);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
             Nueva Misión Colaborativa
           </DialogTitle>
           <DialogDescription>
-            Crea una misión con asistencia de IA multi-cerebro para tu proyecto
+            Crea una misión con asistencia Multi-Brain IA para tu proyecto
           </DialogDescription>
         </DialogHeader>
 
@@ -168,7 +229,7 @@ export function CreateMissionDialog({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bot className="w-4 h-4 text-primary" />
-                <Label htmlFor="ai_enabled" className="font-medium">Asistencia de IA</Label>
+                <Label htmlFor="ai_enabled" className="font-medium">Asistencia Multi-Brain IA</Label>
               </div>
               <Switch
                 id="ai_enabled"
@@ -262,11 +323,27 @@ export function CreateMissionDialog({
             </Select>
           </div>
 
+          {/* Participant Selector - Only shown when visibility is 'team' */}
+          {formData.visibility === 'team' && (
+            <div className="border-t pt-4">
+              <HoldingUserSelector
+                users={users}
+                selectedUsers={selectedParticipants}
+                onSelectionChange={setSelectedParticipants}
+                currentUserId={user?.id}
+                isLoading={loadingUsers}
+              />
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !formData.title.trim()}>
+            <Button 
+              type="submit" 
+              disabled={loading || !formData.title.trim() || (formData.visibility === 'team' && selectedParticipants.length === 0)}
+            >
               {loading ? 'Creando...' : 'Crear Misión'}
             </Button>
           </DialogFooter>

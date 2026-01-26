@@ -84,7 +84,7 @@ export function useMissions() {
   }, [fetchMissions]);
 
   // Create a new mission
-  const createMission = async (missionData: Partial<Mission>): Promise<Mission | null> => {
+  const createMission = async (missionData: Partial<Mission>, participantIds?: string[]): Promise<Mission | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
@@ -112,7 +112,7 @@ export function useMissions() {
 
       if (error) throw error;
 
-      // Add creator as participant
+      // Add creator as participant with 'creator' role
       await supabase
         .from('brain_galaxy_mission_participants')
         .insert({
@@ -120,6 +120,23 @@ export function useMissions() {
           user_id: user.id,
           role: 'creator',
         });
+
+      // Add invited participants if visibility is 'team'
+      if (participantIds && participantIds.length > 0) {
+        const participantsToInsert = participantIds
+          .filter(id => id !== user.id) // Exclude creator (already added)
+          .map(userId => ({
+            mission_id: data.id,
+            user_id: userId,
+            role: 'collaborator',
+          }));
+
+        if (participantsToInsert.length > 0) {
+          await supabase
+            .from('brain_galaxy_mission_participants')
+            .insert(participantsToInsert);
+        }
+      }
 
       // Initialize workspace state
       await supabase
@@ -136,7 +153,9 @@ export function useMissions() {
 
       toast({
         title: '🚀 Misión creada',
-        description: 'Tu nueva misión está lista para comenzar',
+        description: participantIds && participantIds.length > 0 
+          ? `Tu misión está lista con ${participantIds.length} participantes invitados`
+          : 'Tu nueva misión está lista para comenzar',
       });
 
       return newMission;
