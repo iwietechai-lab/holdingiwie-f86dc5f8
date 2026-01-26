@@ -151,7 +151,7 @@ export function StudioChat({
   const showEmptyState = messages.length === 0 && !currentOutput && !courseProposal;
 
   return (
-    <div className="h-full flex flex-col border-x">
+    <div className="h-full flex flex-col border-x overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export function StudioChat({
       </div>
 
       {/* Output Display, Course Proposal, or Chat */}
-      <ScrollArea ref={scrollRef} className="flex-1">
+      <ScrollArea ref={scrollRef} className="flex-1 min-h-0">
         {currentOutput ? (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
