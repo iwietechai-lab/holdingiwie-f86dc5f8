@@ -103,6 +103,23 @@ export function CreateMissionDialog({
       return;
     }
 
+    // Map frontend visibility values to database allowed values
+    // Database CHECK constraint allows: 'public', 'company', 'invite_only'
+    const mapVisibilityToDb = (visibility: string): string => {
+      switch (visibility) {
+        case 'private':
+          return 'invite_only'; // Private = invite_only with no participants
+        case 'team':
+          return 'invite_only'; // Team = invite_only with participants
+        case 'company':
+          return 'company';
+        case 'public':
+          return 'public';
+        default:
+          return 'invite_only';
+      }
+    };
+
     setLoading(true);
     try {
       const result = await onCreateMission(
@@ -116,7 +133,7 @@ export function CreateMissionDialog({
           ai_intervention_level: formData.ai_intervention_level,
           estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : undefined,
           target_end_date: formData.target_end_date || undefined,
-          visibility: formData.visibility,
+          visibility: mapVisibilityToDb(formData.visibility) as any,
         },
         formData.visibility === 'team' ? selectedParticipants : undefined
       );
