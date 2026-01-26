@@ -149,11 +149,11 @@ export default function BrainGalaxyPage() {
             </TabsTrigger>
             <TabsTrigger value="studio" className="gap-2">
               <Sparkles className="h-4 w-4" />
-              <span className="hidden md:inline">Studio</span>
+              <span className="hidden md:inline">Studio Brain</span>
             </TabsTrigger>
             <TabsTrigger value="studio-prompt" className="gap-2">
               <Wand2 className="h-4 w-4" />
-              <span className="hidden md:inline">Studio Brain</span>
+              <span className="hidden md:inline">Studio Prompt</span>
             </TabsTrigger>
             <TabsTrigger value="chat" className="gap-2">
               <MessageSquare className="h-4 w-4" />
