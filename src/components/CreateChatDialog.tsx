@@ -57,8 +57,8 @@ export function CreateChatDialog({ open, onOpenChange, onChatCreated }: CreateCh
         ]);
 
         if (usersRes.data) {
-          // Filter out current user
-          setUsers(usersRes.data.filter(u => u.id !== user?.id));
+          // Include all users - allow self-selection
+          setUsers(usersRes.data);
         }
         if (companiesRes.data) {
           setCompanies(companiesRes.data);

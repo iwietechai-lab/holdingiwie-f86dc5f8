@@ -21,6 +21,7 @@ interface HoldingUserSelectorProps {
   onSelectionChange: (userIds: string[]) => void;
   currentUserId?: string;
   isLoading?: boolean;
+  allowSelfSelection?: boolean; // Default true - allows user to include themselves
 }
 
 export function HoldingUserSelector({
@@ -29,6 +30,7 @@ export function HoldingUserSelector({
   onSelectionChange,
   currentUserId,
   isLoading,
+  allowSelfSelection = true, // Default to true - users can include themselves
 }: HoldingUserSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set(['ceo', ...companies.map(c => c.id)]));
@@ -52,7 +54,8 @@ export function HoldingUserSelector({
     groups['sin-empresa'] = []; // Users without company
 
     users.forEach(user => {
-      if (user.id === currentUserId) return; // Exclude current user
+      // Only exclude current user if allowSelfSelection is explicitly false
+      if (allowSelfSelection === false && user.id === currentUserId) return;
       
       const search = searchQuery.toLowerCase();
       const matchesSearch = 
@@ -77,7 +80,7 @@ export function HoldingUserSelector({
     });
 
     return groups;
-  }, [users, currentUserId, searchQuery]);
+  }, [users, currentUserId, searchQuery, allowSelfSelection]);
 
   // Count total filtered users
   const totalFilteredUsers = useMemo(() => {
