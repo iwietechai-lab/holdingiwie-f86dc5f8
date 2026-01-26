@@ -120,7 +120,7 @@ export default function BrainGalaxyPage() {
 
   return (
     <ResponsiveLayout>
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="h-full flex flex-col p-4 md:p-6 gap-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -141,7 +141,7 @@ export default function BrainGalaxyPage() {
         </div>
 
         {/* Main Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <TabsList className="grid w-full grid-cols-6 md:w-auto md:inline-grid">
             <TabsTrigger value="dashboard" className="gap-2">
               <BookOpen className="h-4 w-4" />
@@ -169,7 +169,7 @@ export default function BrainGalaxyPage() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="mt-6">
+          <div className="flex-1 min-h-0">
             <TabsContent value="dashboard" className="m-0">
               <BrainGalaxyDashboard
                 userStats={userStats}
@@ -185,7 +185,7 @@ export default function BrainGalaxyPage() {
               />
             </TabsContent>
 
-            <TabsContent value="studio" className="m-0 h-[calc(100vh-12rem)]">
+            <TabsContent value="studio" className="m-0 h-full">
               <CourseBuilder
                 areas={areas}
                 existingContent={myContent}
