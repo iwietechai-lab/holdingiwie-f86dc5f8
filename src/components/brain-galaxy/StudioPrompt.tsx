@@ -177,7 +177,7 @@ IMPORTANTE:
   };
 
   return (
-    <div className="flex h-[calc(100vh-14rem)] bg-card/30 rounded-xl border border-border/50 overflow-hidden">
+    <div className="flex flex-1 min-h-0 bg-card/30 rounded-xl border border-border/50 overflow-hidden">
       {/* Sidebar - AI Target Selector */}
       <div className="w-56 border-r border-border/50 flex flex-col bg-background/50">
         <div className="p-3 border-b border-border/50">
