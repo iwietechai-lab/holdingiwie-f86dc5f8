@@ -194,7 +194,7 @@ export default function BrainGalaxyPage() {
               />
             </TabsContent>
 
-            <TabsContent value="studio-prompt" className="m-0">
+            <TabsContent value="studio-prompt" className="m-0 flex-1 [&>div]:h-full">
               <StudioPrompt />
             </TabsContent>
 
