@@ -91,7 +91,7 @@ export function CreateTicketDialog({ open, onOpenChange, onTicketCreated }: Crea
           supabase.from('companies').select('id, name'),
         ]);
         
-        if (usersRes.data) setUsers(usersRes.data.filter(u => u.id !== user?.id));
+        if (usersRes.data) setUsers(usersRes.data);
         if (companiesRes.data) setCompanies(companiesRes.data);
       } catch (err) {
         console.error('Error fetching data:', err);
