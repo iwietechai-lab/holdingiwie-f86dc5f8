@@ -150,8 +150,9 @@ export function StudioChat({
   const readySources = sources.filter(s => s.status === 'ready');
   const showEmptyState = messages.length === 0 && !currentOutput && !courseProposal;
 
+  // Ensure input is always visible by using a proper flex layout
   return (
-    <div className="h-full flex flex-col border-x overflow-hidden">
+    <div className="h-full flex flex-col border-x overflow-hidden min-h-0">
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -178,7 +179,7 @@ export function StudioChat({
       </div>
 
       {/* Output Display, Course Proposal, or Chat */}
-      <ScrollArea ref={scrollRef} className="flex-1 min-h-0">
+      <ScrollArea ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         {currentOutput ? (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -480,7 +481,7 @@ export function StudioChat({
       )}
 
       {/* Input - Fixed Height Textarea */}
-      <div className="p-4 border-t shrink-0 bg-background">
+      <div className="p-4 border-t flex-shrink-0 bg-background mt-auto">
         {onStartNewChat && messages.length > 0 && (
           <div className="flex justify-end mb-2">
             <Button variant="ghost" size="sm" onClick={onStartNewChat} className="text-xs">
