@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles } from 'lucide-react';
+import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles, Wand2 } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking, UploadContentDialog } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
 import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
 import { CourseBuilder } from '@/components/brain-galaxy/CourseBuilder';
+import { StudioPrompt } from '@/components/brain-galaxy/StudioPrompt';
 import { useBrainGalaxy } from '@/hooks/useBrainGalaxy';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -141,7 +142,7 @@ export default function BrainGalaxyPage() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 md:w-auto md:inline-grid">
+          <TabsList className="grid w-full grid-cols-6 md:w-auto md:inline-grid">
             <TabsTrigger value="dashboard" className="gap-2">
               <BookOpen className="h-4 w-4" />
               <span className="hidden md:inline">Mi Dashboard</span>
@@ -149,6 +150,10 @@ export default function BrainGalaxyPage() {
             <TabsTrigger value="studio" className="gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden md:inline">Studio</span>
+            </TabsTrigger>
+            <TabsTrigger value="studio-prompt" className="gap-2">
+              <Wand2 className="h-4 w-4" />
+              <span className="hidden md:inline">Studio Prompt</span>
             </TabsTrigger>
             <TabsTrigger value="chat" className="gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -187,6 +192,10 @@ export default function BrainGalaxyPage() {
                 onBack={() => setActiveTab('dashboard')}
                 onSaveCourse={createCourse}
               />
+            </TabsContent>
+
+            <TabsContent value="studio-prompt" className="m-0">
+              <StudioPrompt />
             </TabsContent>
 
             <TabsContent value="chat" className="m-0">
