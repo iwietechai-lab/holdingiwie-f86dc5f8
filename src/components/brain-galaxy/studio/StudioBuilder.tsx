@@ -646,7 +646,7 @@ Responde de manera clara y en español.`,
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Header with Tabs */}
       <div className="border-b">
         <div className="flex items-center justify-between p-4">
@@ -693,7 +693,7 @@ Responde de manera clara y en español.`,
       </div>
 
       {/* Main Content with optional History Sidebar */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* History Sidebar */}
         {showHistory && (
           <div className="w-64 border-r flex flex-col bg-muted/30">
@@ -753,7 +753,7 @@ Responde de manera clara y en español.`,
         )}
 
         {/* Three Column Layout for Studio/AI modes */}
-        <div className={`flex-1 grid ${showHistory ? 'grid-cols-[240px_1fr_240px]' : 'grid-cols-[280px_1fr_280px]'} min-h-0 overflow-hidden [&>*]:h-full`}>
+        <div className={`flex-1 grid ${showHistory ? 'grid-cols-[240px_1fr_240px]' : 'grid-cols-[280px_1fr_280px]'} min-h-0 overflow-hidden`} style={{ gridTemplateRows: '1fr' }}>
           {/* Sources Panel */}
           <SourcesPanel
             sources={sources}

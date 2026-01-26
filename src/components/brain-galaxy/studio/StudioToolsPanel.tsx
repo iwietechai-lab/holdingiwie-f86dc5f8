@@ -22,7 +22,7 @@ export function StudioToolsPanel({
   hasSourcesReady,
 }: StudioToolsPanelProps) {
   return (
-    <div className="h-full flex flex-col border-l bg-muted/30">
+    <div className="flex-1 flex flex-col border-l bg-muted/30 min-h-0">
       <div className="p-4 border-b">
         <h3 className="font-semibold">Studio</h3>
         <p className="text-xs text-muted-foreground mt-1">

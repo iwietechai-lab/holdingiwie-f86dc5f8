@@ -173,7 +173,7 @@ export function SourcesPanel({
   };
 
   return (
-    <div className="h-full flex flex-col border-r bg-muted/30">
+    <div className="flex-1 flex flex-col border-r bg-muted/30 min-h-0">
       <div className="p-4 border-b">
         <h3 className="font-semibold mb-3">Fuentes</h3>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

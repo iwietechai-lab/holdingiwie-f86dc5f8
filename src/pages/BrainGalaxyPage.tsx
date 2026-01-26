@@ -169,7 +169,7 @@ export default function BrainGalaxyPage() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col">
             <TabsContent value="dashboard" className="m-0">
               <BrainGalaxyDashboard
                 userStats={userStats}
@@ -185,7 +185,7 @@ export default function BrainGalaxyPage() {
               />
             </TabsContent>
 
-            <TabsContent value="studio" className="m-0 h-full">
+            <TabsContent value="studio" className="m-0 flex-1 [&>div]:h-full">
               <CourseBuilder
                 areas={areas}
                 existingContent={myContent}
