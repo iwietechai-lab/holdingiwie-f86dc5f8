@@ -20,7 +20,7 @@ import { CreateMissionDialog } from './CreateMissionDialog';
 interface MissionsBoardProps {
   missions: Mission[];
   onSelectMission: (mission: Mission) => void;
-  onCreateMission: (data: Partial<Mission>) => Promise<Mission | null>;
+  onCreateMission: (data: Partial<Mission>, participantIds?: string[]) => Promise<Mission | null>;
   loading?: boolean;
 }
 
