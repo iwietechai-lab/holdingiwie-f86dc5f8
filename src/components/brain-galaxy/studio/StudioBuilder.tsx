@@ -646,7 +646,7 @@ Responde de manera clara y en español.`,
   }
 
   return (
-    <div className="h-[calc(100vh-16rem)] flex flex-col">
+    <div className="h-full flex flex-col min-h-0" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
       {/* Header with Tabs */}
       <div className="border-b">
         <div className="flex items-center justify-between p-4">
