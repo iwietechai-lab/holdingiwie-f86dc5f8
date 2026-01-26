@@ -25,6 +25,7 @@ import CompanyChatbotPage from "./pages/CompanyChatbotPage";
 import BudgetPage from "./pages/BudgetPage";
 import IwieChat from "./pages/IwieChat";
 import MisionIwiePage from "./pages/MisionIwiePage";
+import AITareasPage from "./pages/AITareasPage";
 import ConfiguracionPage from "./pages/ConfiguracionPage";
 import BrainGalaxyPage from "./pages/BrainGalaxyPage";
 import NotFound from "./pages/NotFound";
@@ -78,6 +79,7 @@ function AppContent() {
         
         {/* Mobile-friendly pages - no mobile blocking */}
         <Route path="/mision-iwie" element={<ProtectedRoute><MisionIwiePage /></ProtectedRoute>} />
+        <Route path="/ai-tareas" element={<ProtectedRoute><AITareasPage /></ProtectedRoute>} />
         <Route path="/brain-galaxy" element={<ProtectedRoute><BrainGalaxyPage /></ProtectedRoute>} />
         <Route path="/iwiechat" element={<ProtectedRoute><IwieChat /></ProtectedRoute>} />
         <Route path="/videollamada/:roomId" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
