@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Book, Sparkles, Upload, History, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Book, Sparkles, Upload, History, GraduationCap, Wand2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SourcesPanel } from './SourcesPanel';
 import { StudioChat } from './StudioChat';
 import { StudioToolsPanel } from './StudioToolsPanel';
+import { ManualCourseBuilder } from './ManualCourseBuilder';
 import type { Source, StudioOutput, StudioToolType, ChatMessage } from './types';
 import type { BrainGalaxyArea, BrainGalaxyContent } from '@/types/brain-galaxy';
 
@@ -32,13 +33,14 @@ interface ChatSession {
   lastMessage: string;
   createdAt: string;
   messages: ChatMessage[];
+  mode: CreationMode;
 }
 
 interface CreatedCourse {
   id: string;
   title: string;
   createdAt: string;
-  mode: 'manual' | 'ai';
+  mode: CreationMode;
 }
 
 interface StudioBuilderProps {
@@ -56,7 +58,8 @@ interface StudioBuilderProps {
   }) => Promise<boolean>;
 }
 
-type CreationMode = 'manual' | 'ai';
+// 3 creation modes
+type CreationMode = 'studio' | 'ai' | 'manual';
 
 // Course creation detection patterns
 const COURSE_CREATION_PATTERNS = [
@@ -82,7 +85,7 @@ export function StudioBuilder({
   onBack,
   onSaveCourse,
 }: StudioBuilderProps) {
-  const [creationMode, setCreationMode] = useState<CreationMode>('ai');
+  const [creationMode, setCreationMode] = useState<CreationMode>('studio');
   const [sources, setSources] = useState<Source[]>([]);
   const [outputs, setOutputs] = useState<StudioOutput[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -95,7 +98,7 @@ export function StudioBuilder({
   const [foundSources, setFoundSources] = useState<FoundSource[]>([]);
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   
-  // Historial
+  // History
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [createdCourses, setCreatedCourses] = useState<CreatedCourse[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -174,13 +177,89 @@ export function StudioBuilder({
     }
   }, [addSource, scrapeUrl]);
 
-  const processCourseCreationRequest = useCallback(async (message: string, allMessages: ChatMessage[]) => {
+  const processCourseCreationRequest = useCallback(async (message: string, allMessages: ChatMessage[], isAutoMode: boolean = false) => {
     setIsCreatingCourse(true);
     
     try {
       const sourcesContext = getSourcesContext();
       
-      // First, get a course proposal with sources
+      // System prompt varies based on mode
+      const systemPrompt = isAutoMode 
+        ? `Eres Brain Galaxy Studio en MODO AUTOMÁTICO. Tu trabajo es crear un curso COMPLETO sin intervención del usuario.
+
+El usuario te dirá qué curso necesita y TÚ DECIDES TODO:
+- La estructura completa
+- Los módulos y su contenido
+- Las metodologías de aprendizaje
+- Los recursos y fuentes a utilizar
+- Las evaluaciones y ejercicios
+
+Debes buscar fuentes relevantes de internet y del conocimiento interno disponible.
+
+${sourcesContext ? `FUENTES DISPONIBLES:\n${sourcesContext}` : ''}
+
+RESPONDE EN FORMATO JSON con esta estructura exacta:
+{
+  "title": "Título del curso",
+  "description": "Descripción completa",
+  "modules": [
+    {
+      "title": "Módulo 1: Nombre",
+      "description": "Qué aprenderá",
+      "topics": ["Tema 1", "Tema 2"],
+      "methodology": "Descripción de la metodología de enseñanza",
+      "estimatedMinutes": 60,
+      "activities": ["Actividad 1", "Actividad 2"]
+    }
+  ],
+  "sources": [
+    {
+      "title": "Nombre de la fuente",
+      "url": "https://...",
+      "type": "web",
+      "description": "Por qué es útil"
+    }
+  ],
+  "learningObjectives": ["Objetivo 1", "Objetivo 2"],
+  "evaluationMethods": ["Método de evaluación 1"],
+  "difficulty": "beginner|intermediate|advanced",
+  "estimatedHours": 10,
+  "explanation": "Breve explicación de por qué estructuré el curso así y de dónde obtuve la información"
+}`
+        : `Eres un experto en diseño instruccional de Brain Galaxy. El usuario quiere crear un curso de manera COLABORATIVA.
+
+Tu tarea es:
+1. Analizar el tema solicitado
+2. Proponer una estructura inicial que el usuario puede modificar
+3. Identificar fuentes relevantes
+4. Sugerir temas adicionales para discutir
+
+${sourcesContext ? `FUENTES DISPONIBLES:\n${sourcesContext}` : ''}
+
+RESPONDE EN FORMATO JSON:
+{
+  "title": "Título propuesto",
+  "description": "Descripción breve",
+  "modules": [
+    {
+      "title": "Módulo 1: Nombre",
+      "description": "Qué aprenderá",
+      "topics": ["Tema 1"]
+    }
+  ],
+  "sources": [
+    {
+      "title": "Nombre de la fuente",
+      "url": "https://...",
+      "type": "web",
+      "description": "Por qué es útil"
+    }
+  ],
+  "suggestedTopics": ["Tema adicional 1"],
+  "questionsForUser": ["¿Prefieres enfocarte más en teoría o práctica?"],
+  "explanation": "Breve explicación de la propuesta"
+}`;
+
       const proposalResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-galaxy-ai`,
         {
@@ -191,45 +270,7 @@ export function StudioBuilder({
           },
           body: JSON.stringify({
             messages: [
-              {
-                role: 'system',
-                content: `Eres un experto en diseño instruccional de Brain Galaxy Studio. El usuario quiere crear un curso.
-
-Tu tarea es:
-1. Analizar el tema solicitado
-2. Proponer una estructura de curso con módulos
-3. Identificar fuentes relevantes (URLs reales de internet, documentos internos, o temas sugeridos)
-4. Sugerir temas adicionales que el usuario podría querer incluir
-
-${sourcesContext ? `FUENTES DISPONIBLES DEL USUARIO:\n${sourcesContext}\n\nUsa estas fuentes si son relevantes para el curso.` : ''}
-
-RESPONDE SIEMPRE EN FORMATO JSON con esta estructura exacta:
-{
-  "title": "Título del curso",
-  "description": "Descripción breve del curso",
-  "modules": [
-    {
-      "title": "Módulo 1: Nombre",
-      "description": "Qué aprenderá el estudiante",
-      "topics": ["Tema 1", "Tema 2"]
-    }
-  ],
-  "sources": [
-    {
-      "title": "Nombre de la fuente",
-      "url": "https://...",
-      "type": "web",
-      "description": "Por qué es útil esta fuente"
-    }
-  ],
-  "suggestedTopics": ["Tema adicional 1", "Tema adicional 2"],
-  "explanation": "Breve explicación de la propuesta"
-}
-
-Para las fuentes tipo "web", usa URLs reales de sitios educativos conocidos (MDN, W3Schools, Khan Academy, Coursera, documentación oficial, etc.).
-Para fuentes tipo "internal", usa contenido de las fuentes del usuario.
-Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podría agregar.`,
-              },
+              { role: 'system', content: systemPrompt },
               ...allMessages.map(m => ({ role: m.role, content: m.content })),
             ],
             brainModel: 'brain-4',
@@ -244,25 +285,36 @@ Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podr
       const data = await proposalResponse.json();
       const responseContent = data.choices?.[0]?.message?.content || '';
       
-      // Try to parse JSON from response
       try {
         const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          const proposal = JSON.parse(jsonMatch[0]) as CourseProposal & { explanation?: string };
+          const proposal = JSON.parse(jsonMatch[0]) as CourseProposal & { 
+            explanation?: string;
+            questionsForUser?: string[];
+            learningObjectives?: string[];
+          };
           setCourseProposal(proposal);
           setFoundSources(proposal.sources || []);
           
-          // Add explanation as assistant message
+          let assistantContent = proposal.explanation || '';
+          
+          if (isAutoMode) {
+            assistantContent = `✨ **Curso diseñado automáticamente**\n\n${proposal.explanation || 'He analizado tu solicitud y creado un curso completo.'}\n\nRevisa la estructura propuesta. Si estás de acuerdo, puedo proceder a generar todo el contenido.`;
+          } else {
+            if (proposal.questionsForUser?.length) {
+              assistantContent += `\n\n**Algunas preguntas para personalizar mejor:**\n${proposal.questionsForUser.map(q => `- ${q}`).join('\n')}`;
+            }
+          }
+          
           const assistantMessage: ChatMessage = {
             id: `msg-${Date.now()}`,
             role: 'assistant',
-            content: proposal.explanation || `He analizado tu solicitud y preparado una propuesta de curso. Revisa la estructura y las fuentes que encontré. Puedes agregar más material o pedirme que modifique la estructura.`,
+            content: assistantContent,
             timestamp: new Date().toISOString(),
           };
           setChatMessages(prev => [...prev, assistantMessage]);
           
         } else {
-          // No JSON, treat as regular response
           const assistantMessage: ChatMessage = {
             id: `msg-${Date.now()}`,
             role: 'assistant',
@@ -272,7 +324,6 @@ Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podr
           setChatMessages(prev => [...prev, assistantMessage]);
         }
       } catch (parseError) {
-        // JSON parse failed, use as regular message
         const assistantMessage: ChatMessage = {
           id: `msg-${Date.now()}`,
           role: 'assistant',
@@ -305,16 +356,26 @@ Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podr
     setIsLoading(true);
 
     try {
+      const isStudioMode = creationMode === 'studio';
+      
       // Check if this is a course creation request
-      if (detectCourseCreationIntent(message) && sources.length === 0) {
-        await processCourseCreationRequest(message, updatedMessages);
+      if (detectCourseCreationIntent(message) || chatMessages.length === 0) {
+        await processCourseCreationRequest(message, updatedMessages, isStudioMode);
         return;
       }
 
       // Check if user wants to proceed with course creation
-      if (message.toLowerCase().includes('procede') && message.toLowerCase().includes('curso') && courseProposal) {
-        // Generate the actual course using the tool
+      if ((message.toLowerCase().includes('procede') || message.toLowerCase().includes('crear')) && courseProposal) {
         await generateOutput('course');
+        
+        // Save to created courses
+        const newCourse: CreatedCourse = {
+          id: `course-${Date.now()}`,
+          title: courseProposal.title,
+          createdAt: new Date().toISOString(),
+          mode: creationMode,
+        };
+        setCreatedCourses(prev => [newCourse, ...prev]);
         setCourseProposal(null);
         return;
       }
@@ -335,17 +396,13 @@ Para fuentes tipo "suggested", sugiere búsquedas o recursos que el usuario podr
                 role: 'system',
                 content: `Eres Brain Galaxy Studio, un asistente experto en educación y creación de contenido.
 
-${sourcesContext ? `FUENTES DISPONIBLES:\n${sourcesContext}\n\nResponde basándote en estas fuentes cuando sea relevante.` : 'No hay fuentes cargadas aún.'}
+${isStudioMode ? 'MODO STUDIO: Tomas decisiones autónomas sobre la estructura y contenido del curso.' : 'MODO COLABORATIVO: Trabajas junto al usuario para definir la estructura.'}
 
-${courseProposal ? `PROPUESTA DE CURSO ACTUAL:\n${JSON.stringify(courseProposal, null, 2)}\n\nPuedes modificar esta propuesta según las indicaciones del usuario.` : ''}
+${sourcesContext ? `FUENTES DISPONIBLES:\n${sourcesContext}` : ''}
 
-CAPACIDADES:
-- Puedo crear cursos completos desde cero
-- Busco y sugiero fuentes de información
-- Analizo documentos y extraigo conocimiento
-- Genero quizzes, flashcards, mapas mentales, etc.
+${courseProposal ? `PROPUESTA DE CURSO ACTUAL:\n${JSON.stringify(courseProposal, null, 2)}` : ''}
 
-Responde de manera clara, útil y en español.`,
+Responde de manera clara y en español.`,
               },
               ...updatedMessages.map(m => ({ role: m.role, content: m.content })),
             ],
@@ -375,14 +432,13 @@ Responde de manera clara, útil y en español.`,
     } finally {
       setIsLoading(false);
     }
-  }, [chatMessages, getSourcesContext, isLoading, courseProposal, sources.length, processCourseCreationRequest]);
+  }, [chatMessages, getSourcesContext, isLoading, courseProposal, creationMode, processCourseCreationRequest]);
 
   const generateOutput = useCallback(async (toolType: StudioToolType) => {
     if (isGenerating) return;
 
     const readySources = sources.filter(s => s.status === 'ready');
     
-    // Allow course generation even without sources if we have a proposal
     if (readySources.length === 0 && toolType !== 'course') {
       toast.error('Añade al menos una fuente primero');
       return;
@@ -395,19 +451,19 @@ Responde de manera clara, útil y en español.`,
       const sourcesContext = getSourcesContext();
       
       const toolPrompts: Record<StudioToolType, string> = {
-        'audio-summary': 'Genera un guión para un podcast/audio que resuma el contenido. Incluye: intro, puntos principales, conclusión. Formato conversacional.',
-        'video-summary': 'Crea un guión para un video explicativo. Incluye: escenas, texto en pantalla, narración, y duración estimada por sección.',
-        'mind-map': 'Genera un mapa mental en formato de texto estructurado. Usa indentación para mostrar jerarquías. Formato:\n- Tema central\n  - Rama 1\n    - Sub-tema 1.1\n    - Sub-tema 1.2\n  - Rama 2',
-        'report': 'Genera un informe ejecutivo detallado con: resumen ejecutivo, hallazgos principales, análisis, recomendaciones y conclusiones.',
-        'flashcards': 'Genera tarjetas de estudio en formato:\n\n**Tarjeta 1**\nPregunta: [pregunta]\nRespuesta: [respuesta]\n\nCrea al menos 10 tarjetas cubriendo los conceptos más importantes.',
-        'quiz': 'Genera un cuestionario con 10 preguntas variadas (opción múltiple, verdadero/falso, respuesta corta). Incluye la respuesta correcta y explicación para cada una.',
-        'infographic': 'Diseña el contenido para una infografía. Incluye: título, estadísticas clave, puntos visuales, iconos sugeridos, y flujo visual.',
-        'presentation': 'Crea slides para una presentación. Formato:\n\n**Slide 1: [Título]**\n- Punto 1\n- Punto 2\n[Nota del presentador]\n\nGenera al menos 10 slides.',
-        'data-table': 'Extrae y organiza la información en tablas. Formato Markdown. Identifica datos estructurables como fechas, números, comparaciones.',
-        'deep-research': 'Realiza una investigación profunda. Analiza las fuentes, identifica gaps de información, sugiere preguntas de investigación adicionales, y proporciona un análisis exhaustivo.',
+        'audio-summary': 'Genera un guión para un podcast/audio que resuma el contenido.',
+        'video-summary': 'Crea un guión para un video explicativo.',
+        'mind-map': 'Genera un mapa mental en formato de texto estructurado.',
+        'report': 'Genera un informe ejecutivo detallado.',
+        'flashcards': 'Genera tarjetas de estudio. Crea al menos 10.',
+        'quiz': 'Genera un cuestionario con 10 preguntas variadas.',
+        'infographic': 'Diseña el contenido para una infografía.',
+        'presentation': 'Crea slides para una presentación. Al menos 10.',
+        'data-table': 'Extrae y organiza la información en tablas.',
+        'deep-research': 'Realiza una investigación profunda.',
         'course': courseProposal 
-          ? `Genera un curso completo basado en esta propuesta:\n${JSON.stringify(courseProposal, null, 2)}\n\nFormato JSON:\n{\n  "title": "Título",\n  "description": "Descripción",\n  "objectives": ["Objetivo 1"],\n  "difficulty": "beginner|intermediate|advanced",\n  "estimated_hours": 10,\n  "modules": [{"title": "Módulo 1", "description": "Desc", "estimated_minutes": 60, "topics": ["Tema 1"], "content": "Contenido completo del módulo..."}]\n}`
-          : 'Genera una malla curricular completa en JSON con el formato:\n{\n  "title": "Título del curso",\n  "description": "Descripción",\n  "objectives": ["Objetivo 1"],\n  "difficulty": "beginner|intermediate|advanced|expert",\n  "estimated_hours": 10,\n  "modules": [{"title": "Módulo 1", "description": "Desc", "estimated_minutes": 60, "topics": ["Tema 1"]}]\n}',
+          ? `Genera un curso completo basado en esta propuesta:\n${JSON.stringify(courseProposal, null, 2)}\n\nIncluye contenido detallado para cada módulo, actividades, evaluaciones y recursos.`
+          : 'Genera una malla curricular completa.',
       };
 
       const response = await fetch(
@@ -422,7 +478,7 @@ Responde de manera clara, útil y en español.`,
             messages: [
               {
                 role: 'system',
-                content: `Eres un experto en creación de contenido educativo. ${sourcesContext ? `Analiza las siguientes fuentes y genera el contenido solicitado.\n\nFUENTES:\n${sourcesContext}` : 'Genera contenido educativo de alta calidad.'}`,
+                content: `Eres un experto en creación de contenido educativo. ${sourcesContext ? `Analiza las siguientes fuentes:\n\n${sourcesContext}` : ''}`,
               },
               {
                 role: 'user',
@@ -469,20 +525,6 @@ Responde de manera clara, útil y en español.`,
       setCurrentOutput(newOutput);
       toast.success(`${toolNames[toolType]} generado correctamente`);
 
-      // If it's a course, try to save it
-      if (toolType === 'course') {
-        try {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const courseData = JSON.parse(jsonMatch[0]);
-            // Could auto-save or prompt user
-            console.log('Course data:', courseData);
-          }
-        } catch (e) {
-          console.log('Could not parse course JSON');
-        }
-      }
-
     } catch (error) {
       console.error('Error generating output:', error);
       toast.error('Error al generar el contenido');
@@ -496,6 +538,18 @@ Responde de manera clara, útil y en español.`,
 
   const handleModeChange = (mode: string) => {
     setCreationMode(mode as CreationMode);
+    // Save current session before switching
+    if (chatMessages.length > 0) {
+      const session: ChatSession = {
+        id: `session-${Date.now()}`,
+        title: chatMessages[0]?.content.substring(0, 50) || 'Conversación',
+        lastMessage: chatMessages[chatMessages.length - 1]?.content.substring(0, 100) || '',
+        createdAt: new Date().toISOString(),
+        messages: [...chatMessages],
+        mode: creationMode,
+      };
+      setChatSessions(prev => [session, ...prev]);
+    }
     // Clear state when switching modes
     setChatMessages([]);
     setSources([]);
@@ -505,7 +559,6 @@ Responde de manera clara, útil y en español.`,
   };
 
   const startNewChat = () => {
-    // Save current session if has messages
     if (chatMessages.length > 0) {
       const session: ChatSession = {
         id: `session-${Date.now()}`,
@@ -513,6 +566,7 @@ Responde de manera clara, útil y en español.`,
         lastMessage: chatMessages[chatMessages.length - 1]?.content.substring(0, 100) || '',
         createdAt: new Date().toISOString(),
         messages: [...chatMessages],
+        mode: creationMode,
       };
       setChatSessions(prev => [session, ...prev]);
     }
@@ -523,8 +577,73 @@ Responde de manera clara, útil y en español.`,
 
   const loadChatSession = (session: ChatSession) => {
     setChatMessages(session.messages);
+    setCreationMode(session.mode);
     setShowHistory(false);
   };
+
+  // Render Manual Mode
+  if (creationMode === 'manual') {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex flex-col">
+        {/* Header */}
+        <div className="border-b">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={onBack}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-2">
+                <Book className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold">Brain Galaxy Studio</h2>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => setShowHistory(!showHistory)}
+            >
+              <History className="h-4 w-4" />
+              Historial
+            </Button>
+          </div>
+          
+          {/* Mode Tabs */}
+          <Tabs value={creationMode} onValueChange={handleModeChange} className="px-4">
+            <TabsList className="w-full max-w-2xl">
+              <TabsTrigger value="studio" className="flex-1 gap-2">
+                <Wand2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Crear con Studio</span>
+                <span className="sm:hidden">Studio</span>
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="flex-1 gap-2">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Crear con IA</span>
+                <span className="sm:hidden">Con IA</span>
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="flex-1 gap-2">
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Crear Manual</span>
+                <span className="sm:hidden">Manual</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {/* Manual Course Builder */}
+        <ManualCourseBuilder
+          areas={areas}
+          existingContent={existingContent}
+          onSaveCourse={onSaveCourse}
+          sources={sources}
+          onAddSource={addSource}
+          onRemoveSource={removeSource}
+          onScrapeUrl={scrapeUrl}
+          isScrapingUrl={isScrapingUrl}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -551,16 +670,23 @@ Responde de manera clara, útil y en español.`,
           </Button>
         </div>
         
-        {/* Mode Tabs */}
+        {/* Mode Tabs - Now with 3 options */}
         <Tabs value={creationMode} onValueChange={handleModeChange} className="px-4">
-          <TabsList className="w-full max-w-md">
+          <TabsList className="w-full max-w-2xl">
+            <TabsTrigger value="studio" className="flex-1 gap-2">
+              <Wand2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Crear con Studio</span>
+              <span className="sm:hidden">Studio</span>
+            </TabsTrigger>
             <TabsTrigger value="ai" className="flex-1 gap-2">
-              <Sparkles className="h-4 w-4" />
-              Crear Curso con IA
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Crear con IA</span>
+              <span className="sm:hidden">Con IA</span>
             </TabsTrigger>
             <TabsTrigger value="manual" className="flex-1 gap-2">
               <Upload className="h-4 w-4" />
-              Crear Curso Manual
+              <span className="hidden sm:inline">Crear Manual</span>
+              <span className="sm:hidden">Manual</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -576,7 +702,6 @@ Responde de manera clara, útil y en español.`,
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
-                {/* Chat Sessions */}
                 {chatSessions.length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Conversaciones</p>
@@ -586,14 +711,17 @@ Responde de manera clara, útil y en español.`,
                         onClick={() => loadChatSession(session)}
                         className="w-full text-left p-2 rounded hover:bg-muted text-sm truncate"
                       >
-                        <p className="font-medium truncate">{session.title}</p>
+                        <div className="flex items-center gap-1 mb-1">
+                          {session.mode === 'studio' && <Wand2 className="h-3 w-3 text-primary" />}
+                          {session.mode === 'ai' && <MessageSquare className="h-3 w-3 text-primary" />}
+                          <p className="font-medium truncate text-xs">{session.title}</p>
+                        </div>
                         <p className="text-xs text-muted-foreground truncate">{session.lastMessage}</p>
                       </button>
                     ))}
                   </div>
                 )}
                 
-                {/* Created Courses */}
                 {createdCourses.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Cursos creados</p>
@@ -604,10 +732,10 @@ Responde de manera clara, útil y en español.`,
                       >
                         <div className="flex items-center gap-2">
                           <GraduationCap className="h-4 w-4 text-primary" />
-                          <p className="font-medium truncate">{course.title}</p>
+                          <p className="font-medium truncate text-xs">{course.title}</p>
                         </div>
                         <p className="text-xs text-muted-foreground ml-6">
-                          {course.mode === 'ai' ? 'Con IA' : 'Manual'}
+                          {course.mode === 'studio' ? 'Studio' : course.mode === 'ai' ? 'Con IA' : 'Manual'}
                         </p>
                       </div>
                     ))}
@@ -624,7 +752,7 @@ Responde de manera clara, útil y en español.`,
           </div>
         )}
 
-        {/* Three Column Layout */}
+        {/* Three Column Layout for Studio/AI modes */}
         <div className={`flex-1 grid ${showHistory ? 'grid-cols-[240px_1fr_240px]' : 'grid-cols-[280px_1fr_280px]'} overflow-hidden`}>
           {/* Sources Panel */}
           <SourcesPanel
