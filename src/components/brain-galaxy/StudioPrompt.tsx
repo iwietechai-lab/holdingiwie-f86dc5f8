@@ -179,12 +179,12 @@ Responde siempre en español y sé amigable pero profesional.`;
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] gap-4">
+    <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-            <Wand2 className="h-6 w-6 text-amber-400" />
+          <div className="p-2 rounded-xl bg-primary/20 border border-primary/30">
+            <Wand2 className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">Studio Prompt</h2>
@@ -197,7 +197,7 @@ Responde siempre en español y sé amigable pero profesional.`;
         {/* AI System Selector */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">IA destino:</span>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {AI_SYSTEMS.map(ai => (
               <Button
                 key={ai.id}
@@ -214,199 +214,227 @@ Responde siempre en español y sé amigable pero profesional.`;
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      {/* Main Content - Compact Layout */}
+      <div className="flex gap-4">
         {/* Chat Area */}
         <div className="flex-1 flex flex-col bg-card/50 rounded-xl border border-border/50 overflow-hidden">
           {messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+            <div className="flex flex-col p-6 gap-4">
+              {/* Welcome Section */}
               <div className="text-center space-y-2">
-                <div className="p-4 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 inline-block">
-                  <Sparkles className="h-8 w-8 text-amber-400" />
+                <div className="p-3 rounded-full bg-primary/20 border border-primary/30 inline-block">
+                  <Sparkles className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold">¿Cómo puedo ayudarte hoy?</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Cuéntame qué quieres pedirle a la IA y te ayudaré a crear un prompt 
                   más efectivo para obtener mejores resultados.
                 </p>
               </div>
 
-              {/* Quick Tips */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl">
-                <Card className="bg-background/50 border-border/50 p-3 text-center">
-                  <Target className="h-5 w-5 text-primary mx-auto mb-1" />
-                  <p className="text-xs font-medium">Sé específico</p>
-                </Card>
-                <Card className="bg-background/50 border-border/50 p-3 text-center">
-                  <Brain className="h-5 w-5 text-primary mx-auto mb-1" />
-                  <p className="text-xs font-medium">Da contexto</p>
-                </Card>
-                <Card className="bg-background/50 border-border/50 p-3 text-center">
-                  <Zap className="h-5 w-5 text-primary mx-auto mb-1" />
-                  <p className="text-xs font-medium">Define formato</p>
-                </Card>
-                <Card className="bg-background/50 border-border/50 p-3 text-center">
-                  <Lightbulb className="h-5 w-5 text-primary mx-auto mb-1" />
-                  <p className="text-xs font-medium">Itera y mejora</p>
-                </Card>
+              {/* Quick Tips - Inline */}
+              <div className="grid grid-cols-4 gap-2 max-w-xl mx-auto">
+                <div className="bg-background/50 border border-border/50 rounded-lg p-2 text-center">
+                  <Target className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-[10px] font-medium">Sé específico</p>
+                </div>
+                <div className="bg-background/50 border border-border/50 rounded-lg p-2 text-center">
+                  <Brain className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-[10px] font-medium">Da contexto</p>
+                </div>
+                <div className="bg-background/50 border border-border/50 rounded-lg p-2 text-center">
+                  <Zap className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-[10px] font-medium">Define formato</p>
+                </div>
+                <div className="bg-background/50 border border-border/50 rounded-lg p-2 text-center">
+                  <Lightbulb className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-[10px] font-medium">Itera y mejora</p>
+                </div>
               </div>
 
               {/* Prompt Starters */}
-              <div className="w-full max-w-2xl">
-                <p className="text-sm text-muted-foreground mb-2 text-center">Prueba con estos ejemplos:</p>
+              <div className="w-full max-w-xl mx-auto">
+                <p className="text-xs text-muted-foreground mb-2 text-center">Prueba con estos ejemplos:</p>
                 <div className="grid grid-cols-2 gap-2">
                   {PROMPT_STARTERS.map((starter, idx) => (
                     <Button
                       key={idx}
                       variant="outline"
-                      className="justify-start gap-2 h-auto py-3 px-4 text-left"
+                      className="justify-start gap-2 h-auto py-2 px-3 text-left"
                       onClick={() => handleStarterClick(starter.prompt)}
                     >
-                      <span className="text-lg">{starter.icon}</span>
+                      <span className="text-base">{starter.icon}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{starter.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{starter.prompt}</p>
+                        <p className="font-medium text-xs">{starter.title}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{starter.prompt}</p>
                       </div>
                     </Button>
                   ))}
                 </div>
               </div>
+
+              {/* Input Area - Visible Immediately */}
+              <div className="w-full max-w-xl mx-auto mt-2">
+                <div className="relative">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Escribe aquí qué quieres pedirle a la IA... Ej: 'Quiero que me ayude a redactar un informe de ventas'"
+                    className="min-h-[100px] resize-none pr-14 text-sm"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    disabled={!input.trim() || isLoading}
+                    className="absolute bottom-3 right-3"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  Presiona Enter para enviar o Shift+Enter para nueva línea
+                </p>
+              </div>
             </div>
           ) : (
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-              <div className="space-y-4">
-                {messages.map(message => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+            <>
+              <ScrollArea className="flex-1 p-4 max-h-[400px]" ref={scrollRef}>
+                <div className="space-y-4">
+                  {messages.map(message => (
                     <div
-                      className={`max-w-[85%] rounded-xl p-4 ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted/50 border border-border/50'
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      {message.role === 'assistant' ? (
-                        <div className="space-y-3">
-                          <MarkdownRenderer content={message.content} />
-                          
-                          {message.improvedPrompt && (
-                            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                              <div className="flex items-center justify-between mb-2">
-                                <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  Prompt Mejorado
-                                </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleCopy(message.improvedPrompt!, message.id)}
-                                  className="h-7 gap-1"
-                                >
-                                  {copiedId === message.id ? (
-                                    <Check className="h-3 w-3" />
-                                  ) : (
-                                    <Copy className="h-3 w-3" />
-                                  )}
-                                  Copiar
-                                </Button>
+                      <div
+                        className={`max-w-[85%] rounded-xl p-3 ${
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted/50 border border-border/50'
+                        }`}
+                      >
+                        {message.role === 'assistant' ? (
+                          <div className="space-y-3">
+                            <MarkdownRenderer content={message.content} />
+                            
+                            {message.improvedPrompt && (
+                              <div className="mt-3 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Prompt Mejorado
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleCopy(message.improvedPrompt!, message.id)}
+                                    className="h-7 gap-1"
+                                  >
+                                    {copiedId === message.id ? (
+                                      <Check className="h-3 w-3" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                    Copiar
+                                  </Button>
+                                </div>
+                                <p className="text-sm font-mono bg-background/50 p-2 rounded">
+                                  {message.improvedPrompt}
+                                </p>
                               </div>
-                              <p className="text-sm font-mono bg-background/50 p-2 rounded">
-                                {message.improvedPrompt}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm">{message.content}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-muted/50 border border-border/50 rounded-xl p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex gap-1">
-                          <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" />
-                          <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce [animation-delay:0.1s]" />
-                          <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-                        </div>
-                        <span className="text-sm text-muted-foreground">Mejorando tu prompt...</span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm">{message.content}</p>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          )}
+                  ))}
+                  
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted/50 border border-border/50 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.1s]" />
+                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
+                          </div>
+                          <span className="text-sm text-muted-foreground">Mejorando tu prompt...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
 
-          {/* Input Area */}
-          <div className="p-4 border-t border-border/50">
-            <div className="relative">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Describe qué quieres pedirle a la IA... Ej: 'Quiero que me ayude a redactar un informe de ventas'"
-                className="min-h-[80px] max-h-[120px] resize-none pr-12"
-                disabled={isLoading}
-              />
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="absolute bottom-2 right-2 bg-amber-500 hover:bg-amber-600"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+              {/* Input Area - Always visible at bottom of messages */}
+              <div className="p-4 border-t border-border/50">
+                <div className="relative">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Continúa la conversación o pide más mejoras..."
+                    className="min-h-[80px] max-h-[100px] resize-none pr-14 text-sm"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    disabled={!input.trim() || isLoading}
+                    className="absolute bottom-3 right-3"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Tips Sidebar */}
-        <div className="hidden lg:block w-72">
-          <Card className="bg-card/50 border-border/50 h-full">
-            <CardHeader className="pb-3">
+        {/* Tips Sidebar - Compact */}
+        <div className="hidden lg:block w-64 shrink-0">
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-amber-400" />
+                <Lightbulb className="h-4 w-4 text-primary" />
                 Tips para mejores prompts
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div className="space-y-2">
+            <CardContent className="space-y-3 text-xs pb-4">
+              <div className="space-y-1">
                 <h4 className="font-medium text-foreground">🎯 Sé específico</h4>
-                <p className="text-muted-foreground text-xs">
-                  En lugar de "ayúdame con un email", di "escribe un email formal para solicitar una reunión con el equipo de ventas"
+                <p className="text-muted-foreground text-[10px]">
+                  En lugar de "ayúdame con un email", di "escribe un email formal para solicitar una reunión"
                 </p>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h4 className="font-medium text-foreground">📝 Proporciona contexto</h4>
-                <p className="text-muted-foreground text-xs">
-                  Incluye información relevante como tu rol, la audiencia objetivo y el propósito
+                <p className="text-muted-foreground text-[10px]">
+                  Incluye información relevante como tu rol y la audiencia objetivo
                 </p>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h4 className="font-medium text-foreground">📋 Define el formato</h4>
-                <p className="text-muted-foreground text-xs">
-                  Indica cómo quieres la respuesta: lista, párrafos, tabla, bullet points, etc.
+                <p className="text-muted-foreground text-[10px]">
+                  Indica cómo quieres la respuesta: lista, tabla, bullet points, etc.
                 </p>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h4 className="font-medium text-foreground">🔄 Itera</h4>
-                <p className="text-muted-foreground text-xs">
-                  No tengas miedo de pedir ajustes o reformular. Los mejores prompts se refinan con práctica
+                <p className="text-muted-foreground text-[10px]">
+                  No tengas miedo de pedir ajustes. Los mejores prompts se refinan con práctica
                 </p>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h4 className="font-medium text-foreground">⚡ Usa ejemplos</h4>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-[10px]">
                   Si tienes un ejemplo de lo que buscas, inclúyelo en tu prompt
                 </p>
               </div>
