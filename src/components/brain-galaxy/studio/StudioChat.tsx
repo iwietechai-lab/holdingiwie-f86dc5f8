@@ -179,9 +179,9 @@ export function StudioChat({
         </div>
       </div>
 
-      {/* Output Display, Course Proposal, or Chat - scrollable middle section */}
-      <div className="flex-1 overflow-hidden min-h-0">
-        <ScrollArea ref={scrollRef} className="h-full">
+      {/* Scrollable content area - uses relative/absolute positioning for reliable scroll */}
+      <div className="flex-1 relative min-h-0">
+        <div className="absolute inset-0 overflow-y-auto" ref={scrollRef}>
         {currentOutput ? (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -468,7 +468,7 @@ export function StudioChat({
             )}
           </div>
         )}
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Deep Research Banner */}
