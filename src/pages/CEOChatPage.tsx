@@ -280,7 +280,7 @@ export default function CEOChatPage() {
               </div>
             </div>
 
-            {/* Pending Reviews (CEO only) */}
+{/* Pending Reviews (CEO only) - Now clickable */}
             {isSuperadmin && pendingReviews.length > 0 && (
               <Card className="bg-amber-500/10 border-amber-500/30">
                 <CardHeader className="py-3 px-4">
@@ -289,13 +289,30 @@ export default function CEOChatPage() {
                     {pendingReviews.length} Pendiente{pendingReviews.length > 1 ? 's' : ''}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="py-2 px-4">
-                  {pendingReviews.slice(0, 3).map(review => (
-                    <div key={review.id} className="flex items-center gap-2 text-xs py-1">
-                      <AlertCircle className="w-3 h-3 text-amber-400" />
-                      <span className="truncate">{review.title}</span>
+                <CardContent className="py-2 px-2">
+                  <ScrollArea className="h-32">
+                    <div className="space-y-1 px-2">
+                      {pendingReviews.map(review => {
+                        // Find the corresponding submission to analyze
+                        const submission = teamSubmissions.find(s => s.id === review.reference_id);
+                        return (
+                          <button
+                            key={review.id}
+                            onClick={() => {
+                              if (submission) {
+                                handleAnalyzeNow(submission as any);
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 text-xs py-2 px-2 rounded-lg hover:bg-amber-500/20 transition-colors text-left"
+                          >
+                            <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span className="truncate flex-1">{review.title}</span>
+                            <Wand2 className="w-3 h-3 text-amber-400 opacity-60" />
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
+                  </ScrollArea>
                 </CardContent>
               </Card>
             )}
@@ -348,8 +365,8 @@ export default function CEOChatPage() {
               </CardContent>
             </Card>
 
-            {/* User Submissions History - Always visible for non-superadmins */}
-            {!isSuperadmin && (
+            {/* User Submissions History - Visible for ALL users including CEO */}
+            {(
               <Card className="bg-card/50 backdrop-blur-sm border-border">
                 <CardHeader className="py-3 px-4">
                   <CardTitle className="text-sm flex items-center gap-2">
