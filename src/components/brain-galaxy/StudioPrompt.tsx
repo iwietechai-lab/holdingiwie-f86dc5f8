@@ -6,15 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Send, 
   Sparkles, 
-  GraduationCap,
-  Settings2,
+  Wand2,
+  Copy,
+  Check,
   Loader2,
-  BookOpen,
-  FileText,
-  Video,
-  ListChecks
+  MessageSquare,
+  Brain,
+  Zap,
+  Target,
+  RefreshCw
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
@@ -23,45 +24,36 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  courseStructure?: CourseStructure;
+  optimizedPrompt?: string;
 }
 
-interface CourseModule {
-  title: string;
-  description: string;
-  estimatedMinutes: number;
-  contentTypes: string[];
-}
+const AI_TARGETS = [
+  { id: 'ceo-chat', name: 'CEO Chat', icon: '👔', description: 'Para consultas estratégicas y de negocio' },
+  { id: 'brain-galaxy', name: 'Brain Galaxy', icon: '🧠', description: 'Para aprendizaje y conocimiento' },
+  { id: 'mision-iwie', name: 'Misión Iwie', icon: '🚀', description: 'Para gestión de tareas y proyectos' },
+  { id: 'general', name: 'IA General', icon: '✨', description: 'Para cualquier asistente de IA' },
+];
 
-interface CourseStructure {
-  title: string;
-  description: string;
-  objectives: string[];
-  modules: CourseModule[];
-  totalHours: number;
-  difficulty: string;
-}
-
-const COURSE_STARTERS = [
+const PROMPT_EXAMPLES = [
   {
-    icon: '💻',
-    title: 'Curso de programación en Python',
-    prompt: 'Necesito un curso completo de programación en Python'
+    icon: '📊',
+    original: 'Dame un reporte de ventas',
+    description: 'Reportes y análisis'
   },
   {
-    icon: '🚀',
-    title: 'Programa de liderazgo empresarial',
-    prompt: 'Crea un programa de capacitación en liderazgo empresarial'
+    icon: '💡',
+    original: 'Necesito ideas para mi proyecto',
+    description: 'Brainstorming'
   },
   {
-    icon: '📱',
-    title: 'Marketing digital con certificación',
-    prompt: 'Quiero un curso de marketing digital con certificación'
+    icon: '📝',
+    original: 'Escribe un email profesional',
+    description: 'Redacción'
   },
   {
-    icon: '🛸',
-    title: 'Operación de drones',
-    prompt: 'Genera un curso de operación de drones para principiantes'
+    icon: '🔍',
+    original: 'Explícame cómo funciona X',
+    description: 'Explicaciones'
   }
 ];
 
@@ -69,6 +61,8 @@ export function StudioPrompt() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState(AI_TARGETS[3]); // General by default
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,6 +70,13 @@ export function StudioPrompt() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleCopyPrompt = async (text: string, messageId: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedId(messageId);
+    toast.success('Prompt copiado al portapapeles');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -92,32 +93,30 @@ export function StudioPrompt() {
     setIsLoading(true);
 
     try {
-      const systemPrompt = `Eres Studio, un experto en diseño instruccional y creación de cursos. Tu misión es ayudar a los usuarios a crear cursos y programas de capacitación completos.
+      const systemPrompt = `Eres Studio Prompt, un experto en ingeniería de prompts. Tu única misión es ayudar a los usuarios a redactar prompts más efectivos para obtener mejores respuestas de las IAs.
 
-Cuando el usuario te pida crear un curso, debes:
-1. **Entender** qué tipo de curso necesita
-2. **Proponer** una estructura completa del curso con módulos
-3. **Incluir** objetivos de aprendizaje claros
-4. **Definir** tipos de contenido (videos, lecturas, ejercicios, quizzes)
-5. **Estimar** la duración de cada módulo
+Contexto de destino: El usuario quiere usar el prompt en "${selectedTarget.name}" (${selectedTarget.description}).
 
-Formato de respuesta para propuestas de cursos:
-- Título del curso
-- Descripción general
-- Objetivos de aprendizaje (3-5)
-- Estructura de módulos con:
-  - Nombre del módulo
-  - Descripción breve
-  - Duración estimada
-  - Tipos de contenido incluidos
-- Nivel de dificultad
-- Duración total estimada
+Cuando el usuario te dé un prompt o idea:
+1. **Analiza** qué quiere lograr el usuario
+2. **Identifica** qué información falta o podría mejorar el prompt
+3. **Redacta** una versión optimizada del prompt que sea:
+   - Claro y específico
+   - Con contexto relevante
+   - Con el formato de salida esperado
+   - Con restricciones o parámetros si aplica
 
-Si el usuario quiere ajustes, modifica la propuesta según sus necesidades.
-Si hace preguntas generales sobre educación o diseño instruccional, responde de manera útil.
+Formato de respuesta:
+1. Breve análisis del prompt original (1-2 líneas)
+2. El prompt optimizado en un bloque destacado
+3. Explicación breve de las mejoras (opcional, solo si es útil)
 
-Sé creativo, profesional y orienta tus respuestas al contexto latinoamericano.
-Responde siempre en español.`;
+Si el usuario hace preguntas sobre cómo escribir prompts, responde con consejos prácticos.
+
+IMPORTANTE: 
+- No generes contenido, solo optimiza prompts
+- Sé conciso y directo
+- Responde siempre en español`;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-galaxy-ai`,
@@ -154,15 +153,15 @@ Responde siempre en español.`;
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Studio error:', error);
+      console.error('Studio Prompt error:', error);
       toast.error('Error al procesar tu solicitud');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleStarterClick = (prompt: string) => {
-    setInput(prompt);
+  const handleExampleClick = (example: string) => {
+    setInput(example);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -172,43 +171,51 @@ Responde siempre en español.`;
     }
   };
 
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput('');
+  };
+
   return (
     <div className="flex h-[calc(100vh-14rem)] bg-card/30 rounded-xl border border-border/50 overflow-hidden">
-      {/* Sidebar */}
+      {/* Sidebar - AI Target Selector */}
       <div className="w-56 border-r border-border/50 flex flex-col bg-background/50">
-        <div className="p-3 border-b border-border/50 flex items-center justify-between">
-          <span className="text-sm font-medium">Definir Estructura</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-            <Settings2 className="h-4 w-4" />
-          </Button>
+        <div className="p-3 border-b border-border/50">
+          <span className="text-sm font-medium">Destino del Prompt</span>
         </div>
         
-        <div className="flex-1 p-3">
-          <p className="text-xs text-muted-foreground mb-2">Historial de sesiones</p>
-          <div className="space-y-1">
-            {messages.length > 0 && (
-              <div className="text-xs bg-primary/10 border border-primary/20 rounded-md px-2 py-1.5 truncate">
-                {messages[0]?.content.slice(0, 30)}...
+        <div className="flex-1 p-3 space-y-2">
+          {AI_TARGETS.map((target) => (
+            <button
+              key={target.id}
+              onClick={() => setSelectedTarget(target)}
+              className={`w-full text-left p-2 rounded-lg transition-colors ${
+                selectedTarget.id === target.id 
+                  ? 'bg-primary/10 border border-primary/30' 
+                  : 'hover:bg-muted/50 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{target.icon}</span>
+                <div>
+                  <p className="text-sm font-medium">{target.name}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{target.description}</p>
+                </div>
               </div>
-            )}
-          </div>
+            </button>
+          ))}
         </div>
 
         <div className="p-3 border-t border-border/50">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <BookOpen className="h-3 w-3" />
-              <span>Cursos</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
-              <span>Docs</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Video className="h-3 w-3" />
-              <span>Videos</span>
-            </div>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full gap-2"
+            onClick={handleNewChat}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Nueva conversación
+          </Button>
         </div>
       </div>
 
@@ -217,45 +224,64 @@ Responde siempre en español.`;
         {messages.length === 0 ? (
           /* Empty State - Welcome */
           <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
-            {/* Studio Logo */}
+            {/* Studio Prompt Logo */}
             <div className="relative">
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
               <div className="relative p-4 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/30">
                 <div className="relative">
-                  <Sparkles className="h-10 w-10 text-primary" />
-                  <GraduationCap className="h-5 w-5 text-primary absolute -bottom-1 -right-1" />
+                  <Wand2 className="h-10 w-10 text-primary" />
+                  <Sparkles className="h-5 w-5 text-primary absolute -bottom-1 -right-1" />
                 </div>
               </div>
             </div>
 
             {/* Welcome Text */}
             <div className="text-center space-y-2 max-w-md">
-              <h2 className="text-xl font-bold">Crear con Studio</h2>
+              <h2 className="text-xl font-bold">Studio Prompt</h2>
               <p className="text-sm text-muted-foreground">
-                Dime qué curso necesitas y Studio lo creará automáticamente: 
-                estructura, contenido, metodología y recursos. Tú solo describes, yo hago el resto.
+                Escribe tu idea o prompt básico y lo transformaré en un prompt optimizado 
+                para obtener mejores respuestas de las IAs del holding.
               </p>
+              <Badge variant="outline" className="gap-1">
+                <Target className="h-3 w-3" />
+                Destino: {selectedTarget.name}
+              </Badge>
             </div>
 
-            {/* Starters */}
+            {/* Examples */}
             <div className="w-full max-w-md space-y-3">
               <p className="text-xs text-muted-foreground text-center uppercase tracking-wide">
-                Empieza así
+                Ejemplos de prompts a optimizar
               </p>
-              <div className="space-y-2">
-                {COURSE_STARTERS.map((starter, idx) => (
+              <div className="grid grid-cols-2 gap-2">
+                {PROMPT_EXAMPLES.map((example, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleStarterClick(starter.prompt)}
-                    className="w-full flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:bg-accent/50 hover:border-primary/30 transition-colors text-left group"
+                    onClick={() => handleExampleClick(example.original)}
+                    className="flex flex-col items-start gap-1 p-3 rounded-lg bg-background/50 border border-border/50 hover:bg-accent/50 hover:border-primary/30 transition-colors text-left group"
                   >
-                    <span className="text-lg">{starter.icon}</span>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      {starter.prompt}
+                    <span className="text-lg">{example.icon}</span>
+                    <span className="text-xs font-medium text-muted-foreground">{example.description}</span>
+                    <span className="text-xs text-muted-foreground/70 group-hover:text-foreground transition-colors line-clamp-2">
+                      "{example.original}"
                     </span>
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Tips */}
+            <div className="w-full max-w-md bg-muted/30 rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Zap className="h-4 w-4 text-primary" />
+                Tips para mejores prompts
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Sé específico sobre lo que necesitas</li>
+                <li>• Indica el formato de respuesta deseado</li>
+                <li>• Proporciona contexto relevante</li>
+                <li>• Define restricciones si las hay</li>
+              </ul>
             </div>
 
             {/* Input at Bottom of Empty State */}
@@ -265,7 +291,7 @@ Responde siempre en español.`;
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe el curso que necesitas crear..."
+                  placeholder="Escribe tu prompt o idea aquí para optimizarlo..."
                   className="min-h-[80px] resize-none pr-14 text-sm bg-background/80"
                   disabled={isLoading}
                 />
@@ -305,20 +331,31 @@ Responde siempre en español.`;
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-1 rounded-md bg-primary/20">
-                              <Sparkles className="h-3 w-3 text-primary" />
+                              <Wand2 className="h-3 w-3 text-primary" />
                             </div>
-                            <span className="text-xs font-medium text-primary">Studio</span>
+                            <span className="text-xs font-medium text-primary">Studio Prompt</span>
                           </div>
                           <MarkdownRenderer content={message.content} />
                           
-                          {/* Action Buttons */}
-                          <div className="flex flex-wrap gap-2 pt-3 border-t border-border/30">
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                              <ListChecks className="h-3 w-3" />
-                              Crear este curso
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs">
-                              Ajustar estructura
+                          {/* Copy Button */}
+                          <div className="flex justify-end pt-2 border-t border-border/30">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 text-xs gap-1"
+                              onClick={() => handleCopyPrompt(message.content, message.id)}
+                            >
+                              {copiedId === message.id ? (
+                                <>
+                                  <Check className="h-3 w-3" />
+                                  Copiado
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  Copiar respuesta
+                                </>
+                              )}
                             </Button>
                           </div>
                         </div>
@@ -334,14 +371,14 @@ Responde siempre en español.`;
                     <div className="bg-muted/50 border border-border/50 rounded-xl p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-1 rounded-md bg-primary/20">
-                          <Sparkles className="h-3 w-3 text-primary" />
+                          <Wand2 className="h-3 w-3 text-primary" />
                         </div>
                         <div className="flex gap-1">
                           <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
                           <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.1s]" />
                           <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
                         </div>
-                        <span className="text-sm text-muted-foreground">Studio está diseñando tu curso...</span>
+                        <span className="text-sm text-muted-foreground">Optimizando tu prompt...</span>
                       </div>
                     </div>
                   </div>
@@ -351,27 +388,35 @@ Responde siempre en español.`;
 
             {/* Input Area */}
             <div className="p-4 border-t border-border/50 bg-background/50">
-              <div className="max-w-3xl mx-auto relative">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Escribe aquí para continuar la conversación con Studio..."
-                  className="min-h-[60px] max-h-[120px] resize-none pr-14 text-sm"
-                  disabled={isLoading}
-                />
-                <Button
-                  size="icon"
-                  onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
-                  className="absolute bottom-3 right-3"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="max-w-3xl mx-auto">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Target className="h-3 w-3" />
+                    {selectedTarget.name}
+                  </Badge>
+                </div>
+                <div className="relative">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Escribe otro prompt para optimizar..."
+                    className="min-h-[60px] max-h-[120px] resize-none pr-14 text-sm"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    disabled={!input.trim() || isLoading}
+                    className="absolute bottom-3 right-3"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </>
