@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Check, X, Users, Search, Building2, Crown, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check, X, Users, Search, Crown, ChevronDown, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { companies } from '@/data/companies';
 
 interface UserInfo {
@@ -327,75 +326,74 @@ function CompanySection({
   const selectedCount = users.filter(u => selectedUsers.includes(u.id)).length;
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-      <div className={`rounded-lg border ${isCEOSection ? 'border-amber-500/30 bg-amber-500/5' : 'border-border bg-muted/30'}`}>
-        <CollapsibleTrigger asChild>
-          <div className="flex items-center justify-between p-2 cursor-pointer hover:bg-muted/50 rounded-t-lg">
-            <div className="flex items-center gap-2">
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              )}
-              <span className="text-lg">{icon}</span>
-              <span className={`font-medium text-sm ${isCEOSection ? 'text-amber-400' : ''}`}>
-                {name}
-              </span>
-              <Badge variant="outline" className="text-xs">
-                {selectedCount}/{users.length}
-              </Badge>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectCompany(companyId);
-              }}
-              className="h-6 text-xs"
-            >
-              {isFullySelected ? 'Quitar todos' : 'Seleccionar todos'}
-            </Button>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="p-2 pt-0 space-y-1">
-            {users.map(user => (
-              <div
-                key={user.id}
-                className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
-                  selectedUsers.includes(user.id)
-                    ? isCEOSection 
-                      ? 'bg-amber-500/10 border border-amber-500/30'
-                      : 'bg-primary/10 border border-primary/30'
-                    : 'hover:bg-muted/50'
-                }`}
-                onClick={() => onToggleUser(user.id)}
-              >
-                <Checkbox
-                  checked={selectedUsers.includes(user.id)}
-                  className="pointer-events-none"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {isCEOSection && <Crown className="w-3 h-3 text-amber-400" />}
-                    <span className="font-medium text-sm truncate">
-                      {user.full_name || 'Sin nombre'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {user.email}
-                  </div>
-                </div>
-                {selectedUsers.includes(user.id) && (
-                  <Check className={`w-4 h-4 shrink-0 ${isCEOSection ? 'text-amber-400' : 'text-primary'}`} />
-                )}
-              </div>
-            ))}
-          </div>
-        </CollapsibleContent>
+    <div className={`rounded-lg border ${isCEOSection ? 'border-amber-500/30 bg-amber-500/5' : 'border-border bg-muted/30'}`}>
+      <div 
+        className="flex items-center justify-between p-2 cursor-pointer hover:bg-muted/50 rounded-t-lg"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          )}
+          <span className="text-lg">{icon}</span>
+          <span className={`font-medium text-sm ${isCEOSection ? 'text-amber-400' : ''}`}>
+            {name}
+          </span>
+          <Badge variant="outline" className="text-xs">
+            {selectedCount}/{users.length}
+          </Badge>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectCompany(companyId);
+          }}
+          className="h-6 text-xs"
+        >
+          {isFullySelected ? 'Quitar todos' : 'Seleccionar todos'}
+        </Button>
       </div>
-    </Collapsible>
+      {isExpanded && (
+        <div className="p-2 pt-0 space-y-1">
+          {users.map(user => (
+            <div
+              key={user.id}
+              className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                selectedUsers.includes(user.id)
+                  ? isCEOSection 
+                    ? 'bg-amber-500/10 border border-amber-500/30'
+                    : 'bg-primary/10 border border-primary/30'
+                  : 'hover:bg-muted/50'
+              }`}
+              onClick={() => onToggleUser(user.id)}
+            >
+              <Checkbox
+                checked={selectedUsers.includes(user.id)}
+                className="pointer-events-none"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  {isCEOSection && <Crown className="w-3 h-3 text-amber-400" />}
+                  <span className="font-medium text-sm truncate">
+                    {user.full_name || 'Sin nombre'}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {user.email}
+                </div>
+              </div>
+              {selectedUsers.includes(user.id) && (
+                <Check className={`w-4 h-4 shrink-0 ${isCEOSection ? 'text-amber-400' : 'text-primary'}`} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
