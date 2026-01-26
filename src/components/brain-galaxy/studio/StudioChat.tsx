@@ -153,9 +153,9 @@ export function StudioChat({
   // Ensure input is always visible by using a proper flex layout
   // Key: shrink-0 for header/footer, flex-1 + overflow for scrollable middle
   return (
-    <div className="h-full flex flex-col border-x">
+    <div className="h-full flex flex-col border-x overflow-hidden">
       {/* Header - fixed height, never shrinks */}
-      <div className="p-4 border-b flex items-center justify-between shrink-0">
+      <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold">
             {creationMode === 'ai' ? 'Chat con IA' : 'Definir Estructura'}
@@ -483,8 +483,8 @@ export function StudioChat({
         </div>
       )}
 
-      {/* Input - Fixed Height Textarea */}
-      <div className="p-4 border-t shrink-0 bg-background">
+      {/* Input - Fixed Height Textarea - ALWAYS visible at bottom */}
+      <div className="p-4 border-t flex-shrink-0 bg-background">
         {onStartNewChat && messages.length > 0 && (
           <div className="flex justify-end mb-2">
             <Button variant="ghost" size="sm" onClick={onStartNewChat} className="text-xs">

@@ -28,7 +28,7 @@ export const ResponsiveLayout = ({
   const headerTitle = company ? company.name : 'IWIE Holding';
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
+    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
       {showBackground && <SpaceBackground />}
 
       {/* Desktop Sidebar - hidden on mobile */}
@@ -53,7 +53,7 @@ export const ResponsiveLayout = ({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto min-h-0">
         {children}
       </main>
     </div>
