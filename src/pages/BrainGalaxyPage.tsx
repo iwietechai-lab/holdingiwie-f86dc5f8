@@ -185,7 +185,7 @@ export default function BrainGalaxyPage() {
               />
             </TabsContent>
 
-            <TabsContent value="studio" className="m-0">
+            <TabsContent value="studio" className="m-0 h-[calc(100vh-12rem)]">
               <CourseBuilder
                 areas={areas}
                 existingContent={myContent}

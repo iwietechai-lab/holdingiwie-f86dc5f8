@@ -151,10 +151,11 @@ export function StudioChat({
   const showEmptyState = messages.length === 0 && !currentOutput && !courseProposal;
 
   // Ensure input is always visible by using a proper flex layout
+  // Key: shrink-0 for header/footer, flex-1 + overflow for scrollable middle
   return (
-    <div className="h-full flex flex-col border-x overflow-hidden min-h-0">
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between">
+    <div className="h-full flex flex-col border-x">
+      {/* Header - fixed height, never shrinks */}
+      <div className="p-4 border-b flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold">
             {creationMode === 'ai' ? 'Chat con IA' : 'Definir Estructura'}
@@ -178,8 +179,9 @@ export function StudioChat({
         </div>
       </div>
 
-      {/* Output Display, Course Proposal, or Chat */}
-      <ScrollArea ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+      {/* Output Display, Course Proposal, or Chat - scrollable middle section */}
+      <div className="flex-1 overflow-hidden min-h-0">
+        <ScrollArea ref={scrollRef} className="h-full">
         {currentOutput ? (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -466,7 +468,8 @@ export function StudioChat({
             )}
           </div>
         )}
-      </ScrollArea>
+        </ScrollArea>
+      </div>
 
       {/* Deep Research Banner */}
       {readySources.length > 0 && !currentOutput && !courseProposal && (
@@ -481,7 +484,7 @@ export function StudioChat({
       )}
 
       {/* Input - Fixed Height Textarea */}
-      <div className="p-4 border-t flex-shrink-0 bg-background mt-auto">
+      <div className="p-4 border-t shrink-0 bg-background">
         {onStartNewChat && messages.length > 0 && (
           <div className="flex justify-end mb-2">
             <Button variant="ghost" size="sm" onClick={onStartNewChat} className="text-xs">
