@@ -49,7 +49,7 @@ interface StudioChatProps {
   onClearProposal?: () => void;
   foundSources?: FoundSource[];
   isCreatingCourse?: boolean;
-  creationMode?: 'manual' | 'ai';
+  creationMode?: 'studio' | 'ai' | 'manual';
   onStartNewChat?: () => void;
 }
 
@@ -80,12 +80,16 @@ const QUICK_PROMPTS = [
   },
 ];
 
-const COURSE_CREATION_STARTERS = [
-  'Quiero crear un curso sobre programación en Python para principiantes',
-  'Necesito un curso de marketing digital para emprendedores',
+const STUDIO_MODE_STARTERS = [
+  'Necesito un curso completo de programación en Python',
+  'Crea un programa de capacitación en liderazgo empresarial',
+  'Quiero un curso de marketing digital con certificación',
+];
+
+const AI_MODE_STARTERS = [
   'Ayúdame a diseñar un curso de finanzas personales',
-  'Crear un curso de diseño 3D con Blender',
-  'Quiero un curso sobre inteligencia artificial aplicada a negocios',
+  'Quiero explorar opciones para un curso de diseño UX/UI',
+  'Necesito ideas para un curso de gestión de proyectos',
 ];
 
 export function StudioChat({
@@ -326,42 +330,53 @@ export function StudioChat({
             {showEmptyState && (
               <div className="text-center py-8 text-muted-foreground">
                 <div className="relative mx-auto w-16 h-16 mb-4">
-                  {creationMode === 'ai' ? (
+                  {creationMode === 'studio' ? (
                     <>
-                      <Sparkles className="h-16 w-16 mx-auto opacity-50" />
+                      <Sparkles className="h-16 w-16 mx-auto opacity-50 text-primary" />
                       <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
                     </>
                   ) : (
                     <>
-                      <FileText className="h-16 w-16 mx-auto opacity-50" />
+                      <Sparkles className="h-16 w-16 mx-auto opacity-50" />
                       <GraduationCap className="h-8 w-8 absolute -bottom-1 -right-1 text-primary" />
                     </>
                   )}
                 </div>
                 <p className="font-medium text-foreground">
-                  {creationMode === 'ai' ? 'Crear Curso con IA' : 'Crear Curso Manual'}
+                  {creationMode === 'studio' ? 'Crear con Studio' : 'Crear con IA'}
                 </p>
                 <p className="text-sm mt-2 max-w-md mx-auto">
-                  {creationMode === 'ai' 
-                    ? (readySources.length > 0 
-                        ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. ¡Pregunta lo que quieras o pídeme que cree un curso!`
-                        : 'Dime sobre qué tema quieres aprender. Brain Galaxy buscará fuentes, estructurará el contenido y creará tu curso automáticamente.'
+                  {creationMode === 'studio' 
+                    ? 'Dime qué curso necesitas y Studio lo creará automáticamente: estructura, contenido, metodología y recursos. Tú solo describes, yo hago el resto.'
+                    : (readySources.length > 0 
+                        ? `Tienes ${readySources.length} fuente${readySources.length > 1 ? 's' : ''} lista${readySources.length > 1 ? 's' : ''}. Conversemos sobre cómo estructurar tu curso.`
+                        : 'Trabajemos juntos para diseñar tu curso. Te haré preguntas para entender mejor lo que necesitas y construiremos la estructura paso a paso.'
                       )
-                    : 'Sube tu material en el panel de Fuentes. Luego puedes usar el chat para organizar el contenido y generar la estructura del curso.'
                   }
                 </p>
                 
                 {/* Quick actions */}
                 <div className="mt-6 space-y-3">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {creationMode === 'ai' 
-                      ? (readySources.length > 0 ? 'Acciones rápidas' : 'Empieza así')
-                      : 'Pasos para crear tu curso'
-                    }
+                    Empieza así
                   </p>
                   
-                  {creationMode === 'ai' ? (
-                    readySources.length > 0 ? (
+                  <div className="space-y-2 max-w-md mx-auto">
+                    {(creationMode === 'studio' ? STUDIO_MODE_STARTERS : AI_MODE_STARTERS).map((starter, i) => (
+                      <button
+                        key={i}
+                        className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors text-sm"
+                        onClick={() => onSendMessage(starter)}
+                      >
+                        <span className="text-primary mr-2">{creationMode === 'studio' ? '✨' : '💡'}</span>
+                        {starter}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {readySources.length > 0 && (
+                    <div className="pt-4">
+                      <p className="text-xs text-muted-foreground mb-2">Acciones rápidas</p>
                       <div className="flex flex-wrap justify-center gap-2">
                         {QUICK_PROMPTS.map((item, i) => (
                           <Badge 
@@ -373,34 +388,6 @@ export function StudioChat({
                             {item.icon} {item.label}
                           </Badge>
                         ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-w-md mx-auto">
-                        {COURSE_CREATION_STARTERS.slice(0, 3).map((starter, i) => (
-                          <button
-                            key={i}
-                            className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors text-sm"
-                            onClick={() => onSendMessage(starter)}
-                          >
-                            <span className="text-primary mr-2">💡</span>
-                            {starter}
-                          </button>
-                        ))}
-                      </div>
-                    )
-                  ) : (
-                    <div className="space-y-2 max-w-md mx-auto text-left">
-                      <div className="p-3 rounded-lg border text-sm">
-                        <span className="text-primary font-medium mr-2">1.</span>
-                        Sube archivos PDF, documentos o URLs en el panel "Fuentes"
-                      </div>
-                      <div className="p-3 rounded-lg border text-sm">
-                        <span className="text-primary font-medium mr-2">2.</span>
-                        Define la estructura: módulos, duración y objetivos
-                      </div>
-                      <div className="p-3 rounded-lg border text-sm">
-                        <span className="text-primary font-medium mr-2">3.</span>
-                        Usa las herramientas Studio para generar contenido adicional
                       </div>
                     </div>
                   )}
