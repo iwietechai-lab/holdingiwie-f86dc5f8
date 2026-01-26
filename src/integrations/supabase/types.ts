@@ -1489,6 +1489,53 @@ export type Database = {
         }
         Relationships: []
       }
+      ceo_feedback: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          feedback_type: string | null
+          from_user_id: string
+          id: string
+          is_read: boolean | null
+          message: string
+          read_at: string | null
+          submission_id: string | null
+          to_user_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          feedback_type?: string | null
+          from_user_id: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          read_at?: string | null
+          submission_id?: string | null
+          to_user_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          feedback_type?: string | null
+          from_user_id?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          read_at?: string | null
+          submission_id?: string | null
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ceo_feedback_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "ceo_team_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ceo_internal_chat: {
         Row: {
           attachments: Json | null
@@ -1778,6 +1825,7 @@ export type Database = {
           ai_score: number | null
           ceo_notes: string | null
           ceo_reviewed_at: string | null
+          company_id: string | null
           content: string | null
           created_at: string | null
           file_name: string | null
@@ -1786,6 +1834,8 @@ export type Database = {
           id: string
           notify_ceo: boolean | null
           project_id: string | null
+          source_reference_id: string | null
+          source_type: string | null
           status: string | null
           submission_type: string | null
           submitted_by: string
@@ -1799,6 +1849,7 @@ export type Database = {
           ai_score?: number | null
           ceo_notes?: string | null
           ceo_reviewed_at?: string | null
+          company_id?: string | null
           content?: string | null
           created_at?: string | null
           file_name?: string | null
@@ -1807,6 +1858,8 @@ export type Database = {
           id?: string
           notify_ceo?: boolean | null
           project_id?: string | null
+          source_reference_id?: string | null
+          source_type?: string | null
           status?: string | null
           submission_type?: string | null
           submitted_by: string
@@ -1820,6 +1873,7 @@ export type Database = {
           ai_score?: number | null
           ceo_notes?: string | null
           ceo_reviewed_at?: string | null
+          company_id?: string | null
           content?: string | null
           created_at?: string | null
           file_name?: string | null
@@ -1828,6 +1882,8 @@ export type Database = {
           id?: string
           notify_ceo?: boolean | null
           project_id?: string | null
+          source_reference_id?: string | null
+          source_type?: string | null
           status?: string | null
           submission_type?: string | null
           submitted_by?: string

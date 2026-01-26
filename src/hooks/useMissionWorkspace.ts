@@ -358,6 +358,82 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
     return timeEstimates.reduce((sum, e) => sum + (e.estimated_days || 0), 0);
   };
 
+  // Export completed mission to CEOChat
+  const exportToCEOChat = async (): Promise<boolean> => {
+    if (!mission || !currentUserId) return false;
+
+    try {
+      // Generate mission report
+      const missionReport = `
+# ${mission.title}
+## Código: ${mission.project_code || 'N/A'}
+
+### Descripción
+${mission.description || 'Sin descripción'}
+
+### Desafío Abordado
+${mission.challenge_text || 'Sin desafío definido'}
+
+### Participantes
+${participants.map(p => `- ${p.full_name || p.email || 'Usuario'} (${p.role})`).join('\n')}
+
+### Resumen de Conversación
+${chatMessages.slice(-20).map(m => `**${m.is_ai_message ? 'AI' : 'Usuario'}**: ${m.content.substring(0, 300)}${m.content.length > 300 ? '...' : ''}`).join('\n\n')}
+
+### Estimaciones de Costos
+${costEstimates.length > 0 
+  ? costEstimates.map(c => `- ${c.item_name}: $${c.unit_price} x ${c.quantity || 1} = $${c.total_price || c.unit_price}`).join('\n')
+  : 'Sin estimaciones de costos'}
+
+**Total Presupuesto Estimado**: $${getTotalBudget().toLocaleString()}
+
+### Estimaciones de Tiempo
+${timeEstimates.length > 0 
+  ? timeEstimates.map(t => `- ${t.phase_name}: ${t.estimated_days} días`).join('\n')
+  : 'Sin estimaciones de tiempo'}
+
+**Total Días Estimados**: ${getTotalDays()}
+
+### Presupuesto
+- Estimado: $${mission.estimated_budget?.toLocaleString() || 'Por definir'}
+- Real: $${mission.actual_budget?.toLocaleString() || 'Por definir'}
+
+### Fecha de Entrega
+${mission.target_end_date || 'Por definir'}
+      `.trim();
+
+      // Create submission in CEOChat
+      const { error } = await supabase
+        .from('ceo_team_submissions')
+        .insert({
+          title: `Plan Final: ${mission.title}`,
+          content: missionReport,
+          submission_type: 'propuesta',
+          submitted_by: currentUserId,
+          notify_ceo: true,
+          source_type: 'mission',
+          source_reference_id: mission.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Plan enviado a CEOChat',
+        description: 'El CEO revisará tu plan final',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error exporting to CEOChat:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el plan a CEOChat',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
   return {
     loading,
     chatMessages,
@@ -376,6 +452,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
     addTimeEstimate,
     getTotalBudget,
     getTotalDays,
+    exportToCEOChat,
     refreshData: fetchWorkspaceData,
   };
 }
