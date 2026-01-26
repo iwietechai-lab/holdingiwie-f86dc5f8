@@ -1,0 +1,345 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import type { 
+  Mission, 
+  MissionChatMessage, 
+  MissionWorkspaceState, 
+  ContextClassification,
+  ConversationContext,
+  PanelType,
+  MissionCostEstimate,
+  MissionTimeEstimate,
+  MissionArtifact,
+} from '@/types/mision-iwie';
+
+interface UseMissionWorkspaceProps {
+  mission: Mission | null;
+}
+
+export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<MissionChatMessage[]>([]);
+  const [workspaceState, setWorkspaceState] = useState<MissionWorkspaceState | null>(null);
+  const [currentContext, setCurrentContext] = useState<ContextClassification | null>(null);
+  const [isAITyping, setIsAITyping] = useState(false);
+  const [costEstimates, setCostEstimates] = useState<MissionCostEstimate[]>([]);
+  const [timeEstimates, setTimeEstimates] = useState<MissionTimeEstimate[]>([]);
+  const [artifacts, setArtifacts] = useState<MissionArtifact[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Fetch workspace data
+  const fetchWorkspaceData = useCallback(async () => {
+    if (!mission) return;
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      // Fetch chat messages
+      const { data: chatData } = await supabase
+        .from('brain_galaxy_mission_chat')
+        .select('*')
+        .eq('mission_id', mission.id)
+        .order('created_at', { ascending: true });
+
+      // Fetch workspace state
+      const { data: stateData } = await supabase
+        .from('brain_galaxy_mission_workspace_state')
+        .select('*')
+        .eq('mission_id', mission.id)
+        .single();
+
+      // Fetch cost estimates
+      const { data: costData } = await supabase
+        .from('brain_galaxy_mission_cost_estimates')
+        .select('*')
+        .eq('mission_id', mission.id)
+        .order('created_at', { ascending: false });
+
+      // Fetch time estimates
+      const { data: timeData } = await supabase
+        .from('brain_galaxy_mission_time_estimates')
+        .select('*')
+        .eq('mission_id', mission.id)
+        .order('created_at', { ascending: false });
+
+      // Fetch artifacts
+      const { data: artifactData } = await supabase
+        .from('brain_galaxy_mission_artifacts')
+        .select('*')
+        .eq('mission_id', mission.id)
+        .eq('is_latest', true)
+        .order('created_at', { ascending: false });
+
+      setChatMessages((chatData || []) as MissionChatMessage[]);
+      setCostEstimates((costData || []) as MissionCostEstimate[]);
+      setTimeEstimates((timeData || []) as MissionTimeEstimate[]);
+      setArtifacts((artifactData || []) as MissionArtifact[]);
+
+      if (stateData) {
+        setWorkspaceState(stateData as MissionWorkspaceState);
+        setCurrentContext({
+          detected_context: stateData.current_context as ConversationContext,
+          sub_context: stateData.sub_context,
+          confidence: 1,
+          suggested_panels: stateData.active_panels as PanelType[],
+          detected_intents: [],
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching workspace data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [mission]);
+
+  // Subscribe to realtime chat updates
+  useEffect(() => {
+    if (!mission) return;
+
+    // Cleanup previous subscription
+    if (chatChannelRef.current) {
+      supabase.removeChannel(chatChannelRef.current);
+    }
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel(`mission-chat-${mission.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'brain_galaxy_mission_chat',
+          filter: `mission_id=eq.${mission.id}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as MissionChatMessage;
+          setChatMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'brain_galaxy_mission_workspace_state',
+          filter: `mission_id=eq.${mission.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            const newState = payload.new as MissionWorkspaceState;
+            setWorkspaceState(newState);
+            setCurrentContext({
+              detected_context: newState.current_context as ConversationContext,
+              sub_context: newState.sub_context,
+              confidence: 1,
+              suggested_panels: newState.active_panels as PanelType[],
+              detected_intents: [],
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    chatChannelRef.current = channel;
+
+    return () => {
+      if (chatChannelRef.current) {
+        supabase.removeChannel(chatChannelRef.current);
+      }
+    };
+  }, [mission]);
+
+  // Fetch data when mission changes
+  useEffect(() => {
+    fetchWorkspaceData();
+  }, [fetchWorkspaceData]);
+
+  // Send a message and get AI response
+  const sendMessage = async (content: string): Promise<void> => {
+    if (!mission || !currentUserId || !content.trim()) return;
+
+    setIsAITyping(true);
+
+    try {
+      // Prepare messages for the AI
+      const messages = [
+        ...chatMessages.map(m => ({
+          role: m.is_ai_message ? 'assistant' : 'user',
+          content: m.content,
+        })),
+        { role: 'user', content },
+      ];
+
+      // Call the mission-ai-assistant edge function
+      const { data, error } = await supabase.functions.invoke('mission-ai-assistant', {
+        body: {
+          messages,
+          missionId: mission.id,
+          missionInfo: {
+            title: mission.title,
+            description: mission.description,
+            mission_type: mission.mission_type,
+          },
+          userId: currentUserId,
+          action: 'chat',
+        },
+      });
+
+      if (error) throw error;
+
+      // Update context from response
+      if (data.context) {
+        setCurrentContext(data.context);
+      }
+
+      // The messages are saved by the edge function, but we update locally too
+      // for immediate feedback (realtime will sync)
+      
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el mensaje',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAITyping(false);
+    }
+  };
+
+  // Manually insert a user message (optimistic update before AI response)
+  const insertLocalMessage = (content: string) => {
+    if (!currentUserId || !mission) return;
+    
+    const tempMessage: MissionChatMessage = {
+      id: `temp-${Date.now()}`,
+      mission_id: mission.id,
+      user_id: currentUserId,
+      is_ai_message: false,
+      content,
+      created_at: new Date().toISOString(),
+    };
+    
+    setChatMessages(prev => [...prev, tempMessage]);
+  };
+
+  // Change active panels manually
+  const setActivePanels = async (panels: PanelType[]) => {
+    if (!mission) return;
+
+    try {
+      await supabase
+        .from('brain_galaxy_mission_workspace_state')
+        .upsert({
+          mission_id: mission.id,
+          active_panels: panels,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'mission_id' });
+
+      setWorkspaceState(prev => prev ? { ...prev, active_panels: panels } : null);
+    } catch (error) {
+      console.error('Error updating panels:', error);
+    }
+  };
+
+  // Add cost estimate
+  const addCostEstimate = async (estimate: Partial<MissionCostEstimate>) => {
+    if (!mission) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('brain_galaxy_mission_cost_estimates')
+        .insert({
+          mission_id: mission.id,
+          item_name: estimate.item_name,
+          description: estimate.description,
+          quantity: estimate.quantity || 1,
+          unit_price: estimate.unit_price || 0,
+          currency: estimate.currency || 'USD',
+          category: estimate.category,
+          source: estimate.source,
+          is_ai_generated: estimate.is_ai_generated || false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCostEstimates(prev => [data as MissionCostEstimate, ...prev]);
+      return data;
+    } catch (error) {
+      console.error('Error adding cost estimate:', error);
+      return null;
+    }
+  };
+
+  // Add time estimate
+  const addTimeEstimate = async (estimate: Partial<MissionTimeEstimate>) => {
+    if (!mission) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('brain_galaxy_mission_time_estimates')
+        .insert({
+          mission_id: mission.id,
+          phase_name: estimate.phase_name,
+          description: estimate.description,
+          estimated_days: estimate.estimated_days || 1,
+          estimated_hours: estimate.estimated_hours,
+          is_ai_generated: estimate.is_ai_generated || false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTimeEstimates(prev => [data as MissionTimeEstimate, ...prev]);
+      return data;
+    } catch (error) {
+      console.error('Error adding time estimate:', error);
+      return null;
+    }
+  };
+
+  // Get total budget
+  const getTotalBudget = () => {
+    return costEstimates.reduce((sum, e) => sum + (e.total_price || 0), 0);
+  };
+
+  // Get total estimated days
+  const getTotalDays = () => {
+    return timeEstimates.reduce((sum, e) => sum + (e.estimated_days || 0), 0);
+  };
+
+  return {
+    loading,
+    chatMessages,
+    workspaceState,
+    currentContext,
+    isAITyping,
+    costEstimates,
+    timeEstimates,
+    artifacts,
+    currentUserId,
+    sendMessage,
+    insertLocalMessage,
+    setActivePanels,
+    addCostEstimate,
+    addTimeEstimate,
+    getTotalBudget,
+    getTotalDays,
+    refreshData: fetchWorkspaceData,
+  };
+}

@@ -444,6 +444,183 @@ export type Database = {
         }
         Relationships: []
       }
+      brain_galaxy_mission_artifacts: {
+        Row: {
+          artifact_type: string
+          chat_message_id: string | null
+          content: string | null
+          created_at: string
+          created_by: string | null
+          file_url: string | null
+          id: string
+          is_ai_generated: boolean | null
+          is_latest: boolean | null
+          metadata: Json | null
+          mission_id: string
+          parent_artifact_id: string | null
+          preview_url: string | null
+          status: string | null
+          title: string
+          version_number: number | null
+        }
+        Insert: {
+          artifact_type: string
+          chat_message_id?: string | null
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_url?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          is_latest?: boolean | null
+          metadata?: Json | null
+          mission_id: string
+          parent_artifact_id?: string | null
+          preview_url?: string | null
+          status?: string | null
+          title: string
+          version_number?: number | null
+        }
+        Update: {
+          artifact_type?: string
+          chat_message_id?: string | null
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_url?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          is_latest?: boolean | null
+          metadata?: Json | null
+          mission_id?: string
+          parent_artifact_id?: string | null
+          preview_url?: string | null
+          status?: string | null
+          title?: string
+          version_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_artifacts_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_mission_chat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_mission_artifacts_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_mission_artifacts_parent_artifact_id_fkey"
+            columns: ["parent_artifact_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_mission_artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_mission_chat: {
+        Row: {
+          ai_model: string | null
+          attachments: Json | null
+          content: string
+          created_at: string
+          detected_context: string | null
+          detected_intents: Json | null
+          id: string
+          is_ai_message: boolean | null
+          mission_id: string
+          user_id: string
+        }
+        Insert: {
+          ai_model?: string | null
+          attachments?: Json | null
+          content: string
+          created_at?: string
+          detected_context?: string | null
+          detected_intents?: Json | null
+          id?: string
+          is_ai_message?: boolean | null
+          mission_id: string
+          user_id: string
+        }
+        Update: {
+          ai_model?: string | null
+          attachments?: Json | null
+          content?: string
+          created_at?: string
+          detected_context?: string | null
+          detected_intents?: Json | null
+          id?: string
+          is_ai_message?: boolean | null
+          mission_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_chat_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_mission_context_history: {
+        Row: {
+          active_panels: Json | null
+          chat_message_id: string | null
+          confidence: number | null
+          created_at: string
+          detected_context: string
+          id: string
+          mission_id: string
+          panel_data_snapshot: Json | null
+          sub_context: string | null
+        }
+        Insert: {
+          active_panels?: Json | null
+          chat_message_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          detected_context: string
+          id?: string
+          mission_id: string
+          panel_data_snapshot?: Json | null
+          sub_context?: string | null
+        }
+        Update: {
+          active_panels?: Json | null
+          chat_message_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          detected_context?: string
+          id?: string
+          mission_id?: string
+          panel_data_snapshot?: Json | null
+          sub_context?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_context_history_chat_message_id_fkey"
+            columns: ["chat_message_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_mission_chat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_galaxy_mission_context_history_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_galaxy_mission_contributions: {
         Row: {
           content: string | null
@@ -501,6 +678,62 @@ export type Database = {
           },
         ]
       }
+      brain_galaxy_mission_cost_estimates: {
+        Row: {
+          category: string | null
+          confidence_score: number | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          id: string
+          is_ai_generated: boolean | null
+          item_name: string
+          mission_id: string
+          quantity: number | null
+          source: string | null
+          total_price: number | null
+          unit_price: number
+        }
+        Insert: {
+          category?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          item_name: string
+          mission_id: string
+          quantity?: number | null
+          source?: string | null
+          total_price?: number | null
+          unit_price: number
+        }
+        Update: {
+          category?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          item_name?: string
+          mission_id?: string
+          quantity?: number | null
+          source?: string | null
+          total_price?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_cost_estimates_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_galaxy_mission_participants: {
         Row: {
           id: string
@@ -533,9 +766,97 @@ export type Database = {
           },
         ]
       }
+      brain_galaxy_mission_time_estimates: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          dependencies: Json | null
+          description: string | null
+          estimated_days: number
+          estimated_hours: number | null
+          id: string
+          is_ai_generated: boolean | null
+          mission_id: string
+          phase_name: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          dependencies?: Json | null
+          description?: string | null
+          estimated_days: number
+          estimated_hours?: number | null
+          id?: string
+          is_ai_generated?: boolean | null
+          mission_id: string
+          phase_name: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          dependencies?: Json | null
+          description?: string | null
+          estimated_days?: number
+          estimated_hours?: number | null
+          id?: string
+          is_ai_generated?: boolean | null
+          mission_id?: string
+          phase_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_time_estimates_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_galaxy_mission_workspace_state: {
+        Row: {
+          active_panels: Json | null
+          current_context: string | null
+          id: string
+          mission_id: string
+          panel_data: Json | null
+          sub_context: string | null
+          updated_at: string
+        }
+        Insert: {
+          active_panels?: Json | null
+          current_context?: string | null
+          id?: string
+          mission_id: string
+          panel_data?: Json | null
+          sub_context?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active_panels?: Json | null
+          current_context?: string | null
+          id?: string
+          mission_id?: string
+          panel_data?: Json | null
+          sub_context?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_mission_workspace_state_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: true
+            referencedRelation: "brain_galaxy_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_galaxy_missions: {
         Row: {
+          actual_budget: number | null
+          ai_enabled: boolean | null
           ai_final_analysis: string | null
+          ai_intervention_level: string | null
           area_id: string | null
           challenge_text: string
           completed_at: string | null
@@ -543,18 +864,26 @@ export type Database = {
           creator_id: string
           deadline: string | null
           description: string | null
+          estimated_budget: number | null
           id: string
           max_participants: number | null
           min_participants: number | null
+          mission_type: string | null
+          priority: string | null
+          project_code: string | null
           reward_points: number | null
           solution_summary: string | null
           status: string | null
+          target_end_date: string | null
           title: string
           updated_at: string | null
           visibility: string | null
         }
         Insert: {
+          actual_budget?: number | null
+          ai_enabled?: boolean | null
           ai_final_analysis?: string | null
+          ai_intervention_level?: string | null
           area_id?: string | null
           challenge_text: string
           completed_at?: string | null
@@ -562,18 +891,26 @@ export type Database = {
           creator_id: string
           deadline?: string | null
           description?: string | null
+          estimated_budget?: number | null
           id?: string
           max_participants?: number | null
           min_participants?: number | null
+          mission_type?: string | null
+          priority?: string | null
+          project_code?: string | null
           reward_points?: number | null
           solution_summary?: string | null
           status?: string | null
+          target_end_date?: string | null
           title: string
           updated_at?: string | null
           visibility?: string | null
         }
         Update: {
+          actual_budget?: number | null
+          ai_enabled?: boolean | null
           ai_final_analysis?: string | null
+          ai_intervention_level?: string | null
           area_id?: string | null
           challenge_text?: string
           completed_at?: string | null
@@ -581,12 +918,17 @@ export type Database = {
           creator_id?: string
           deadline?: string | null
           description?: string | null
+          estimated_budget?: number | null
           id?: string
           max_participants?: number | null
           min_participants?: number | null
+          mission_type?: string | null
+          priority?: string | null
+          project_code?: string | null
           reward_points?: number | null
           solution_summary?: string | null
           status?: string | null
+          target_end_date?: string | null
           title?: string
           updated_at?: string | null
           visibility?: string | null
