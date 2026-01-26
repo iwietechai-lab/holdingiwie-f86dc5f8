@@ -8,7 +8,7 @@ interface MarkdownRendererProps {
 
 // Configure DOMPurify with allowed tags and attributes
 const PURIFY_CONFIG = {
-  ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span'],
+  ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span', 'div', 'hr', 'p'],
   ALLOWED_ATTR: ['class'],
   KEEP_CONTENT: true,
 };
@@ -17,6 +17,15 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
   const renderedContent = useMemo(() => {
     // Process markdown-like syntax
     let processed = content;
+    
+    // Headers - convert to styled divs (process BEFORE other formatting)
+    // Must be at the start of a line
+    processed = processed.replace(/^###\s+(.*)$/gm, '<div class="text-base font-semibold mt-3 mb-1 text-foreground">$1</div>');
+    processed = processed.replace(/^##\s+(.*)$/gm, '<div class="text-lg font-bold mt-4 mb-2 text-primary">$1</div>');
+    processed = processed.replace(/^#\s+(.*)$/gm, '<div class="text-xl font-bold mt-4 mb-2 text-foreground">$1</div>');
+    
+    // Horizontal rules / separators
+    processed = processed.replace(/^---+$/gm, '<hr class="my-4 border-muted-foreground/30" />');
     
     // Bold text: **text** or __text__
     processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -35,6 +44,10 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
     // Lists: - item or * item or numbered lists
     const lines = processed.split('<br />');
     const processedLines = lines.map((line) => {
+      // Skip if already processed as header or hr
+      if (line.startsWith('<div') || line.startsWith('<hr')) {
+        return line;
+      }
       // Unordered list item
       if (/^[-*]\s+/.test(line)) {
         return `<span class="flex items-start gap-2"><span class="text-primary">•</span><span>${line.replace(/^[-*]\s+/, '')}</span></span>`;
