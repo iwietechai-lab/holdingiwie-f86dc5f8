@@ -12,6 +12,8 @@ import {
   BookOpen,
   BarChart3,
   CheckSquare,
+  Users,
+  Sparkles,
 } from 'lucide-react';
 import type { 
   Mission, 
@@ -21,11 +23,20 @@ import type {
   PanelType,
 } from '@/types/mision-iwie';
 
+interface Participant {
+  id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 interface WorkspacePanelsProps {
   mission: Mission;
   currentContext: ContextClassification | null;
   costEstimates: MissionCostEstimate[];
   timeEstimates: MissionTimeEstimate[];
+  participants: Participant[];
 }
 
 export function WorkspacePanels({
@@ -33,6 +44,7 @@ export function WorkspacePanels({
   currentContext,
   costEstimates,
   timeEstimates,
+  participants,
 }: WorkspacePanelsProps) {
   const activePanels = currentContext?.suggested_panels || ['notes', 'documentation'];
   
@@ -72,6 +84,10 @@ export function WorkspacePanels({
             <TabsTrigger value="notes" className="gap-1 text-xs">
               <FileText className="w-3 h-3" />
               Notas
+            </TabsTrigger>
+            <TabsTrigger value="team" className="gap-1 text-xs">
+              <Users className="w-3 h-3" />
+              Equipo
             </TabsTrigger>
           </TabsList>
 
@@ -238,6 +254,47 @@ export function WorkspacePanels({
                         <p className="text-sm text-muted-foreground">{mission.description}</p>
                       </CardContent>
                     </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Team Panel */}
+            <TabsContent value="team" className="h-full m-0 data-[state=active]:flex flex-col">
+              <ScrollArea className="flex-1 p-4">
+                <div className="space-y-3">
+                  {/* Super IA siempre presente */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-violet-500/30">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Super IA Brain Galaxy</p>
+                      <p className="text-xs text-muted-foreground">Asistente de Misión Inteligente</p>
+                    </div>
+                    <Badge variant="secondary">IA</Badge>
+                  </div>
+                  
+                  {/* Participantes humanos */}
+                  {participants.length > 0 ? (
+                    participants.map(p => (
+                      <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                          <span className="font-medium">
+                            {(p.full_name || p.email || 'U').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{p.full_name || 'Usuario'}</p>
+                          <p className="text-xs text-muted-foreground">{p.email || ''}</p>
+                        </div>
+                        <Badge variant="outline" className="capitalize">{p.role}</Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p className="text-sm">No hay otros participantes aún</p>
+                    </div>
                   )}
                 </div>
               </ScrollArea>

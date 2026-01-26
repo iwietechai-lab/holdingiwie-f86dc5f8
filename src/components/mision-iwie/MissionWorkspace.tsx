@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -15,6 +15,7 @@ import {
   Send,
   Bot,
   User,
+  Users,
   Loader2,
   Settings,
   PanelRightClose,
@@ -42,6 +43,7 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
     costEstimates,
     timeEstimates,
     currentUserId,
+    participants,
     sendMessage,
     insertLocalMessage,
   } = useMissionWorkspace({ mission });
@@ -49,12 +51,21 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
   const [inputValue, setInputValue] = useState('');
   const [showPanels, setShowPanels] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isAITyping]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`;
+    }
+  }, [inputValue]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isAITyping) return;
@@ -65,7 +76,7 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
     await sendMessage(messageContent);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -135,10 +146,42 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
           <ResizablePanel defaultSize={showPanels ? 40 : 100} minSize={30}>
             <Card className="h-full flex flex-col">
               <CardHeader className="py-3 px-4 border-b">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-primary" />
-                  Chat de Misión
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-primary" />
+                    Chat de Misión
+                  </CardTitle>
+                  
+                  {/* Participantes */}
+                  <div className="flex items-center gap-1">
+                    {/* Super IA siempre primero */}
+                    <div 
+                      className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center border-2 border-background" 
+                      title="Super IA Brain Galaxy"
+                    >
+                      <Sparkles className="w-3 h-3 text-white" />
+                    </div>
+                    
+                    {/* Participantes humanos */}
+                    {(participants || []).slice(0, 4).map((p) => (
+                      <div 
+                        key={p.id}
+                        className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center -ml-2 border-2 border-background"
+                        title={p.full_name || p.email || 'Usuario'}
+                      >
+                        <span className="text-xs font-medium">
+                          {(p.full_name || p.email || 'U').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
+                    
+                    {(participants || []).length > 4 && (
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center -ml-2 border-2 border-background">
+                        <span className="text-xs">+{participants.length - 4}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               
               <CardContent className="flex-1 flex flex-col p-0 min-h-0">
@@ -146,14 +189,22 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
                 <ScrollArea className="flex-1 px-4">
                   <div className="space-y-4 py-4">
                     {chatMessages.length === 0 && !loading && (
-                      <div className="text-center text-muted-foreground py-8">
-                        <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p className="text-sm">
-                          ¡Hola! Soy tu asistente de misión.
-                        </p>
-                        <p className="text-xs mt-1">
-                          Pregúntame sobre tu proyecto y te ayudaré con análisis, costos y más.
-                        </p>
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="rounded-lg px-3 py-2 bg-muted max-w-[85%]">
+                          <p className="text-xs font-medium text-violet-400 mb-1">Super IA Brain Galaxy</p>
+                          <p className="text-sm">
+                            ¡Hola! Soy <strong>Super IA Brain Galaxy</strong>, tu asistente de misión inteligente.
+                          </p>
+                          <p className="text-sm mt-2">
+                            Estoy aquí para ayudarte con análisis de costos, cronogramas, especificaciones técnicas y todo lo que necesites para tu proyecto "<strong>{mission.title}</strong>".
+                          </p>
+                          <p className="text-sm mt-2 text-muted-foreground">
+                            Pregúntame lo que necesites para comenzar.
+                          </p>
+                        </div>
                       </div>
                     )}
 
@@ -169,12 +220,12 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
                           className={cn(
                             'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
                             msg.is_ai_message
-                              ? 'bg-primary text-primary-foreground'
+                              ? 'bg-gradient-to-br from-violet-500 to-purple-600'
                               : 'bg-secondary'
                           )}
                         >
                           {msg.is_ai_message ? (
-                            <Bot className="w-4 h-4" />
+                            <Sparkles className="w-4 h-4 text-white" />
                           ) : (
                             <User className="w-4 h-4" />
                           )}
@@ -187,6 +238,9 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
                               : 'bg-primary text-primary-foreground'
                           )}
                         >
+                          {msg.is_ai_message && (
+                            <p className="text-xs font-medium text-violet-400 mb-1">Super IA Brain Galaxy</p>
+                          )}
                           <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                           <p className="text-xs opacity-60 mt-1">
                             {format(new Date(msg.created_at), 'HH:mm', { locale: es })}
@@ -198,8 +252,8 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
 
                     {isAITyping && (
                       <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                          <Bot className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div className="bg-muted rounded-lg px-3 py-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -214,14 +268,15 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
                 {/* Input */}
                 <div className="p-3 border-t">
                   <div className="flex gap-2">
-                    <Input
-                      ref={inputRef}
-                      placeholder="Escribe tu mensaje..."
+                    <Textarea
+                      ref={textareaRef}
+                      placeholder="Escribe tu mensaje... (Shift+Enter para nueva línea)"
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleKeyDown}
                       disabled={isAITyping}
-                      className="flex-1"
+                      className="flex-1 min-h-[40px] max-h-[120px] resize-none py-2"
+                      rows={1}
                     />
                     <Button
                       size="icon"
@@ -246,6 +301,7 @@ export function MissionWorkspace({ mission, onBack }: MissionWorkspaceProps) {
                   currentContext={currentContext}
                   costEstimates={costEstimates}
                   timeEstimates={timeEstimates}
+                  participants={participants || []}
                 />
               </ResizablePanel>
             </>

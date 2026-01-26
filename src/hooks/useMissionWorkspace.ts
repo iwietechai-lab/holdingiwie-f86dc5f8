@@ -13,6 +13,14 @@ import type {
   MissionArtifact,
 } from '@/types/mision-iwie';
 
+interface Participant {
+  id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 interface UseMissionWorkspaceProps {
   mission: Mission | null;
 }
@@ -28,6 +36,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
   const [timeEstimates, setTimeEstimates] = useState<MissionTimeEstimate[]>([]);
   const [artifacts, setArtifacts] = useState<MissionArtifact[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -76,6 +85,32 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
         .eq('mission_id', mission.id)
         .eq('is_latest', true)
         .order('created_at', { ascending: false });
+
+      // Fetch participants
+      const { data: participantData } = await supabase
+        .from('brain_galaxy_mission_participants')
+        .select('id, user_id, role')
+        .eq('mission_id', mission.id);
+
+      if (participantData && participantData.length > 0) {
+        const userIds = participantData.map(p => p.user_id);
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+        
+        const enrichedParticipants = participantData.map(p => {
+          const profile = profiles?.find(pr => pr.id === p.user_id);
+          return {
+            ...p,
+            full_name: profile?.full_name || null,
+            email: profile?.email || null,
+          };
+        });
+        setParticipants(enrichedParticipants);
+      } else {
+        setParticipants([]);
+      }
 
       setChatMessages((chatData || []) as MissionChatMessage[]);
       setCostEstimates((costData || []) as MissionCostEstimate[]);
@@ -333,6 +368,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
     timeEstimates,
     artifacts,
     currentUserId,
+    participants,
     sendMessage,
     insertLocalMessage,
     setActivePanels,
