@@ -130,32 +130,7 @@ export function useMissions() {
           active_panels: ['notes', 'documentation'],
         });
 
-      const newMission: Mission = {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        challenge_text: data.challenge_text || '',
-        mission_type: data.mission_type || 'general',
-        project_code: data.project_code,
-        priority: data.priority || 'medium',
-        status: data.status || 'active',
-        creator_id: data.creator_id,
-        ai_enabled: data.ai_enabled ?? true,
-        ai_intervention_level: data.ai_intervention_level || 'proactive',
-        estimated_budget: data.estimated_budget,
-        actual_budget: data.actual_budget,
-        target_end_date: data.target_end_date,
-        deadline: data.deadline,
-        area_id: data.area_id,
-        visibility: data.visibility || 'private',
-        min_participants: data.min_participants,
-        max_participants: data.max_participants,
-        reward_points: data.reward_points,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        completed_at: data.completed_at,
-        participants: [],
-      };
+      const newMission = castMission({ ...data, participants: [] });
 
       setMissions(prev => [newMission, ...prev]);
 
