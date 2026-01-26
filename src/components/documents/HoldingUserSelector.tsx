@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { companies } from '@/data/companies';
 
@@ -370,27 +369,34 @@ function CompanySection({
                     : 'bg-primary/10 border border-primary/30'
                   : 'hover:bg-muted/50'
               }`}
-              onClick={() => onToggleUser(user.id)}
+            onClick={() => onToggleUser(user.id)}
+          >
+            {/* Checkbox visual nativo - sin Radix para evitar conflicto de refs */}
+            <div 
+              className={`w-4 h-4 rounded-sm border flex items-center justify-center shrink-0 transition-colors ${
+                selectedUsers.includes(user.id)
+                  ? isCEOSection
+                    ? 'bg-amber-500 border-amber-500 text-white'
+                    : 'bg-primary border-primary text-primary-foreground'
+                  : 'border-muted-foreground/50'
+              }`}
             >
-              <Checkbox
-                checked={selectedUsers.includes(user.id)}
-                className="pointer-events-none"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {isCEOSection && <Crown className="w-3 h-3 text-amber-400" />}
-                  <span className="font-medium text-sm truncate">
-                    {user.full_name || 'Sin nombre'}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </div>
-              </div>
               {selectedUsers.includes(user.id) && (
-                <Check className={`w-4 h-4 shrink-0 ${isCEOSection ? 'text-amber-400' : 'text-primary'}`} />
+                <Check className="w-3 h-3" />
               )}
             </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                {isCEOSection && <Crown className="w-3 h-3 text-amber-400" />}
+                <span className="font-medium text-sm truncate">
+                  {user.full_name || 'Sin nombre'}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground truncate">
+                {user.email}
+              </div>
+            </div>
+          </div>
           ))}
         </div>
       )}
