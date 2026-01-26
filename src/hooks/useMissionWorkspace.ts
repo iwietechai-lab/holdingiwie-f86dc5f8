@@ -53,7 +53,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
         .from('brain_galaxy_mission_workspace_state')
         .select('*')
         .eq('mission_id', mission.id)
-        .single();
+        .maybeSingle();
 
       // Fetch cost estimates
       const { data: costData } = await supabase

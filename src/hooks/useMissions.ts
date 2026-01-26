@@ -48,8 +48,16 @@ export function useMissions() {
       
       setCurrentUserId(user.id);
 
-      // Fetch missions where user is creator or participant
-      const { data: missionsData, error } = await supabase
+      // First, get mission IDs where user is a participant
+      const { data: participations } = await supabase
+        .from('brain_galaxy_mission_participants')
+        .select('mission_id')
+        .eq('user_id', user.id);
+
+      const participantMissionIds = (participations || []).map(p => p.mission_id);
+
+      // Fetch missions where user is creator
+      const { data: createdMissions, error: createdError } = await supabase
         .from('brain_galaxy_missions')
         .select(`
           *,
@@ -60,12 +68,46 @@ export function useMissions() {
             joined_at
           )
         `)
-        .or(`creator_id.eq.${user.id},brain_galaxy_mission_participants.user_id.eq.${user.id}`)
+        .eq('creator_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (createdError) throw createdError;
 
-      const transformedMissions = (missionsData || []).map(castMission);
+      // Fetch missions where user is a participant (but not creator)
+      let participantMissions: any[] = [];
+      if (participantMissionIds.length > 0) {
+        const { data: partMissions, error: partError } = await supabase
+          .from('brain_galaxy_missions')
+          .select(`
+            *,
+            participants:brain_galaxy_mission_participants(
+              id,
+              user_id,
+              role,
+              joined_at
+            )
+          `)
+          .in('id', participantMissionIds)
+          .neq('creator_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (partError) throw partError;
+        participantMissions = partMissions || [];
+      }
+
+      // Combine and deduplicate
+      const allMissions = [...(createdMissions || []), ...participantMissions];
+      const uniqueMissions = allMissions.reduce((acc, m) => {
+        if (!acc.find((x: any) => x.id === m.id)) {
+          acc.push(m);
+        }
+        return acc;
+      }, [] as any[]);
+
+      // Sort by created_at descending
+      uniqueMissions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const transformedMissions = uniqueMissions.map(castMission);
       setMissions(transformedMissions);
     } catch (error) {
       console.error('Error fetching missions:', error);
