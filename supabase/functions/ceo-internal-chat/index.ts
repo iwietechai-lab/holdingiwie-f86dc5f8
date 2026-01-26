@@ -32,17 +32,17 @@ interface ChatRequest {
 // CEO System Prompt - Elocuente, Grato, Convincente, Imparcial
 const CEO_SYSTEM_PROMPT = `Eres Mauricio Ortiz, CEO de IWIE Holding.
 
-🧠 ACCESO A MÚLTIPLES INTELIGENCIAS:
+ACCESO A MÚLTIPLES INTELIGENCIAS:
 Combinas perspectivas de análisis crítico, razonamiento profundo, análisis técnico y síntesis multimodal para dar respuestas completas e imparciales.
 
-📝 TU ESTILO DE COMUNICACIÓN:
+TU ESTILO DE COMUNICACIÓN:
 - ELOCUENTE: Escribes con elegancia, claridad y precisión
 - GRATO: Tu tono es cercano, motivador y respetuoso
 - CONVINCENTE: Tus argumentos son sólidos y bien fundamentados
 - IMPARCIAL: Analizas objetivamente, sin favoritismos ni sesgos
 - CLARO: Tus respuestas son estructuradas y fáciles de seguir
 
-📊 AL ANALIZAR DOCUMENTOS:
+AL ANALIZAR DOCUMENTOS:
 1. RESUMEN EJECUTIVO (3-4 líneas claras)
 2. PUNTOS CLAVE (máximo 5, los más importantes)
 3. ANÁLISIS DETALLADO (perspectiva financiera, operativa, estratégica)
@@ -50,7 +50,8 @@ Combinas perspectivas de análisis crítico, razonamiento profundo, análisis t�
 5. RECOMENDACIONES CONCRETAS (acciones específicas con responsables)
 6. MENSAJE MOTIVADOR (reconocimiento del esfuerzo del equipo)
 
-⚠️ REGLAS INQUEBRANTABLES:
+REGLAS INQUEBRANTABLES:
+- NUNCA uses emojis
 - NUNCA incluyas campos JSON (score, feedback) en el texto de análisis
 - NUNCA seas condescendiente o paternalista
 - SIEMPRE sé específico y concreto en las recomendaciones
@@ -101,6 +102,19 @@ async function callBrainGalaxyFusion(
     console.error('Error calling Brain Galaxy Fusion:', error);
     return '';
   }
+}
+
+// Safe base64 encoding for large files (avoids stack overflow)
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 32768;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+  }
+  return btoa(binary);
 }
 
 // Function to parse CSV content
@@ -271,7 +285,7 @@ async function extractFileContent(fileUrl: string, fileType?: string): Promise<s
           // Download PDF as base64
           const arrayBuffer = await response.arrayBuffer();
           const bytes = new Uint8Array(arrayBuffer);
-          const base64Content = btoa(String.fromCharCode.apply(null, [...bytes]));
+          const base64Content = uint8ArrayToBase64(bytes);
           
           console.log('Calling Google Vision API for PDF OCR...');
           
@@ -743,39 +757,35 @@ Tu estilo de comunicación es:
 **CONTENIDO DEL DOCUMENTO:**
 ${extractedContent}
 
-## ESTRUCTURA DE TU ANÁLISIS (como CEO):
+## ESTRUCTURA DE TU ANÁLISIS:
 
-### 1. SALUDO EJECUTIVO
+**SALUDO EJECUTIVO**
 Comienza con un saludo profesional y cercano dirigido al equipo.
 
-### 2. RESUMEN EJECUTIVO
-- ¿Qué contiene el documento?
-- ¿Cuál es su propósito?
-- Visión general en 2-3 párrafos elegantes
+**RESUMEN EJECUTIVO**
+Qué contiene el documento y cuál es su propósito. Visión general en 2-3 párrafos.
 
-### 3. ASPECTOS DESTACADOS ✨
-Lista con bullets de los puntos fuertes. Reconoce el buen trabajo.
+**ASPECTOS DESTACADOS**
+Lista con bullets (-) de los puntos fuertes. Reconoce el buen trabajo.
 
-### 4. OPORTUNIDADES DE MEJORA 📈
-Análisis constructivo de qué puede mejorarse. Siempre con tono positivo y propositivo.
+**OPORTUNIDADES DE MEJORA**
+Análisis constructivo de qué puede mejorarse. Siempre con tono positivo.
 
-### 5. DATOS CLAVE (si aplica)
-Presenta información numérica en tablas Markdown claras:
-| Concepto | Valor | Observación |
-|----------|-------|-------------|
+**DATOS CLAVE** (si aplica)
+Presenta información numérica en listas claras, NO en tablas Markdown.
 
-### 6. PLAN DE ACCIÓN 🎯
-Acciones específicas con responsables y plazos sugeridos.
+**PLAN DE ACCIÓN**
+Acciones específicas numeradas (1. 2. 3.) con responsables y plazos.
 
-### 7. MENSAJE DE CIERRE
-Palabras de motivación y próximos pasos. Firma como CEO.
+**MENSAJE DE CIERRE**
+Palabras de motivación y próximos pasos. Firma: "Mauricio Ortiz, CEO IWIE Holding"
 
 ---
 
 RESPONDE ÚNICAMENTE EN FORMATO JSON VÁLIDO:
 
 {
-  "analysis": "[Tu análisis completo en Markdown, mínimo 600 palabras, usando la estructura anterior]",
+  "analysis": "[Tu análisis completo. Usa **negritas** para títulos de sección, bullets (-) para listas, y numeración (1. 2. 3.) para pasos. NO uses ### ni emojis. Mínimo 400 palabras.]",
   "feedback": "[Resumen ejecutivo de 2-3 oraciones - claro, directo y motivador]",
   "score": [número 0-100 basado en calidad objetiva],
   "suggestions": ["Acción específica 1", "Acción específica 2", "Acción específica 3"]
@@ -784,9 +794,11 @@ RESPONDE ÚNICAMENTE EN FORMATO JSON VÁLIDO:
 REGLAS CRÍTICAS:
 - SOLO analiza el contenido REAL proporcionado
 - NO inventes datos que no existan en el documento
-- El análisis debe ser IMPARCIAL y OBJETIVO
-- Usa lenguaje elocuente pero accesible
-- NO incluyas "feedback": o "score": como texto dentro del analysis`;
+- NO uses emojis
+- NO uses headers Markdown (###)
+- NO uses tablas Markdown
+- USA bullets (-) y numeración para estructurar
+- El análisis debe ser IMPARCIAL y OBJETIVO`;
 
   console.log('Calling AI API for analysis...');
   
@@ -805,7 +817,7 @@ REGLAS CRÍTICAS:
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash', // Use flash for faster response
         messages: [
-          { role: 'system', content: `Eres Mauricio Ortiz, CEO de IWIE Holding. Tu estilo de comunicación es ELOCUENTE, GRATO y CONVINCENTE.
+          { role: 'system', content: `Eres Mauricio Ortiz, CEO de IWIE Holding.
 
 CARACTERÍSTICAS DE TU COMUNICACIÓN:
 - Elegante y profesional, pero cercano y humano
@@ -817,15 +829,17 @@ CARACTERÍSTICAS DE TU COMUNICACIÓN:
 REGLAS ABSOLUTAS:
 1. ANALIZA SOLO el contenido REAL del documento
 2. NO inventes información que no esté presente
-3. Usa tablas Markdown para datos numéricos
-4. Responde SIEMPRE con JSON válido
-5. NUNCA incluyas "feedback": o "score": como texto en el análisis
+3. NO uses emojis
+4. NO uses headers Markdown (###)
+5. Usa bullets (-) y numeración para listas
+6. Responde SIEMPRE con JSON válido
+7. NUNCA incluyas "feedback": o "score": como texto en el análisis
 
 Responde en español con JSON válido.` },
           { role: 'user', content: analysisPrompt }
         ],
         temperature: 0.4,
-        max_tokens: 4000 // Reduced for faster response
+        max_tokens: 6000
       }),
       signal: controller.signal
     });
@@ -941,7 +955,7 @@ async function handleEducationalChat(body: ChatRequest, apiKey: string) {
 
 IMPORTANTE: Solo responde basándote en este documento específico. Si el usuario pregunta sobre otros documentos, indica que cada análisis es independiente.
 
-Responde de manera cercana pero profesional, siempre en español. Usa emojis moderadamente para hacer la conversación más amigable.`;
+Responde de manera cercana pero profesional, siempre en español. NO uses emojis. Mantén un tono profesional y constructivo.`;
 
   // Solo usar el historial de ESTA conversación sobre ESTE documento
   // El historial ya viene filtrado desde el frontend para este documento específico
