@@ -328,7 +328,7 @@ export function StudioChat({
         ) : (
           <div className="p-4 space-y-4">
             {showEmptyState && (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground">
                 <div className="relative mx-auto w-16 h-16 mb-4">
                   {creationMode === 'studio' ? (
                     <>
@@ -480,7 +480,7 @@ export function StudioChat({
       )}
 
       {/* Input - Fixed Height Textarea */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t shrink-0 bg-background">
         {onStartNewChat && messages.length > 0 && (
           <div className="flex justify-end mb-2">
             <Button variant="ghost" size="sm" onClick={onStartNewChat} className="text-xs">
