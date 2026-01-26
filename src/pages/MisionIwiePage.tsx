@@ -1,72 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { useMisionIwie } from '@/hooks/useMisionIwie';
+import { useMissions } from '@/hooks/useMissions';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { MissionsBoard } from '@/components/mision-iwie/MissionsBoard';
+import { MissionWorkspace } from '@/components/mision-iwie/MissionWorkspace';
+import { Rocket, Users, Brain, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { KanbanBoard } from '@/components/mision-iwie/KanbanBoard';
-import { DecisionsSection } from '@/components/mision-iwie/DecisionsSection';
-import { MisionDashboard } from '@/components/mision-iwie/MisionDashboard';
-import { CommonBoard } from '@/components/mision-iwie/CommonBoard';
-import { MisionAIAssistant } from '@/components/mision-iwie/MisionAIAssistant';
-import { 
-  Rocket, 
-  ClipboardList, 
-  Target, 
-  BarChart3, 
-  Users,
-  AlertTriangle,
-  Archive
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { Mission } from '@/types/mision-iwie';
 
 export default function MisionIwiePage() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useSupabaseAuth();
-  const [activeTab, setActiveTab] = useState('tasks');
-  const [showMorningPopup, setShowMorningPopup] = useState(false);
+  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   
   const {
+    missions,
     loading,
-    tasks,
-    decisions,
-    areas,
-    userStats,
-    userBadges,
-    levels,
-    badges,
-    todayTaskCount,
-    createArea,
-    createTask,
-    updateTask,
-    completeTask,
-    moveTaskPriority,
-    deleteTask,
-    createDecision,
-    updateDecision,
-    completeDecision,
-    linkTaskToDecision,
-    toggleBadgeShare,
-    setFocusMission,
-    getOverloadStatus,
-    getCurrentLevel,
-    getProgressToNextLevel,
-    initializeDefaultAreas,
-  } = useMisionIwie();
-
-  const overloadStatus = getOverloadStatus();
-  const currentLevel = getCurrentLevel();
-  const progressToNextLevel = getProgressToNextLevel();
+    createMission,
+    updateMission,
+    deleteMission,
+  } = useMissions();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -75,194 +29,101 @@ export default function MisionIwiePage() {
     }
   }, [user, authLoading, navigate]);
 
-  // Initialize default areas for new users
-  useEffect(() => {
-    if (user && areas.length === 0 && !loading) {
-      initializeDefaultAreas(user.id);
-    }
-  }, [user, areas, loading, initializeDefaultAreas]);
-
-  // Morning popup for overload
-  useEffect(() => {
-    if (!loading && overloadStatus.isOverloaded) {
-      const lastShown = localStorage.getItem('mision_iwie_morning_popup');
-      const today = new Date().toISOString().split('T')[0];
-      if (lastShown !== today) {
-        setShowMorningPopup(true);
-        localStorage.setItem('mision_iwie_morning_popup', today);
-      }
-    }
-  }, [loading, overloadStatus.isOverloaded]);
-
+  // Loading state
   if (authLoading || loading) {
     return (
       <ResponsiveLayout selectedCompany={null} onSelectCompany={() => {}}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="text-center">
             <Rocket className="w-12 h-12 mx-auto mb-4 animate-bounce text-primary" />
-            <p className="text-muted-foreground">Preparando tu estación espacial...</p>
+            <p className="text-muted-foreground">Preparando tu centro de misiones...</p>
           </div>
         </div>
       </ResponsiveLayout>
     );
   }
 
+  // If a mission is selected, show the workspace
+  if (selectedMission) {
+    return (
+      <ResponsiveLayout selectedCompany={null} onSelectCompany={() => {}}>
+        <MissionWorkspace
+          mission={selectedMission}
+          onBack={() => setSelectedMission(null)}
+        />
+      </ResponsiveLayout>
+    );
+  }
+
+  // Otherwise, show the missions board
   return (
     <ResponsiveLayout selectedCompany={null} onSelectCompany={() => {}}>
       <div className="p-4 md:p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-xl">
-              <Rocket className="w-8 h-8 text-primary" />
+            <div className="p-3 bg-gradient-to-br from-primary to-primary/60 rounded-xl">
+              <Rocket className="w-8 h-8 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Misión Iwie</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">Centro de Misiones Colaborativas</h1>
               <p className="text-muted-foreground text-sm">
-                Tu centro de comando personal • {currentLevel?.icon} {currentLevel?.name_es}
+                Proyectos inteligentes con asistencia Multi-Brain
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="gap-2 py-1.5 px-3">
-              <span className="text-lg">{currentLevel?.icon}</span>
-              <span>{userStats?.total_points || 0} pts</span>
+              <Users className="w-4 h-4" />
+              <span>{missions.length} {missions.length === 1 ? 'misión' : 'misiones'}</span>
             </Badge>
-            {userStats && userStats.current_streak > 0 && (
-              <Badge variant="secondary" className="gap-2 py-1.5 px-3">
-                🔥 {userStats.current_streak} días
-              </Badge>
-            )}
+            <Badge variant="secondary" className="gap-2 py-1.5 px-3">
+              <Brain className="w-4 h-4" />
+              <span>Multi-Brain IA</span>
+            </Badge>
           </div>
         </div>
 
-        {/* Main Content with Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="tasks" className="gap-2">
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">Tareas</span>
-            </TabsTrigger>
-            <TabsTrigger value="decisions" className="gap-2">
-              <Target className="w-4 h-4" />
-              <span className="hidden sm:inline">Decisiones</span>
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" className="gap-2">
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
-            <TabsTrigger value="common" className="gap-2">
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Común</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Main Content Area */}
-            <div className="lg:col-span-3">
-              <TabsContent value="tasks" className="mt-0">
-                <KanbanBoard
-                  tasks={tasks}
-                  areas={areas}
-                  onCreateTask={createTask}
-                  onUpdateTask={updateTask}
-                  onCompleteTask={completeTask}
-                  onDeleteTask={deleteTask}
-                  onMoveTask={moveTaskPriority}
-                  onCreateArea={createArea}
-                  onSetFocusMission={setFocusMission}
-                  overloadStatus={overloadStatus}
-                  todayTaskCount={todayTaskCount}
-                />
-              </TabsContent>
-
-              <TabsContent value="decisions" className="mt-0">
-                <DecisionsSection
-                  decisions={decisions}
-                  tasks={tasks}
-                  onCreateDecision={createDecision}
-                  onUpdateDecision={updateDecision}
-                  onCompleteDecision={completeDecision}
-                  onLinkTask={linkTaskToDecision}
-                  onSetFocusMission={setFocusMission}
-                />
-              </TabsContent>
-
-              <TabsContent value="dashboard" className="mt-0">
-                <MisionDashboard
-                  tasks={tasks}
-                  decisions={decisions}
-                  userStats={userStats}
-                  userBadges={userBadges}
-                  levels={levels}
-                  currentLevel={currentLevel}
-                  progressToNextLevel={progressToNextLevel}
-                  overloadStatus={overloadStatus}
-                  onToggleBadgeShare={toggleBadgeShare}
-                />
-              </TabsContent>
-
-              <TabsContent value="common" className="mt-0">
-                <CommonBoard />
-              </TabsContent>
+        {/* Feature highlights */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-card border">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Brain className="w-5 h-5 text-primary" />
             </div>
-
-            {/* AI Assistant Sidebar */}
-            <div className="lg:col-span-1">
-              <MisionAIAssistant
-                tasks={tasks}
-                decisions={decisions}
-                userStats={userStats}
-                overloadStatus={overloadStatus}
-              />
+            <div>
+              <p className="font-medium text-sm">Chat con IA Especializada</p>
+              <p className="text-xs text-muted-foreground">Grok, GPT-4o, DeepSeek, Gemini</p>
             </div>
           </div>
-        </Tabs>
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-card border">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">Paneles Contextuales</p>
+              <p className="text-xs text-muted-foreground">Se adaptan según la conversación</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-card border">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Users className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">Colaboración en Tiempo Real</p>
+              <p className="text-xs text-muted-foreground">Trabaja con tu equipo</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Missions Board */}
+        <MissionsBoard
+          missions={missions}
+          onSelectMission={setSelectedMission}
+          onCreateMission={createMission}
+          loading={loading}
+        />
       </div>
-
-      {/* Morning Overload Popup */}
-      <Dialog open={showMorningPopup} onOpenChange={setShowMorningPopup}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              ⚠️ Alerta de Sobrecarga
-            </DialogTitle>
-            <DialogDescription>
-              Tienes {overloadStatus.totalPending} tareas pendientes acumuladas.
-              Esto puede afectar tu productividad y bienestar.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4 space-y-3">
-            <p className="text-sm">Te sugerimos:</p>
-            <ul className="text-sm space-y-2 text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <Archive className="w-4 h-4" />
-                Archivar tareas que ya no son relevantes
-              </li>
-              <li className="flex items-center gap-2">
-                <Target className="w-4 h-4" />
-                Seleccionar una Misión Focus para hoy
-              </li>
-              <li className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Revisar y ajustar prioridades
-              </li>
-            </ul>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMorningPopup(false)}>
-              Revisar después
-            </Button>
-            <Button onClick={() => { setShowMorningPopup(false); setActiveTab('tasks'); }}>
-              Revisar ahora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </ResponsiveLayout>
   );
 }

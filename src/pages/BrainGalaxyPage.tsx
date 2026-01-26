@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Brain, BookOpen, Target, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles, Wand2 } from 'lucide-react';
+import { Brain, BookOpen, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles, Wand2 } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking, UploadContentDialog } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
 import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
@@ -142,7 +142,7 @@ export default function BrainGalaxyPage() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-6 md:w-auto md:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 md:w-auto md:inline-grid">
             <TabsTrigger value="dashboard" className="gap-2">
               <BookOpen className="h-4 w-4" />
               <span className="hidden md:inline">Mi Dashboard</span>
@@ -158,10 +158,6 @@ export default function BrainGalaxyPage() {
             <TabsTrigger value="chat" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden md:inline">Chat IA</span>
-            </TabsTrigger>
-            <TabsTrigger value="missions" className="gap-2">
-              <Target className="h-4 w-4" />
-              <span className="hidden md:inline">Misiones</span>
             </TabsTrigger>
             <TabsTrigger value="ranking" className="gap-2">
               <Trophy className="h-4 w-4" />
@@ -250,16 +246,6 @@ export default function BrainGalaxyPage() {
                     onSaveSession={handleSaveSession}
                   />
                 </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="missions" className="m-0">
-              <div className="text-center py-12 text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Misiones Colaborativas</p>
-                <p className="text-sm mt-2">
-                  Próximamente podrás participar en misiones de aprendizaje colaborativo
-                </p>
               </div>
             </TabsContent>
 
