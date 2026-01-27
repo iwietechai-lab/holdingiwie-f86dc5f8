@@ -68,19 +68,22 @@ export function AnalysisChatDialog({
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [lastAnalyzedId, setLastAnalyzedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Reset chat when dialog opens with new analysis
+  // Reset chat ONLY when dialog opens with a DIFFERENT document
   useEffect(() => {
-    if (open && analysisResult) {
+    const currentId = analysisResult?.submission?.id;
+    if (open && currentId && currentId !== lastAnalyzedId) {
       setChatMessages([]);
       setShowChat(false);
+      setLastAnalyzedId(currentId);
     }
-  }, [open, analysisResult?.submission?.id]);
+  }, [open, analysisResult?.submission?.id, lastAnalyzedId]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isSending || !analysisResult) return;
@@ -89,10 +92,17 @@ export function AnalysisChatDialog({
     setInputMessage('');
     setShowChat(true);
     
-    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    // Create new message object
+    const newUserMessage: ChatMessage = { role: 'user', content: userMessage };
+    
+    // Update UI immediately
+    setChatMessages(prev => [...prev, newUserMessage]);
     setIsSending(true);
 
     try {
+      // CRITICAL FIX: Build full history BEFORE sending (React setState is async)
+      const fullHistory = [...chatMessages, newUserMessage];
+      
       const { data, error } = await supabase.functions.invoke('ceo-internal-chat', {
         body: {
           action: 'educational_chat',
@@ -105,7 +115,7 @@ export function AnalysisChatDialog({
             suggestions: analysisResult.suggestions,
             score: analysisResult.score
           },
-          history: chatMessages,
+          history: fullHistory,  // Now includes ALL messages including the current one
           submitter_name: submitterName
         }
       });

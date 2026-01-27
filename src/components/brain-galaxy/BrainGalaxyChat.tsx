@@ -147,9 +147,6 @@ export function BrainGalaxyChat({
         })),
       };
 
-      const updatedMessages = [...messages, fileMessage];
-      setMessages(updatedMessages);
-
       // Send to AI with context about the files
       const aiContextMessage = {
         role: 'user' as const,
@@ -167,9 +164,25 @@ Por favor:
 Presenta estas opciones de forma clara y amigable.`,
       };
 
-      // Make AI respond about the files
+      // CRITICAL FIX: Create a system context message to persist file context for future messages
+      // This message will be included in subsequent API calls to maintain context
+      const fileContextForState: ChatMessage = {
+        id: `msg-file-context-${Date.now()}`,
+        role: 'system',
+        content: `[CONTEXTO: Archivos cargados por el usuario: ${files.map(f => `"${f.name}" (${getFileTypeLabel(f.type, f.name)})`).join(', ')}. Mantén este contexto para respuestas futuras.]`,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Update messages with BOTH the visible file message AND the hidden context message
+      const updatedMessages = [...messages, fileMessage, fileContextForState];
+      setMessages(updatedMessages);
+
+      // Make AI respond about the files - include context message in API call
       setIsLoading(true);
-      await streamChat([...updatedMessages.map(m => ({ role: m.role, content: m.content })), aiContextMessage]);
+      const messagesForAI = updatedMessages.map(m => ({ role: m.role, content: m.content }));
+      // Add the detailed context for AI (not stored in state)
+      messagesForAI.push({ role: 'user', content: aiContextMessage.content });
+      await streamChat(messagesForAI);
       
     } catch (error) {
       console.error('Error processing files:', error);
