@@ -71,10 +71,8 @@ const ChatContentInner = ({
           <div className="flex justify-start">
             <div className="max-w-[80%] p-3 rounded-lg bg-muted text-foreground rounded-bl-none">
               <p className="text-sm whitespace-pre-wrap">
-                ¡Hola! Soy el Asistente CEO de IWIE Holding con inteligencia artificial. 
-                Puedo ayudarte con información sobre las empresas, solicitar reuniones, 
-                crear tickets de soporte, y responder preguntas sobre estrategias y operaciones. 
-                ¿En qué puedo ayudarte hoy? 🚀
+                Hola. Soy el asistente del CEO de IWIE Holding. 
+                ¿En qué puedo ayudarte? Consultas sobre empresas, reuniones, tickets, o información estratégica.
               </p>
             </div>
           </div>
