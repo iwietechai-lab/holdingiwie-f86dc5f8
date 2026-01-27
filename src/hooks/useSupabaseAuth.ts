@@ -234,6 +234,7 @@ export const useSupabaseAuth = () => {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
 
+  // Security: Geocoding is now proxied through Edge Function to hide user IP from third-party
   const getLocation = useCallback(async (): Promise<LocationData> => {
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -243,19 +244,26 @@ export const useSupabaseAuth = () => {
         });
       });
 
-      // Try to get city/country from coordinates using reverse geocoding
+      // Use Edge Function proxy for geocoding (privacy-safe approach)
+      // This hides user IP from third-party geocoding service
       try {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=es`
-        );
-        const data = await response.json();
+        const { data, error } = await supabase.functions.invoke('reverse-geocode', {
+          body: { 
+            latitude: position.coords.latitude, 
+            longitude: position.coords.longitude 
+          }
+        });
+        
+        if (error) throw error;
+        
         return {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          city: data.city || data.locality || 'Desconocida',
-          country: data.countryName || 'Desconocido',
+          city: data?.city || 'Desconocida',
+          country: data?.country || 'Desconocido',
         };
       } catch {
+        // Fallback: store coordinates without city/country if geocoding fails
         return {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
