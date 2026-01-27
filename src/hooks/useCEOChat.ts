@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from './useSupabaseAuth';
 import { useSuperadmin } from './useSuperadmin';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface Company {
   id: string;
@@ -560,53 +560,40 @@ export function useCEOChat() {
     const fileName = file.name.toLowerCase();
     console.log('📄 Parsing file:', fileName, 'Type:', file.type, 'Size:', file.size);
     
-    // Handle Excel files
+    // Handle Excel files - Using ExcelJS (secure alternative to xlsx)
+    // Security: ExcelJS has no known high-severity vulnerabilities
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       try {
-        console.log('📊 Reading Excel file...');
+        console.log('📊 Reading Excel file with ExcelJS...');
         const arrayBuffer = await file.arrayBuffer();
         console.log('📊 ArrayBuffer size:', arrayBuffer.byteLength);
         
-        const workbook = XLSX.read(arrayBuffer, { 
-          type: 'array',
-          cellDates: true,
-          cellNF: true,
-          cellStyles: true
-        });
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
         
-        console.log('📊 Workbook sheets:', workbook.SheetNames);
+        console.log('📊 Workbook sheets:', workbook.worksheets.map(ws => ws.name));
         let content = `=== ARCHIVO EXCEL: ${file.name} ===\n`;
-        content += `Total de hojas: ${workbook.SheetNames.length}\n`;
+        content += `Total de hojas: ${workbook.worksheets.length}\n`;
         
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
+        for (const sheet of workbook.worksheets) {
+          content += `\n\n========== HOJA: ${sheet.name} ==========\n\n`;
+          console.log(`📊 Sheet "${sheet.name}" has ${sheet.rowCount} rows`);
           
-          // Get data with headers
-          const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-          // Get raw values too
-          const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-          
-          content += `\n\n========== HOJA: ${sheetName} ==========\n\n`;
-          console.log(`📊 Sheet "${sheetName}" has ${jsonData.length} rows (json), ${rawData.length} rows (raw)`);
-          
-          // If sheet has data
-          if (rawData.length > 0) {
-            // Add raw rows first (more reliable for getting all data)
+          // Extract row data
+          if (sheet.rowCount > 0) {
             content += '--- DATOS EN FORMATO TABLA ---\n';
-            for (let i = 0; i < rawData.length; i++) {
-              const row = rawData[i] as unknown[];
-              if (row.some(cell => cell !== '')) {
-                content += `Fila ${i + 1}: ${row.map(cell => String(cell ?? '')).join(' | ')}\n`;
+            sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+              const values = row.values as (string | number | boolean | Date | null | undefined)[];
+              // ExcelJS row.values is 1-indexed, so slice from 1
+              const cleanValues = values.slice(1).map(cell => {
+                if (cell === null || cell === undefined) return '';
+                if (cell instanceof Date) return cell.toISOString().split('T')[0];
+                return String(cell);
+              });
+              if (cleanValues.some(v => v !== '')) {
+                content += `Fila ${rowNumber}: ${cleanValues.join(' | ')}\n`;
               }
-            }
-            
-            // Also add as JSON for structured access
-            if (jsonData.length > 0) {
-              content += '\n--- DATOS ESTRUCTURADOS (JSON) ---\n';
-              for (const row of jsonData) {
-                content += JSON.stringify(row, null, 0) + '\n';
-              }
-            }
+            });
           } else {
             content += '[Hoja vacía]\n';
           }
