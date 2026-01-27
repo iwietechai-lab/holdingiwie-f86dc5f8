@@ -2,7 +2,9 @@ import { useState, useCallback } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Brain, BookOpen, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles, Wand2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Brain, BookOpen, Trophy, MessageSquare, Plus, History, PanelLeftClose, PanelLeft, Sparkles, Wand2, Target } from 'lucide-react';
 import { BrainGalaxyDashboard, BrainGalaxyChat, BrainGalaxyRanking, UploadContentDialog } from '@/components/brain-galaxy';
 import { CreateAreaDialog } from '@/components/brain-galaxy/CreateAreaDialog';
 import { ChatSessionsList } from '@/components/brain-galaxy/ChatSessionsList';
@@ -251,6 +253,52 @@ export default function BrainGalaxyPage() {
 
             <TabsContent value="ranking" className="m-0">
               <BrainGalaxyRanking levels={levels} currentUserId={user?.id} />
+            </TabsContent>
+
+            <TabsContent value="missions" className="m-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Todas las Misiones
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activeMissions.length > 0 ? (
+                    <div className="space-y-3">
+                      {activeMissions.map(mission => (
+                        <div key={mission.id} className="p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium">{mission.title}</p>
+                              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                                {mission.description || 'Sin descripción'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {mission.status}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {mission.visibility}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Badge className="bg-yellow-500/20 text-yellow-600 shrink-0">
+                              +{mission.reward_points || 0} pts
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>No hay misiones activas en este momento</p>
+                      <p className="text-sm mt-1">Las misiones aparecerán aquí cuando estén disponibles</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           </div>
         </Tabs>
