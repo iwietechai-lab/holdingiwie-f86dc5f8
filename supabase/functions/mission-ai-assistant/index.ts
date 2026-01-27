@@ -278,7 +278,7 @@ async function callBrain(
 }
 
 // =====================================================
-// MULTI-BRAIN FUSION
+// MULTI-BRAIN FUSION (with Lovable API fallback)
 // =====================================================
 
 async function multiBrainFusion(
@@ -297,25 +297,25 @@ async function multiBrainFusion(
     }
   }
 
-  if (availableBrains.length === 0) {
-    throw new Error('No AI brains available');
-  }
-
   console.log(`Mission AI: ${availableBrains.length} brains available, context: ${context.detected_context}`);
+
+  // If no external brains available or all fail, use Lovable API directly
+  if (availableBrains.length === 0) {
+    console.log('Mission AI: No external brains, using Lovable API directly');
+    return await callLovableAPI(messages, systemPrompt, lovableKey);
+  }
 
   // Select brains based on context
   let selectedBrains = availableBrains;
   
   // Prioritize specific brains for contexts
   if (context.detected_context === 'engineering' || context.detected_context === 'drone') {
-    // Prioritize DeepSeek for technical, but keep others
     selectedBrains = availableBrains.sort((a, b) => {
       if (a.id === 'deepseek') return -1;
       if (b.id === 'deepseek') return 1;
       return 0;
     });
   } else if (context.detected_context === 'commercial' || context.detected_context === 'financial') {
-    // Prioritize GPT-4o for business
     selectedBrains = availableBrains.sort((a, b) => {
       if (a.id === 'openai') return -1;
       if (b.id === 'openai') return 1;
@@ -331,7 +331,12 @@ async function multiBrainFusion(
       messages,
       systemPrompt
     );
-    return { response: result.response, brainsUsed: [selectedBrains[0].config.name] };
+    if (result.success) {
+      return { response: result.response, brainsUsed: [selectedBrains[0].config.name] };
+    }
+    // Fallback to Lovable API
+    console.log('Mission AI: Single brain failed, falling back to Lovable API');
+    return await callLovableAPI(messages, systemPrompt, lovableKey);
   }
 
   // Query top 3 brains in parallel
@@ -345,8 +350,10 @@ async function multiBrainFusion(
 
   console.log(`Mission AI: ${successfulResults.length} successful responses`);
 
+  // FALLBACK: If all brains fail, use Lovable API
   if (successfulResults.length === 0) {
-    throw new Error('All brains failed to respond');
+    console.log('Mission AI: All brains failed, falling back to Lovable API');
+    return await callLovableAPI(messages, systemPrompt, lovableKey);
   }
 
   if (successfulResults.length === 1) {
@@ -356,7 +363,7 @@ async function multiBrainFusion(
     };
   }
 
-  // Synthesize responses using Gemini
+  // Synthesize responses using Gemini via Lovable API
   const synthesisPrompt = `Eres el SINTETIZADOR de Misión IWIE. Combina las respuestas de múltiples IAs en UNA respuesta óptima.
 
 CONTEXTO DETECTADO: ${context.detected_context}
@@ -408,6 +415,48 @@ RESPUESTA SINTETIZADA:`;
     response: synthesizedResponse, 
     brainsUsed: successfulResults.map(r => r.brain) 
   };
+}
+
+// =====================================================
+// LOVABLE API FALLBACK
+// =====================================================
+
+async function callLovableAPI(
+  messages: any[],
+  systemPrompt: string,
+  lovableKey: string
+): Promise<{ response: string; brainsUsed: string[] }> {
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Lovable API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || 'Lo siento, no pude procesar tu solicitud.';
+    
+    return { response: content, brainsUsed: ['Gemini (Lovable)'] };
+  } catch (error) {
+    console.error('Lovable API error:', error);
+    return { 
+      response: 'Lo siento, hubo un error procesando tu mensaje. Por favor intenta de nuevo.', 
+      brainsUsed: ['Error'] 
+    };
+  }
 }
 
 // =====================================================
