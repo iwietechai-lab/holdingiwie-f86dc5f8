@@ -1,308 +1,298 @@
 
-# Plan: Habilitar Conversación Infinita en Brain Galaxy Chat y CEOChat
+# Plan: Solucionar Problemas de Brain Galaxy Studio
 
-## Diagnóstico de Errores Identificados
+## Resumen de Problemas Reportados
 
-Tras revisar exhaustivamente el código, he identificado los problemas REALES:
+El usuario reportó 5 problemas específicos con Brain Galaxy Studio:
+
+1. **Cursos en borrador no se pueden editar** - Al hacer clic sobre un curso existente, no pasa nada
+2. **Studio no guarda la información** - Al cambiar de ventana o salir, se pierde todo el trabajo
+3. **El historial de Studio no registra nada** - No hay persistencia de sesiones
+4. **Los cursos solo generan temario** - No genera contenido desarrollado, solo estructura
+5. **La UI se bloquea al crear video** - Después de pedir un video, la interfaz deja de responder
 
 ---
 
-## Problema 1: CEOChat - El Historial se Envía ANTES de Agregar el Mensaje Actual
+## Diagnóstico Técnico
 
-**Archivo:** `src/components/ceo/AnalysisChatDialog.tsx` (líneas 92-108)
+### Problema 1: Cursos No Clickeables
 
-**El Bug:**
+**Ubicación:** `src/components/brain-galaxy/BrainGalaxyDashboard.tsx` (líneas 181-198)
+
+**Causa:** El `div` que renderiza cada curso NO tiene `onClick` ni ningún handler interactivo:
+
 ```typescript
-// Línea 92: Primero agrega el mensaje del usuario al estado
-setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+<div key={course.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  <div>
+    <p className="font-medium">{course.title}</p>
+    // ... badges
+  </div>
+  <Badge>...</Badge>
+</div>
+// ⚠️ NO HAY onClick, cursor-pointer, ni ninguna acción
+```
 
-// Líneas 100-108: Pero envía 'chatMessages' que TODAVÍA NO tiene el mensaje nuevo
-const { data, error } = await supabase.functions.invoke('ceo-internal-chat', {
-  body: {
-    ...
-    history: chatMessages,  // <-- AQUÍ ESTÁ EL BUG: chatMessages no incluye el mensaje que acabamos de agregar
+**Solución:** Agregar prop `onViewCourse` y hacer los items clickeables.
+
+---
+
+### Problema 2 y 3: Studio No Guarda y el Historial No Funciona
+
+**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 102-104)
+
+**Causa:** El historial de Studio usa estado LOCAL en memoria (`useState`):
+
+```typescript
+const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+const [createdCourses, setCreatedCourses] = useState<CreatedCourse[]>([]);
+```
+
+Este estado se pierde completamente al:
+- Cambiar de pestaña (de Studio a Dashboard)
+- Refrescar la página
+- Cerrar el navegador
+
+**Contraste con Chat IA:** El Chat IA SÍ funciona porque usa `brain_galaxy_chat_sessions` en la base de datos a través de `useBrainGalaxy` hook.
+
+**Solución:** Crear una tabla `brain_galaxy_studio_sessions` y persistir las sesiones de Studio en la base de datos.
+
+---
+
+### Problema 4: Cursos Solo Generan Temario
+
+**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 186-261)
+
+**Causa:** Los prompts del sistema para creación de cursos piden una estructura JSON que solo incluye:
+- Título
+- Descripción  
+- Módulos (título, descripción, topics)
+- Fuentes
+
+Pero NO piden **contenido desarrollado** para cada módulo. El prompt dice:
+
+```typescript
+"modules": [
+  {
+    "title": "Módulo 1: Nombre",
+    "description": "Qué aprenderá",
+    "topics": ["Tema 1", "Tema 2"]
   }
-});
+]
 ```
 
-**Por qué falla:** React `setState` es asíncrono. Cuando llamamos `setChatMessages(prev => [...prev, userMsg])`, el estado `chatMessages` NO se actualiza inmediatamente. Por lo tanto, cuando enviamos `history: chatMessages`, estamos enviando el historial SIN el mensaje actual del usuario.
+Esto genera solo el temario. Para generar contenido desarrollado, se necesita un segundo paso que llame a la IA para expandir cada módulo.
 
-**Resultado:** La IA recibe el historial incompleto y no puede mantener contexto correctamente.
+**Solución:** Agregar un flujo de dos pasos:
+1. Generar estructura/temario
+2. Generar contenido detallado de cada módulo (bajo demanda o automático)
 
 ---
 
-## Problema 2: CEOChat - El Historial se Borra Cada Vez que se Abre el Diálogo
+### Problema 5: UI Se Bloquea al Crear Video
 
-**Archivo:** `src/components/ceo/AnalysisChatDialog.tsx` (líneas 78-83)
+**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 437-535)
 
-**El Bug:**
-```typescript
-useEffect(() => {
-  if (open && analysisResult) {
-    setChatMessages([]);  // Siempre borra todo
-    setShowChat(false);
-  }
-}, [open, analysisResult?.submission?.id]);
-```
+**Causa:** La función `generateOutput` maneja todos los tipos de herramientas incluyendo `video-summary`. El problema es que:
 
-**El problema:** El `useEffect` tiene `open` como dependencia. Cada vez que `open` cambia de `false` a `true`, se ejecuta y borra el historial. Incluso si es el mismo documento.
-
----
-
-## Problema 3: Brain Galaxy Chat - Contexto de Archivos se Pierde
-
-**Archivo:** `src/components/brain-galaxy/BrainGalaxyChat.tsx` (líneas 150-172)
-
-**El Bug:**
-```typescript
-// Se crea aiContextMessage con instrucciones para la IA
-const aiContextMessage = {
-  role: 'user' as const,
-  content: `El usuario ha subido ${files.length} archivo(s)...`
-};
-
-// Se envía al chat
-await streamChat([...updatedMessages.map(m => ({ role: m.role, content: m.content })), aiContextMessage]);
-```
-
-**El problema:** `aiContextMessage` se envía a la IA pero NUNCA se guarda en el estado `messages`. En mensajes posteriores del usuario, este contexto desaparece porque solo se envían los `messages` del estado.
-
-**Resultado:** La IA "olvida" los archivos después del primer mensaje.
-
----
-
-## Problema 4: Backend CEOChat - Prompt Restrictivo
-
-**Archivo:** `supabase/functions/ceo-internal-chat/index.ts` (línea 956)
-
-**El Bug:**
-```typescript
-// Línea 956 dice explícitamente:
-"IMPORTANTE: Solo responde basándote en este documento específico. 
-Si el usuario pregunta sobre otros documentos, indica que cada análisis es independiente."
-```
-
-**El problema:** Este prompt limita artificialmente la capacidad de la IA para profundizar. No es malo para evitar "contaminación" entre documentos, pero la frase "cada análisis es independiente" confunde a la IA cuando el usuario quiere PROFUNDIZAR en el MISMO documento.
-
----
-
-## Soluciones Propuestas
-
-### Solución 1: Enviar Historial Completo (CEOChat)
-
-**Archivo:** `src/components/ceo/AnalysisChatDialog.tsx`
-
-Cambiar la función `handleSendMessage` para construir el historial ANTES de enviarlo:
+1. El estado `isGenerating` se pone en `true`
+2. Si la API falla o tarda mucho, no hay timeout
+3. No hay manejo de error que libere el estado
+4. Los botones quedan `disabled` indefinidamente
 
 ```typescript
-const handleSendMessage = async () => {
-  if (!inputMessage.trim() || isSending || !analysisResult) return;
-  
-  const userMessage = inputMessage.trim();
-  setInputMessage('');
-  setShowChat(true);
-  
-  // Crear el nuevo mensaje
-  const newUserMessage: ChatMessage = { role: 'user', content: userMessage };
-  
-  // Actualizar UI
-  setChatMessages(prev => [...prev, newUserMessage]);
-  setIsSending(true);
-
-  try {
-    // CORRECCION: Construir historial completo incluyendo el mensaje actual
-    const fullHistory = [...chatMessages, newUserMessage];
-    
-    const { data, error } = await supabase.functions.invoke('ceo-internal-chat', {
-      body: {
-        action: 'educational_chat',
-        message: userMessage,
-        document_context: {...},
-        history: fullHistory,  // Ahora incluye TODOS los mensajes
-        submitter_name: submitterName
-      }
-    });
-    // ...resto del código
-  }
-};
+setIsGenerating(true);
+setGeneratingTool(toolType);
+try {
+  // ... llamada API sin timeout
+} catch (error) {
+  // Solo toast.error, pero...
+} finally {
+  setIsGenerating(false);  // Si nunca llega aquí, la UI queda bloqueada
+}
 ```
 
-### Solución 2: Solo Reiniciar si Cambia el Documento (CEOChat)
-
-**Archivo:** `src/components/ceo/AnalysisChatDialog.tsx`
-
-Agregar un estado para rastrear qué documento se analizó:
-
-```typescript
-const [lastAnalyzedId, setLastAnalyzedId] = useState<string | null>(null);
-
-useEffect(() => {
-  // Solo reiniciar si es un documento DIFERENTE al anterior
-  const currentId = analysisResult?.submission?.id;
-  if (open && currentId && currentId !== lastAnalyzedId) {
-    setChatMessages([]);
-    setShowChat(false);
-    setLastAnalyzedId(currentId);
-  }
-}, [open, analysisResult?.submission?.id]);
-```
-
-### Solución 3: Persistir Contexto de Archivos (Brain Galaxy)
-
-**Archivo:** `src/components/brain-galaxy/BrainGalaxyChat.tsx`
-
-Guardar el contexto del archivo como un mensaje "sistema" invisible:
-
-```typescript
-const processFilesForChat = async (files: AttachedFile[]) => {
-  // ... código existente ...
-
-  // NUEVO: Guardar el contexto de archivos en el estado para futuros mensajes
-  const fileContextMessage: ChatMessage = {
-    id: `msg-context-${Date.now()}`,
-    role: 'system',  // O 'user' con metadata especial
-    content: `[CONTEXTO DE ARCHIVOS: ${files.map(f => f.name).join(', ')}]`,
-    timestamp: new Date().toISOString(),
-    metadata: { type: 'file_context', files: files.map(f => f.name) }
-  };
-
-  // Guardar en estado para que persista en futuros mensajes
-  setMessages(prev => [...prev, fileMessage, fileContextMessage]);
-  
-  // Enviar a la IA
-  await streamChat([...updatedMessages, aiContextMessage].map(m => ({ role: m.role, content: m.content })));
-};
-```
-
-Y en `handleSend`, verificar si hay contexto de archivos previo e incluirlo.
-
-### Solución 4: Actualizar Prompt del Backend (CEOChat)
-
-**Archivo:** `supabase/functions/ceo-internal-chat/index.ts`
-
-Cambiar la línea restrictiva:
-
-**Antes (línea 956):**
-```
-"IMPORTANTE: Solo responde basándote en este documento específico. Si el usuario pregunta sobre otros documentos, indica que cada análisis es independiente."
-```
-
-**Después:**
-```
-"IMPORTANTE: Responde basándote en este documento y en todo el historial de la conversación actual. El usuario puede hacer múltiples preguntas para profundizar en el análisis. Mantén coherencia con lo ya discutido. Si el usuario quiere hablar de OTRO documento diferente, indícale que cada análisis de documento es independiente."
-```
+**Solución:** Agregar timeout, mejor manejo de errores, y botón de cancelación.
 
 ---
 
 ## Archivos a Modificar
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/ceo/AnalysisChatDialog.tsx` | 1. Corregir envío de historial para incluir mensaje actual 2. Solo reiniciar chat si es documento diferente |
-| `src/components/brain-galaxy/BrainGalaxyChat.tsx` | Persistir contexto de archivos en el estado de mensajes |
-| `supabase/functions/ceo-internal-chat/index.ts` | Actualizar prompt para permitir profundización en mismo documento |
+| Archivo | Cambios |
+|---------|---------|
+| `src/components/brain-galaxy/BrainGalaxyDashboard.tsx` | Agregar `onViewCourse` prop y hacer cursos clickeables |
+| `src/pages/BrainGalaxyPage.tsx` | Agregar handler para abrir curso en modo edición |
+| `src/components/brain-galaxy/studio/StudioBuilder.tsx` | 1. Persistir sesiones en DB 2. Agregar generación de contenido 3. Agregar timeout y cancelación |
+| `src/hooks/useBrainGalaxy.ts` | Agregar funciones para sesiones de Studio |
+| Nueva migración SQL | Crear tabla `brain_galaxy_studio_sessions` |
 
 ---
 
-## Sección Técnica Detallada
+## Solución Detallada
 
-### Cambio 1: AnalysisChatDialog.tsx - handleSendMessage
+### Cambio 1: Cursos Clickeables en Dashboard
 
 ```typescript
-// ANTES (buggy):
-setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-// ...más tarde...
-history: chatMessages,  // chatMessages aún no tiene el nuevo mensaje
+// BrainGalaxyDashboard.tsx - Agregar prop
+interface BrainGalaxyDashboardProps {
+  // ... existing props
+  onViewCourse?: (course: BrainGalaxyCourse) => void;
+}
 
-// DESPUÉS (correcto):
-const newUserMessage: ChatMessage = { role: 'user', content: userMessage };
-setChatMessages(prev => [...prev, newUserMessage]);
-// ...más tarde...
-history: [...chatMessages, newUserMessage],  // Incluye explícitamente el nuevo mensaje
+// Hacer curso clickeable
+<div 
+  key={course.id} 
+  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+  onClick={() => onViewCourse?.(course)}
+>
 ```
 
-### Cambio 2: AnalysisChatDialog.tsx - useEffect
+### Cambio 2: Crear Tabla para Sesiones de Studio
 
-```typescript
-// ANTES:
-useEffect(() => {
-  if (open && analysisResult) {
-    setChatMessages([]);
-    setShowChat(false);
-  }
-}, [open, analysisResult?.submission?.id]);
+```sql
+CREATE TABLE brain_galaxy_studio_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  title TEXT NOT NULL DEFAULT 'Nueva sesión',
+  mode TEXT NOT NULL DEFAULT 'studio', -- 'studio' | 'ai' | 'manual'
+  messages JSONB DEFAULT '[]',
+  sources JSONB DEFAULT '[]',
+  outputs JSONB DEFAULT '[]',
+  course_proposal JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-// DESPUÉS:
-const [lastAnalyzedId, setLastAnalyzedId] = useState<string | null>(null);
+ALTER TABLE brain_galaxy_studio_sessions ENABLE ROW LEVEL SECURITY;
 
-useEffect(() => {
-  const currentId = analysisResult?.submission?.id;
-  if (open && currentId && currentId !== lastAnalyzedId) {
-    setChatMessages([]);
-    setShowChat(false);
-    setLastAnalyzedId(currentId);
-  }
-}, [open, analysisResult?.submission?.id, lastAnalyzedId]);
+CREATE POLICY "Users can manage own studio sessions"
+  ON brain_galaxy_studio_sessions
+  FOR ALL USING (auth.uid() = user_id);
 ```
 
-### Cambio 3: BrainGalaxyChat.tsx - processFilesForChat
-
-En la función `processFilesForChat`, después de crear el `fileMessage`:
+### Cambio 3: Persistir Sesiones en StudioBuilder
 
 ```typescript
-// Guardar contexto para persistencia
-const fileContextForState: ChatMessage = {
-  id: `msg-file-context-${Date.now()}`,
-  role: 'user',
-  content: aiContextMessage.content,  // Mismo contenido que se envía a la IA
-  timestamp: new Date().toISOString(),
-  metadata: { isContextMessage: true, hidden: true }
+// Agregar auto-guardado cada vez que cambia el estado
+useEffect(() => {
+  if (sessionId && chatMessages.length > 0) {
+    saveStudioSession(sessionId, {
+      messages: chatMessages,
+      sources,
+      outputs,
+      courseProposal,
+      mode: creationMode,
+    });
+  }
+}, [chatMessages, sources, outputs, courseProposal]);
+```
+
+### Cambio 4: Generar Contenido Desarrollado
+
+Agregar un segundo paso después de generar la propuesta:
+
+```typescript
+const generateModuleContent = async (module: Module, index: number) => {
+  const response = await fetch(BRAIN_GALAXY_AI_URL, {
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: `Desarrolla el contenido completo del módulo "${module.title}". Incluye:
+          - Introducción (2-3 párrafos)
+          - Conceptos clave con explicaciones detalladas
+          - Ejemplos prácticos
+          - Actividades de aprendizaje
+          - Recursos complementarios
+          - Evaluación del módulo` 
+        },
+        { role: 'user', content: `Módulo: ${module.title}\nDescripción: ${module.description}\nTemas: ${module.topics.join(', ')}` }
+      ],
+    }),
+  });
+  // ... procesar respuesta
+};
+```
+
+### Cambio 5: Timeout y Cancelación para Generación
+
+```typescript
+const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+const generateOutput = async (toolType: StudioToolType) => {
+  const controller = new AbortController();
+  setAbortController(controller);
+  
+  // Timeout de 60 segundos
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    toast.error('La generación tardó demasiado. Intenta de nuevo.');
+  }, 60000);
+  
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      // ...
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      toast.info('Generación cancelada');
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    setAbortController(null);
+    setIsGenerating(false);
+  }
 };
 
-// Actualizar estado con AMBOS mensajes
-const messagesWithContext = [...messages, fileMessage, fileContextForState];
-setMessages(messagesWithContext);
-
-// Enviar a IA
-await streamChat(messagesWithContext.map(m => ({ role: m.role, content: m.content })));
-```
-
-### Cambio 4: ceo-internal-chat/index.ts - Prompt
-
-Línea 956, cambiar de:
-```
-IMPORTANTE: Solo responde basándote en este documento específico. Si el usuario pregunta sobre otros documentos, indica que cada análisis es independiente.
-```
-
-A:
-```
-IMPORTANTE: Responde basándote en este documento y mantén el contexto de toda la conversación. El usuario puede profundizar con múltiples preguntas sobre el mismo documento. Mantén coherencia con respuestas anteriores. Si pregunta por un documento DIFERENTE, indica que cada documento tiene su propio análisis.
+// Botón de cancelar
+{isGenerating && (
+  <Button variant="destructive" onClick={() => abortController?.abort()}>
+    Cancelar
+  </Button>
+)}
 ```
 
 ---
 
-## Flujo de Usuario Después de las Correcciones
+## Flujo de Usuario Después de los Cambios
 
-### CEOChat:
-1. Usuario sube documento Excel
-2. AI CEO analiza y muestra resultados
-3. Usuario: "Explícame más sobre el indicador de ventas"
-4. AI CEO responde con explicación detallada (MANTIENE CONTEXTO)
-5. Usuario: "¿Cómo puedo mejorar eso?"
-6. AI CEO: Sugiere mejoras específicas basadas en la conversación anterior
-7. Usuario cierra el diálogo
-8. Usuario reabre el diálogo del mismo documento
-9. El historial de chat PERSISTE (no se borra)
+### Cursos Editables:
+1. Usuario va a Dashboard
+2. Ve su curso "De Cero a Dronero" en estado Borrador
+3. Hace clic en el curso
+4. Se abre Studio con el curso cargado para edición
+5. Puede modificar módulos, agregar contenido, publicar
 
-### Brain Galaxy:
-1. Usuario sube PDF
-2. AI Brain Galaxy: "He recibido tu documento, ¿qué quieres hacer?"
-3. Usuario: "Analízalo"
-4. AI: Proporciona análisis completo
-5. Usuario: "Dame más detalles sobre el punto 3"
-6. AI: Profundiza en punto 3 (RECUERDA EL DOCUMENTO)
-7. Usuario: "Crea un quiz basado en esto"
-8. AI: Crea quiz sobre el contenido (SIGUE RECORDANDO)
+### Studio con Persistencia:
+1. Usuario abre Studio y comienza a crear curso
+2. Cada cambio se guarda automáticamente en la base de datos
+3. Usuario sale de la plataforma
+4. Al volver, abre "Historial" y ve sus sesiones guardadas
+5. Puede continuar donde lo dejó
+
+### Contenido Desarrollado:
+1. Usuario crea propuesta de curso
+2. Sistema genera estructura con módulos
+3. Usuario hace clic en "Desarrollar contenido" (nuevo botón)
+4. Sistema genera contenido completo para cada módulo
+5. Usuario puede editar y personalizar
+
+### Generación Sin Bloqueo:
+1. Usuario hace clic en "Video"
+2. Aparece loader con botón "Cancelar"
+3. Si tarda más de 60 segundos, se cancela automáticamente
+4. Usuario puede cancelar manualmente en cualquier momento
+5. La UI nunca queda bloqueada
+
+---
+
+## Orden de Implementación
+
+1. **Migración SQL** - Crear tabla `brain_galaxy_studio_sessions`
+2. **useBrainGalaxy.ts** - Agregar funciones CRUD para sesiones de Studio
+3. **StudioBuilder.tsx** - Integrar persistencia y auto-guardado
+4. **BrainGalaxyDashboard.tsx** - Hacer cursos clickeables
+5. **BrainGalaxyPage.tsx** - Agregar handler para editar cursos
+6. **StudioBuilder.tsx** - Agregar generación de contenido detallado
+7. **StudioBuilder.tsx** - Agregar timeout y cancelación
 
 ---
 
@@ -310,6 +300,8 @@ IMPORTANTE: Responde basándote en este documento y mantén el contexto de toda 
 
 Después de implementar:
 
-1. CEOChat: Verificar que al hacer preguntas consecutivas, la IA mantiene coherencia
-2. CEOChat: Verificar que cerrar/abrir el diálogo NO borra el historial para el mismo documento
-3. Brain Galaxy: Verificar que después de analizar un archivo, las siguientes preguntas siguen teniendo contexto del archivo
+1. Crear un curso en Studio, cambiar de pestaña, volver - el trabajo debe persistir
+2. Salir de la plataforma, volver, abrir historial - las sesiones deben estar guardadas
+3. Hacer clic en un curso borrador en Dashboard - debe abrir el editor
+4. Generar contenido - debe incluir desarrollo detallado, no solo temario
+5. Intentar generar video y cancelar - la UI no debe bloquearse
