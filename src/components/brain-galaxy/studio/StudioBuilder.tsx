@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Book, Sparkles, Upload, History, GraduationCap, Wand2, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Book, Sparkles, Upload, History, GraduationCap, Wand2, MessageSquare, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SourcesPanel } from './SourcesPanel';
@@ -10,7 +10,9 @@ import { StudioChat } from './StudioChat';
 import { StudioToolsPanel } from './StudioToolsPanel';
 import { ManualCourseBuilder } from './ManualCourseBuilder';
 import type { Source, StudioOutput, StudioToolType, ChatMessage } from './types';
-import type { BrainGalaxyArea, BrainGalaxyContent } from '@/types/brain-galaxy';
+import type { BrainGalaxyArea, BrainGalaxyContent, BrainGalaxyCourse } from '@/types/brain-galaxy';
+import { useStudioSessions, type StudioSession } from '@/hooks/useStudioSessions';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 interface FoundSource {
   title: string;
@@ -22,25 +24,9 @@ interface FoundSource {
 interface CourseProposal {
   title: string;
   description: string;
-  modules: { title: string; description: string; topics: string[] }[];
+  modules: { title: string; description: string; topics: string[]; content?: string }[];
   sources: FoundSource[];
   suggestedTopics?: string[];
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  lastMessage: string;
-  createdAt: string;
-  messages: ChatMessage[];
-  mode: CreationMode;
-}
-
-interface CreatedCourse {
-  id: string;
-  title: string;
-  createdAt: string;
-  mode: CreationMode;
 }
 
 interface StudioBuilderProps {
@@ -56,6 +42,7 @@ interface StudioBuilderProps {
     modules: { id: string; title: string; description: string; estimatedMinutes: number }[];
     isPublic: boolean;
   }) => Promise<boolean>;
+  editingCourse?: BrainGalaxyCourse | null;
 }
 
 // 3 creation modes
@@ -79,12 +66,30 @@ function detectCourseCreationIntent(message: string): boolean {
   return COURSE_CREATION_PATTERNS.some(pattern => pattern.test(message));
 }
 
+// Timeout for API calls (60 seconds)
+const API_TIMEOUT_MS = 60000;
+
 export function StudioBuilder({
   areas,
   existingContent,
   onBack,
   onSaveCourse,
+  editingCourse,
 }: StudioBuilderProps) {
+  const { user } = useSupabaseAuth();
+  const {
+    sessions,
+    currentSessionId,
+    setCurrentSessionId,
+    isLoading: isLoadingSessions,
+    isSaving,
+    createSession,
+    saveSession,
+    loadSession,
+    deleteSession,
+    getCurrentSession,
+  } = useStudioSessions({ userId: user?.id });
+
   const [creationMode, setCreationMode] = useState<CreationMode>('studio');
   const [sources, setSources] = useState<Source[]>([]);
   const [outputs, setOutputs] = useState<StudioOutput[]>([]);
@@ -97,11 +102,74 @@ export function StudioBuilder({
   const [courseProposal, setCourseProposal] = useState<CourseProposal | null>(null);
   const [foundSources, setFoundSources] = useState<FoundSource[]>([]);
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
-  
-  // History
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [createdCourses, setCreatedCourses] = useState<CreatedCourse[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Abort controller for cancellable operations
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Auto-save timer ref
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load editing course if provided
+  useEffect(() => {
+    if (editingCourse) {
+      // Set up state for editing existing course
+      const modules = (editingCourse.curriculum_structure as { title: string; description: string; topics?: string[] }[]) || [];
+      setCourseProposal({
+        title: editingCourse.title,
+        description: editingCourse.description || '',
+        modules: modules.map(m => ({
+          title: m.title,
+          description: m.description,
+          topics: m.topics || [],
+        })),
+        sources: [],
+      });
+      toast.info('Curso cargado para edición');
+    }
+  }, [editingCourse]);
+
+  // Auto-save effect - debounced save when state changes
+  useEffect(() => {
+    if (!currentSessionId || chatMessages.length === 0) return;
+
+    // Clear previous timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    // Set new timer for auto-save
+    autoSaveTimerRef.current = setTimeout(async () => {
+      const title = chatMessages[0]?.content.substring(0, 50) || 'Nueva sesión';
+      await saveSession(currentSessionId, {
+        messages: chatMessages,
+        sources,
+        outputs,
+        course_proposal: courseProposal,
+        title,
+        mode: creationMode,
+      });
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [chatMessages, sources, outputs, courseProposal, currentSessionId, creationMode, saveSession]);
+
+  // Cancel ongoing operation
+  const cancelOperation = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      setGeneratingTool(undefined);
+      setIsLoading(false);
+      setIsCreatingCourse(false);
+      toast.info('Operación cancelada');
+    }
+  }, []);
 
   const addSource = useCallback((sourceData: Omit<Source, 'id' | 'addedAt'>) => {
     const newSource: Source = {
@@ -368,15 +436,9 @@ RESPONDE EN FORMATO JSON:
       if ((message.toLowerCase().includes('procede') || message.toLowerCase().includes('crear')) && courseProposal) {
         await generateOutput('course');
         
-        // Save to created courses
-        const newCourse: CreatedCourse = {
-          id: `course-${Date.now()}`,
-          title: courseProposal.title,
-          createdAt: new Date().toISOString(),
-          mode: creationMode,
-        };
-        setCreatedCourses(prev => [newCourse, ...prev]);
+        // Course is saved via onSaveCourse, just clear the proposal
         setCourseProposal(null);
+        toast.success('¡Curso creado correctamente!');
         return;
       }
 
@@ -444,26 +506,50 @@ Responde de manera clara y en español.`,
       return;
     }
 
+    // Create abort controller for this operation
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // Set timeout
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current === controller) {
+        controller.abort();
+        toast.error('La generación tardó demasiado. Intenta de nuevo.');
+      }
+    }, API_TIMEOUT_MS);
+
     setIsGenerating(true);
     setGeneratingTool(toolType);
 
     try {
       const sourcesContext = getSourcesContext();
       
+      // Enhanced prompts that ask for DETAILED content, not just structure
       const toolPrompts: Record<StudioToolType, string> = {
-        'audio-summary': 'Genera un guión para un podcast/audio que resuma el contenido.',
-        'video-summary': 'Crea un guión para un video explicativo.',
-        'mind-map': 'Genera un mapa mental en formato de texto estructurado.',
-        'report': 'Genera un informe ejecutivo detallado.',
-        'flashcards': 'Genera tarjetas de estudio. Crea al menos 10.',
-        'quiz': 'Genera un cuestionario con 10 preguntas variadas.',
-        'infographic': 'Diseña el contenido para una infografía.',
-        'presentation': 'Crea slides para una presentación. Al menos 10.',
-        'data-table': 'Extrae y organiza la información en tablas.',
-        'deep-research': 'Realiza una investigación profunda.',
+        'audio-summary': 'Genera un guión COMPLETO para un podcast/audio que resuma el contenido. Incluye: introducción, desarrollo de cada punto con explicaciones detalladas, ejemplos, y conclusión.',
+        'video-summary': 'Crea un guión COMPLETO para un video explicativo con: escenas, narración detallada, puntos clave visuales, y sugerencias de elementos gráficos.',
+        'mind-map': 'Genera un mapa mental DETALLADO en formato de texto estructurado con múltiples niveles de profundidad.',
+        'report': 'Genera un informe ejecutivo COMPLETO con: resumen, análisis detallado, datos relevantes, conclusiones y recomendaciones.',
+        'flashcards': 'Genera al menos 15 tarjetas de estudio con preguntas Y respuestas detalladas. Incluye explicaciones adicionales en cada respuesta.',
+        'quiz': 'Genera un cuestionario con 15 preguntas variadas (opción múltiple, verdadero/falso, respuesta corta). Incluye las respuestas correctas Y explicaciones.',
+        'infographic': 'Diseña el contenido COMPLETO para una infografía con: título, secciones, datos, estadísticas, y descripciones de elementos visuales.',
+        'presentation': 'Crea una presentación de al menos 15 slides. Cada slide debe tener: título, puntos principales CON desarrollo, y notas del presentador.',
+        'data-table': 'Extrae y organiza TODA la información relevante en tablas estructuradas con explicaciones.',
+        'deep-research': 'Realiza una investigación profunda y exhaustiva. Incluye: contexto, análisis, fuentes, conclusiones y recomendaciones detalladas.',
         'course': courseProposal 
-          ? `Genera un curso completo basado en esta propuesta:\n${JSON.stringify(courseProposal, null, 2)}\n\nIncluye contenido detallado para cada módulo, actividades, evaluaciones y recursos.`
-          : 'Genera una malla curricular completa.',
+          ? `Genera un curso COMPLETO basado en esta propuesta:
+${JSON.stringify(courseProposal, null, 2)}
+
+IMPORTANTE: Para cada módulo, desarrolla el CONTENIDO COMPLETO incluyendo:
+1. Introducción del módulo (2-3 párrafos explicativos)
+2. Desarrollo de cada tema con explicaciones detalladas (no solo títulos)
+3. Ejemplos prácticos y casos de estudio
+4. Actividades de aprendizaje con instrucciones claras
+5. Recursos y lecturas recomendadas
+6. Preguntas de autoevaluación con respuestas
+
+NO generes solo la estructura. Genera TODO el contenido educativo desarrollado.`
+          : 'Genera una malla curricular completa con TODO el contenido desarrollado para cada módulo.',
       };
 
       const response = await fetch(
@@ -478,7 +564,11 @@ Responde de manera clara y en español.`,
             messages: [
               {
                 role: 'system',
-                content: `Eres un experto en creación de contenido educativo. ${sourcesContext ? `Analiza las siguientes fuentes:\n\n${sourcesContext}` : ''}`,
+                content: `Eres un experto en creación de contenido educativo de alta calidad. Tu trabajo es generar contenido COMPLETO y DETALLADO, no solo estructuras o temarios.
+                
+${sourcesContext ? `Analiza las siguientes fuentes y usa su información:\n\n${sourcesContext}` : ''}
+
+REGLA IMPORTANTE: Siempre genera contenido completo y desarrollado. Nunca des solo títulos o estructuras vacías.`,
               },
               {
                 role: 'user',
@@ -489,6 +579,7 @@ Responde de manera clara y en español.`,
             action: 'chat',
             mode: 'fusion',
           }),
+          signal: controller.signal,
         }
       );
 
@@ -526,9 +617,15 @@ Responde de manera clara y en español.`,
       toast.success(`${toolNames[toolType]} generado correctamente`);
 
     } catch (error) {
-      console.error('Error generating output:', error);
-      toast.error('Error al generar el contenido');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.info('Generación cancelada');
+      } else {
+        console.error('Error generating output:', error);
+        toast.error('Error al generar el contenido');
+      }
     } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
       setIsGenerating(false);
       setGeneratingTool(undefined);
     }
@@ -536,49 +633,50 @@ Responde de manera clara y en español.`,
 
   const hasSourcesReady = sources.some(s => s.status === 'ready');
 
-  const handleModeChange = (mode: string) => {
+  const handleModeChange = async (mode: string) => {
     setCreationMode(mode as CreationMode);
-    // Save current session before switching
-    if (chatMessages.length > 0) {
-      const session: ChatSession = {
-        id: `session-${Date.now()}`,
-        title: chatMessages[0]?.content.substring(0, 50) || 'Conversación',
-        lastMessage: chatMessages[chatMessages.length - 1]?.content.substring(0, 100) || '',
-        createdAt: new Date().toISOString(),
-        messages: [...chatMessages],
-        mode: creationMode,
-      };
-      setChatSessions(prev => [session, ...prev]);
-    }
+    // Save current session before switching (auto-save handles this via effect)
     // Clear state when switching modes
     setChatMessages([]);
     setSources([]);
     setCourseProposal(null);
     setFoundSources([]);
     setCurrentOutput(undefined);
+    setCurrentSessionId(null);
   };
 
-  const startNewChat = () => {
-    if (chatMessages.length > 0) {
-      const session: ChatSession = {
-        id: `session-${Date.now()}`,
-        title: chatMessages[0]?.content.substring(0, 50) || 'Nueva conversación',
-        lastMessage: chatMessages[chatMessages.length - 1]?.content.substring(0, 100) || '',
-        createdAt: new Date().toISOString(),
-        messages: [...chatMessages],
-        mode: creationMode,
-      };
-      setChatSessions(prev => [session, ...prev]);
+  const startNewChat = async () => {
+    // Create a new session in the database
+    const newSession = await createSession(creationMode);
+    if (newSession) {
+      setChatMessages([]);
+      setCourseProposal(null);
+      setFoundSources([]);
+      setSources([]);
+      setOutputs([]);
     }
-    setChatMessages([]);
-    setCourseProposal(null);
-    setFoundSources([]);
   };
 
-  const loadChatSession = (session: ChatSession) => {
-    setChatMessages(session.messages);
-    setCreationMode(session.mode);
-    setShowHistory(false);
+  const handleLoadSession = async (session: StudioSession) => {
+    const fullSession = await loadSession(session.id);
+    if (fullSession) {
+      setChatMessages(fullSession.messages || []);
+      setSources(fullSession.sources || []);
+      setOutputs(fullSession.outputs || []);
+      // Cast the course_proposal to the local type since sources types might differ
+      if (fullSession.course_proposal) {
+        const proposal = fullSession.course_proposal as unknown as CourseProposal;
+        setCourseProposal(proposal);
+      } else {
+        setCourseProposal(null);
+      }
+      setCreationMode(fullSession.mode);
+      setShowHistory(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    await deleteSession(sessionId);
   };
 
   // Render Manual Mode
@@ -697,52 +795,60 @@ Responde de manera clara y en español.`,
         {/* History Sidebar */}
         {showHistory && (
           <div className="w-64 border-r flex flex-col bg-muted/30">
-            <div className="p-3 border-b">
+            <div className="p-3 border-b flex items-center justify-between">
               <h3 className="font-medium text-sm">Historial</h3>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6"
+                onClick={startNewChat}
+              >
+                <Sparkles className="h-3 w-3" />
+              </Button>
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
-                {chatSessions.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Conversaciones</p>
-                    {chatSessions.map(session => (
-                      <button
-                        key={session.id}
-                        onClick={() => loadChatSession(session)}
-                        className="w-full text-left p-2 rounded hover:bg-muted text-sm truncate"
-                      >
-                        <div className="flex items-center gap-1 mb-1">
-                          {session.mode === 'studio' && <Wand2 className="h-3 w-3 text-primary" />}
-                          {session.mode === 'ai' && <MessageSquare className="h-3 w-3 text-primary" />}
-                          <p className="font-medium truncate text-xs">{session.title}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{session.lastMessage}</p>
-                      </button>
-                    ))}
+                {isLoadingSessions ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
-                )}
-                
-                {createdCourses.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Cursos creados</p>
-                    {createdCourses.map(course => (
+                ) : sessions.length > 0 ? (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">Sesiones guardadas</p>
+                    {sessions.map(session => (
                       <div
-                        key={course.id}
-                        className="p-2 rounded hover:bg-muted text-sm"
+                        key={session.id}
+                        className={`w-full text-left p-2 rounded hover:bg-muted text-sm truncate cursor-pointer group ${
+                          currentSessionId === session.id ? 'bg-muted' : ''
+                        }`}
+                        onClick={() => handleLoadSession(session)}
                       >
-                        <div className="flex items-center gap-2">
-                          <GraduationCap className="h-4 w-4 text-primary" />
-                          <p className="font-medium truncate text-xs">{course.title}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            {session.mode === 'studio' && <Wand2 className="h-3 w-3 text-primary shrink-0" />}
+                            {session.mode === 'ai' && <MessageSquare className="h-3 w-3 text-primary shrink-0" />}
+                            {session.mode === 'manual' && <Upload className="h-3 w-3 text-primary shrink-0" />}
+                            <p className="font-medium truncate text-xs">{session.title}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSession(session.id);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground ml-6">
-                          {course.mode === 'studio' ? 'Studio' : course.mode === 'ai' ? 'Con IA' : 'Manual'}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {new Date(session.updated_at).toLocaleDateString('es-CL')}
                         </p>
                       </div>
                     ))}
                   </div>
-                )}
-                
-                {chatSessions.length === 0 && createdCourses.length === 0 && (
+                ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     No hay historial aún
                   </p>
@@ -789,6 +895,7 @@ Responde de manera clara y en español.`,
             isGenerating={isGenerating}
             generatingTool={generatingTool}
             hasSourcesReady={hasSourcesReady || !!courseProposal}
+            onCancelGeneration={cancelOperation}
           />
         </div>
       </div>
