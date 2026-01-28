@@ -1041,6 +1041,56 @@ export type Database = {
           },
         ]
       }
+      brain_galaxy_studio_sessions: {
+        Row: {
+          course_id: string | null
+          course_proposal: Json | null
+          created_at: string | null
+          id: string
+          messages: Json | null
+          mode: string
+          outputs: Json | null
+          sources: Json | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          course_id?: string | null
+          course_proposal?: Json | null
+          created_at?: string | null
+          id?: string
+          messages?: Json | null
+          mode?: string
+          outputs?: Json | null
+          sources?: Json | null
+          title?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          course_id?: string | null
+          course_proposal?: Json | null
+          created_at?: string | null
+          id?: string
+          messages?: Json | null
+          mode?: string
+          outputs?: Json | null
+          sources?: Json | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_galaxy_studio_sessions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "brain_galaxy_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_galaxy_user_badges: {
         Row: {
           badge_id: string

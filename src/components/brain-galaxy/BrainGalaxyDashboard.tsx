@@ -26,6 +26,7 @@ interface BrainGalaxyDashboardProps {
   onUploadContent: () => void;
   onOpenChat: () => void;
   onViewMissions: () => void;
+  onViewCourse?: (course: BrainGalaxyCourse) => void;
 }
 
 export function BrainGalaxyDashboard({
@@ -39,6 +40,7 @@ export function BrainGalaxyDashboard({
   onUploadContent,
   onOpenChat,
   onViewMissions,
+  onViewCourse,
 }: BrainGalaxyDashboardProps) {
   const activeCourses = myCourses.filter(c => c.status !== 'archived').slice(0, 3);
 
@@ -179,9 +181,16 @@ export function BrainGalaxyDashboard({
             {activeCourses.length > 0 ? (
               <div className="space-y-3">
                 {activeCourses.map(course => (
-                  <div key={course.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div 
+                    key={course.id} 
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors group"
+                    onClick={() => onViewCourse?.(course)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && onViewCourse?.(course)}
+                  >
                     <div>
-                      <p className="font-medium">{course.title}</p>
+                      <p className="font-medium group-hover:text-primary transition-colors">{course.title}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
                           {course.difficulty_level}

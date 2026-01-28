@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, PlusCircle } from 'lucide-react';
+import { Loader2, Sparkles, PlusCircle, X } from 'lucide-react';
 import { STUDIO_TOOLS, type StudioToolType, type StudioOutput } from './types';
 
 interface StudioToolsPanelProps {
@@ -11,6 +11,7 @@ interface StudioToolsPanelProps {
   isGenerating: boolean;
   generatingTool?: StudioToolType;
   hasSourcesReady: boolean;
+  onCancelGeneration?: () => void;
 }
 
 export function StudioToolsPanel({
@@ -20,6 +21,7 @@ export function StudioToolsPanel({
   isGenerating,
   generatingTool,
   hasSourcesReady,
+  onCancelGeneration,
 }: StudioToolsPanelProps) {
   return (
     <div className="flex-1 flex flex-col border-l bg-muted/30 min-h-0">
@@ -66,6 +68,19 @@ export function StudioToolsPanel({
       </ScrollArea>
 
       <div className="p-4 border-t space-y-3">
+        {/* Cancel button when generating */}
+        {isGenerating && onCancelGeneration && (
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            className="w-full gap-2"
+            onClick={onCancelGeneration}
+          >
+            <X className="h-4 w-4" />
+            Cancelar generación
+          </Button>
+        )}
+        
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="h-4 w-4" />
           <p>Los resultados de Studio se guardarán aquí.</p>

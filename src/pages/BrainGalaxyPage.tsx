@@ -13,7 +13,7 @@ import { StudioPrompt } from '@/components/brain-galaxy/StudioPrompt';
 import { useBrainGalaxy } from '@/hooks/useBrainGalaxy';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { BrainGalaxyChatSession, ChatMessage, BrainModel } from '@/types/brain-galaxy';
+import type { BrainGalaxyChatSession, ChatMessage, BrainModel, BrainGalaxyCourse } from '@/types/brain-galaxy';
 import { toast } from 'sonner';
 
 export default function BrainGalaxyPage() {
@@ -46,6 +46,14 @@ export default function BrainGalaxyPage() {
   const [showChatHistory, setShowChatHistory] = useState(true);
   const [currentSession, setCurrentSession] = useState<BrainGalaxyChatSession | null>(null);
   const [chatKey, setChatKey] = useState(0); // Force re-render chat component
+  const [editingCourse, setEditingCourse] = useState<BrainGalaxyCourse | null>(null);
+
+  // Handle clicking on a course to edit it
+  const handleViewCourse = useCallback((course: BrainGalaxyCourse) => {
+    setEditingCourse(course);
+    setActiveTab('studio');
+    toast.info(`Abriendo "${course.title}" para edición`);
+  }, []);
 
   // Handle selecting a session from history
   const handleSelectSession = useCallback(async (session: BrainGalaxyChatSession) => {
@@ -180,6 +188,7 @@ export default function BrainGalaxyPage() {
                 onUploadContent={() => setShowUploadContent(true)}
                 onOpenChat={() => setActiveTab('chat')}
                 onViewMissions={() => setActiveTab('missions')}
+                onViewCourse={handleViewCourse}
               />
             </TabsContent>
 
@@ -187,8 +196,12 @@ export default function BrainGalaxyPage() {
               <CourseBuilder
                 areas={areas}
                 existingContent={myContent}
-                onBack={() => setActiveTab('dashboard')}
+                onBack={() => {
+                  setEditingCourse(null);
+                  setActiveTab('dashboard');
+                }}
                 onSaveCourse={createCourse}
+                editingCourse={editingCourse}
               />
             </TabsContent>
 
