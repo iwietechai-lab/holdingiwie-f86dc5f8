@@ -20,6 +20,7 @@ export default function IwieChat() {
   const [activeTab, setActiveTab] = useState<'chats' | 'calls'>(initialTab as 'chats' | 'calls');
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [showSplash, setShowSplash] = useState(true);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   // Force dark mode for IwieChat
   useEffect(() => {
@@ -32,9 +33,13 @@ export default function IwieChat() {
     };
   }, []);
 
+  // Check authentication status
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/login');
+    if (!authLoading) {
+      setHasCheckedAuth(true);
+      if (!isAuthenticated) {
+        navigate('/login');
+      }
     }
   }, [authLoading, isAuthenticated, navigate]);
 
@@ -43,12 +48,18 @@ export default function IwieChat() {
     setShowSplash(false);
   };
 
-  // Show splash screen
-  if (showSplash) {
+  // Show splash while loading auth or splash animation - only if authenticated or still loading
+  if (authLoading || (showSplash && !hasCheckedAuth)) {
     return <IwieChatSplash onComplete={handleSplashComplete} />;
   }
 
-  if (authLoading) {
+  // Show splash after auth confirmed for smooth transition
+  if (showSplash && isAuthenticated) {
+    return <IwieChatSplash onComplete={handleSplashComplete} />;
+  }
+
+  // If not authenticated and auth check done, don't render (will redirect)
+  if (!isAuthenticated && hasCheckedAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0b141a]">
         <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
