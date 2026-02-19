@@ -1,307 +1,89 @@
 
-# Plan: Solucionar Problemas de Brain Galaxy Studio
+# Problema: Brain Galaxy sin datos en tiempo real (datos limitados a 2023)
 
-## Resumen de Problemas Reportados
+## Diagnóstico del problema
 
-El usuario reportó 5 problemas específicos con Brain Galaxy Studio:
+Los modelos de IA que usa Brain Galaxy (Grok, GPT-4o, DeepSeek, Gemini) tienen una **fecha de corte de entrenamiento** ("knowledge cutoff") que varía entre modelos:
 
-1. **Cursos en borrador no se pueden editar** - Al hacer clic sobre un curso existente, no pasa nada
-2. **Studio no guarda la información** - Al cambiar de ventana o salir, se pierde todo el trabajo
-3. **El historial de Studio no registra nada** - No hay persistencia de sesiones
-4. **Los cursos solo generan temario** - No genera contenido desarrollado, solo estructura
-5. **La UI se bloquea al crear video** - Después de pedir un video, la interfaz deja de responder
+- Grok (grok-beta): conocimiento hasta ~2023
+- GPT-4o: hasta ~2023
+- DeepSeek Chat: hasta ~2023
+- Gemini 2.5 Flash: hasta principios de 2024
 
----
+Esto significa que cuando se pregunta "¿cómo está el mercado de drones en 2026?" o "¿qué pasó con el precio del cobre esta semana?", los modelos responden con datos desactualizados porque **no tienen acceso a internet en tiempo real**.
 
-## Diagnóstico Técnico
+La solución correcta no es cambiar de modelo (todos tienen este límite), sino **agregar búsqueda web en tiempo real** antes de que la IA responda.
 
-### Problema 1: Cursos No Clickeables
-
-**Ubicación:** `src/components/brain-galaxy/BrainGalaxyDashboard.tsx` (líneas 181-198)
-
-**Causa:** El `div` que renderiza cada curso NO tiene `onClick` ni ningún handler interactivo:
-
-```typescript
-<div key={course.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-  <div>
-    <p className="font-medium">{course.title}</p>
-    // ... badges
-  </div>
-  <Badge>...</Badge>
-</div>
-// ⚠️ NO HAY onClick, cursor-pointer, ni ninguna acción
-```
-
-**Solución:** Agregar prop `onViewCourse` y hacer los items clickeables.
+El proyecto ya tiene **Firecrawl conectado** (se detectó `FIRECRAWL_API_KEY` configurada), que incluye capacidad de búsqueda web en tiempo real.
 
 ---
 
-### Problema 2 y 3: Studio No Guarda y el Historial No Funciona
+## Solución: Motor de búsqueda web en tiempo real para Brain Galaxy
 
-**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 102-104)
+Se añadirá un sistema de **Web Search Augmentation** (búsqueda aumentada) que:
 
-**Causa:** El historial de Studio usa estado LOCAL en memoria (`useState`):
-
-```typescript
-const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-const [createdCourses, setCreatedCourses] = useState<CreatedCourse[]>([]);
-```
-
-Este estado se pierde completamente al:
-- Cambiar de pestaña (de Studio a Dashboard)
-- Refrescar la página
-- Cerrar el navegador
-
-**Contraste con Chat IA:** El Chat IA SÍ funciona porque usa `brain_galaxy_chat_sessions` en la base de datos a través de `useBrainGalaxy` hook.
-
-**Solución:** Crear una tabla `brain_galaxy_studio_sessions` y persistir las sesiones de Studio en la base de datos.
+1. Detecta cuando el usuario hace una pregunta que requiere información actual
+2. Busca en la web con Firecrawl Search en tiempo real
+3. Inyecta esos resultados frescos como contexto antes de que la IA genere la respuesta
+4. La IA responde usando datos de hoy, no de 2023
 
 ---
 
-### Problema 4: Cursos Solo Generan Temario
+## Arquitectura del flujo
 
-**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 186-261)
-
-**Causa:** Los prompts del sistema para creación de cursos piden una estructura JSON que solo incluye:
-- Título
-- Descripción  
-- Módulos (título, descripción, topics)
-- Fuentes
-
-Pero NO piden **contenido desarrollado** para cada módulo. El prompt dice:
-
-```typescript
-"modules": [
-  {
-    "title": "Módulo 1: Nombre",
-    "description": "Qué aprenderá",
-    "topics": ["Tema 1", "Tema 2"]
-  }
-]
-```
-
-Esto genera solo el temario. Para generar contenido desarrollado, se necesita un segundo paso que llame a la IA para expandir cada módulo.
-
-**Solución:** Agregar un flujo de dos pasos:
-1. Generar estructura/temario
-2. Generar contenido detallado de cada módulo (bajo demanda o automático)
-
----
-
-### Problema 5: UI Se Bloquea al Crear Video
-
-**Ubicación:** `src/components/brain-galaxy/studio/StudioBuilder.tsx` (líneas 437-535)
-
-**Causa:** La función `generateOutput` maneja todos los tipos de herramientas incluyendo `video-summary`. El problema es que:
-
-1. El estado `isGenerating` se pone en `true`
-2. Si la API falla o tarda mucho, no hay timeout
-3. No hay manejo de error que libere el estado
-4. Los botones quedan `disabled` indefinidamente
-
-```typescript
-setIsGenerating(true);
-setGeneratingTool(toolType);
-try {
-  // ... llamada API sin timeout
-} catch (error) {
-  // Solo toast.error, pero...
-} finally {
-  setIsGenerating(false);  // Si nunca llega aquí, la UI queda bloqueada
-}
-```
-
-**Solución:** Agregar timeout, mejor manejo de errores, y botón de cancelación.
-
----
-
-## Archivos a Modificar
-
-| Archivo | Cambios |
-|---------|---------|
-| `src/components/brain-galaxy/BrainGalaxyDashboard.tsx` | Agregar `onViewCourse` prop y hacer cursos clickeables |
-| `src/pages/BrainGalaxyPage.tsx` | Agregar handler para abrir curso en modo edición |
-| `src/components/brain-galaxy/studio/StudioBuilder.tsx` | 1. Persistir sesiones en DB 2. Agregar generación de contenido 3. Agregar timeout y cancelación |
-| `src/hooks/useBrainGalaxy.ts` | Agregar funciones para sesiones de Studio |
-| Nueva migración SQL | Crear tabla `brain_galaxy_studio_sessions` |
-
----
-
-## Solución Detallada
-
-### Cambio 1: Cursos Clickeables en Dashboard
-
-```typescript
-// BrainGalaxyDashboard.tsx - Agregar prop
-interface BrainGalaxyDashboardProps {
-  // ... existing props
-  onViewCourse?: (course: BrainGalaxyCourse) => void;
-}
-
-// Hacer curso clickeable
-<div 
-  key={course.id} 
-  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
-  onClick={() => onViewCourse?.(course)}
->
-```
-
-### Cambio 2: Crear Tabla para Sesiones de Studio
-
-```sql
-CREATE TABLE brain_galaxy_studio_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  title TEXT NOT NULL DEFAULT 'Nueva sesión',
-  mode TEXT NOT NULL DEFAULT 'studio', -- 'studio' | 'ai' | 'manual'
-  messages JSONB DEFAULT '[]',
-  sources JSONB DEFAULT '[]',
-  outputs JSONB DEFAULT '[]',
-  course_proposal JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE brain_galaxy_studio_sessions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage own studio sessions"
-  ON brain_galaxy_studio_sessions
-  FOR ALL USING (auth.uid() = user_id);
-```
-
-### Cambio 3: Persistir Sesiones en StudioBuilder
-
-```typescript
-// Agregar auto-guardado cada vez que cambia el estado
-useEffect(() => {
-  if (sessionId && chatMessages.length > 0) {
-    saveStudioSession(sessionId, {
-      messages: chatMessages,
-      sources,
-      outputs,
-      courseProposal,
-      mode: creationMode,
-    });
-  }
-}, [chatMessages, sources, outputs, courseProposal]);
-```
-
-### Cambio 4: Generar Contenido Desarrollado
-
-Agregar un segundo paso después de generar la propuesta:
-
-```typescript
-const generateModuleContent = async (module: Module, index: number) => {
-  const response = await fetch(BRAIN_GALAXY_AI_URL, {
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: `Desarrolla el contenido completo del módulo "${module.title}". Incluye:
-          - Introducción (2-3 párrafos)
-          - Conceptos clave con explicaciones detalladas
-          - Ejemplos prácticos
-          - Actividades de aprendizaje
-          - Recursos complementarios
-          - Evaluación del módulo` 
-        },
-        { role: 'user', content: `Módulo: ${module.title}\nDescripción: ${module.description}\nTemas: ${module.topics.join(', ')}` }
-      ],
-    }),
-  });
-  // ... procesar respuesta
-};
-```
-
-### Cambio 5: Timeout y Cancelación para Generación
-
-```typescript
-const [abortController, setAbortController] = useState<AbortController | null>(null);
-
-const generateOutput = async (toolType: StudioToolType) => {
-  const controller = new AbortController();
-  setAbortController(controller);
-  
-  // Timeout de 60 segundos
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    toast.error('La generación tardó demasiado. Intenta de nuevo.');
-  }, 60000);
-  
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      // ...
-    });
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      toast.info('Generación cancelada');
-    }
-  } finally {
-    clearTimeout(timeoutId);
-    setAbortController(null);
-    setIsGenerating(false);
-  }
-};
-
-// Botón de cancelar
-{isGenerating && (
-  <Button variant="destructive" onClick={() => abortController?.abort()}>
-    Cancelar
-  </Button>
-)}
+```text
+Usuario pregunta sobre mercado/tendencias/precios/eventos 2026
+         ↓
+brain-galaxy-ai detecta que la consulta requiere info actual
+         ↓
+Llama a Firecrawl Search → Devuelve artículos web actuales (2026)
+         ↓
+Los resultados se inyectan como contexto en el system prompt
+         ↓
+Multi-Brain Fusion responde con datos del presente
+         ↓
+La respuesta indica las fuentes web consultadas
 ```
 
 ---
 
-## Flujo de Usuario Después de los Cambios
+## Cambios técnicos
 
-### Cursos Editables:
-1. Usuario va a Dashboard
-2. Ve su curso "De Cero a Dronero" en estado Borrador
-3. Hace clic en el curso
-4. Se abre Studio con el curso cargado para edición
-5. Puede modificar módulos, agregar contenido, publicar
+### 1. Modificar `supabase/functions/brain-galaxy-ai/index.ts`
 
-### Studio con Persistencia:
-1. Usuario abre Studio y comienza a crear curso
-2. Cada cambio se guarda automáticamente en la base de datos
-3. Usuario sale de la plataforma
-4. Al volver, abre "Historial" y ve sus sesiones guardadas
-5. Puede continuar donde lo dejó
+- Agregar función `searchWebForContext(query)` que usa Firecrawl Search para buscar los últimos artículos y noticias relevantes
+- Agregar función `needsWebSearch(message)` que detecta palabras clave como: precio, mercado, tendencia, 2025, 2026, actualidad, hoy, reciente, últimas noticias, industria actual, estadísticas, etc.
+- Si la detección es positiva, ejecutar búsqueda web **antes** de llamar a los modelos
+- Inyectar los resultados web como contexto adicional en el `systemPrompt`
+- Incluir las fuentes encontradas en la respuesta
 
-### Contenido Desarrollado:
-1. Usuario crea propuesta de curso
-2. Sistema genera estructura con módulos
-3. Usuario hace clic en "Desarrollar contenido" (nuevo botón)
-4. Sistema genera contenido completo para cada módulo
-5. Usuario puede editar y personalizar
+### 2. Agregar búsqueda web también en el Studio Builder
 
-### Generación Sin Bloqueo:
-1. Usuario hace clic en "Video"
-2. Aparece loader con botón "Cancelar"
-3. Si tarda más de 60 segundos, se cancela automáticamente
-4. Usuario puede cancelar manualmente en cualquier momento
-5. La UI nunca queda bloqueada
+- En `supabase/functions/brain-galaxy-ai/index.ts`, en el modo `studio`, ejecutar búsqueda web de fuentes reales
+- Las fuentes encontradas se mostrarán al usuario como recursos disponibles
+
+### 3. Indicador visual de "búsqueda en curso"
+
+- Mostrar al usuario cuando la IA está consultando la web antes de responder ("🔍 Buscando información actualizada...")
+- Indicar en la respuesta que contiene datos en tiempo real con fuentes verificables
 
 ---
 
-## Orden de Implementación
+## Palabras clave que activarán búsqueda web
 
-1. **Migración SQL** - Crear tabla `brain_galaxy_studio_sessions`
-2. **useBrainGalaxy.ts** - Agregar funciones CRUD para sesiones de Studio
-3. **StudioBuilder.tsx** - Integrar persistencia y auto-guardado
-4. **BrainGalaxyDashboard.tsx** - Hacer cursos clickeables
-5. **BrainGalaxyPage.tsx** - Agregar handler para editar cursos
-6. **StudioBuilder.tsx** - Agregar generación de contenido detallado
-7. **StudioBuilder.tsx** - Agregar timeout y cancelación
+El sistema detectará automáticamente si la consulta necesita datos en tiempo real cuando contenga:
+
+- Términos temporales: `hoy`, `ahora`, `actualmente`, `2025`, `2026`, `este año`, `este mes`, `reciente`, `últimas`, `nuevo`
+- Términos de mercado: `precio`, `mercado`, `tendencia`, `industria`, `sector`, `estadística`, `dato`, `cifra`, `crecimiento`, `proyección`
+- Tipos de consulta: `¿cuánto vale?`, `¿cómo está?`, `noticias`, `novedades`, `situación actual`
 
 ---
 
-## Validación
+## Resultado esperado
 
-Después de implementar:
+Antes (actual):
+> "El mercado de drones en Chile... según datos de 2022-2023..."
 
-1. Crear un curso en Studio, cambiar de pestaña, volver - el trabajo debe persistir
-2. Salir de la plataforma, volver, abrir historial - las sesiones deben estar guardadas
-3. Hacer clic en un curso borrador en Dashboard - debe abrir el editor
-4. Generar contenido - debe incluir desarrollo detallado, no solo temario
-5. Intentar generar video y cancelar - la UI no debe bloquearse
+Después (con la mejora):
+> "🌐 Fuentes web consultadas (Feb 2026): [artículo1] [artículo2]
+> Según información actualizada de febrero 2026, el mercado de drones en Chile..."
