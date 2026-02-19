@@ -84,7 +84,139 @@ const BRAIN_CONFIGS: Record<string, BrainConfig> = {
   },
 };
 
-// Query collective memory
+// =========================================================
+// WEB SEARCH AUGMENTATION - Firecrawl Real-Time Search
+// =========================================================
+
+interface WebSearchResult {
+  url: string;
+  title: string;
+  description: string;
+  markdown?: string;
+}
+
+/**
+ * Detects if a user message requires real-time web information.
+ * Activates when the query references current events, prices, markets, 2025/2026, etc.
+ */
+function needsWebSearch(message: string): boolean {
+  const lowerMsg = message.toLowerCase();
+  
+  // Temporal terms
+  const temporalTerms = [
+    'hoy', 'ahora', 'actualmente', 'actual', '2025', '2026', 'este año', 'este mes',
+    'reciente', 'recientes', 'últimas', 'últimos', 'nuevo', 'nueva', 'nuevos',
+    'esta semana', 'este trimestre', 'recientemente', 'vigente', 'vigentes',
+    'today', 'current', 'latest', 'recent', 'now',
+  ];
+  
+  // Market / industry terms
+  const marketTerms = [
+    'precio', 'precios', 'mercado', 'tendencia', 'tendencias', 'industria',
+    'sector', 'estadística', 'estadísticas', 'dato', 'datos', 'cifra', 'cifras',
+    'crecimiento', 'proyección', 'proyecciones', 'cuánto vale', 'cuánto cuesta',
+    'cotización', 'demanda', 'oferta', 'análisis de mercado', 'market share',
+    'competencia', 'competidores', 'inversión', 'rentabilidad', 'margen',
+  ];
+  
+  // Query type terms
+  const queryTerms = [
+    'noticias', 'novedad', 'novedades', 'situación actual', 'cómo está',
+    'qué pasó', 'qué está pasando', 'informe', 'reporte', 'estudio',
+    'investigación', 'resultados', 'perspectivas', 'outlook', 'forecast',
+  ];
+
+  const hasTemporalTerm = temporalTerms.some(t => lowerMsg.includes(t));
+  const hasMarketTerm = marketTerms.some(t => lowerMsg.includes(t));
+  const hasQueryTerm = queryTerms.some(t => lowerMsg.includes(t));
+
+  // Activate if: temporal + any other category, OR two market/query categories
+  if (hasTemporalTerm && (hasMarketTerm || hasQueryTerm)) return true;
+  if (hasMarketTerm && hasQueryTerm) return true;
+  if (hasTemporalTerm && message.split(' ').length > 4) return true;
+  
+  return false;
+}
+
+/**
+ * Searches the web using Firecrawl Search for real-time context.
+ * Returns formatted results ready to inject into the AI system prompt.
+ */
+async function searchWebForContext(query: string, firecrawlKey: string): Promise<{
+  context: string;
+  sources: WebSearchResult[];
+}> {
+  try {
+    console.log(`🔍 Web search for: ${query}`);
+    
+    const searchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${firecrawlKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: query,
+        limit: 5,
+        lang: 'es',
+        tbs: 'qdr:m', // Results from the last month
+        scrapeOptions: {
+          formats: ['markdown'],
+        },
+      }),
+    });
+
+    if (!searchResponse.ok) {
+      console.error('Firecrawl search error:', searchResponse.status);
+      return { context: '', sources: [] };
+    }
+
+    const searchData = await searchResponse.json();
+    
+    if (!searchData.success || !searchData.data || searchData.data.length === 0) {
+      console.log('No web results found');
+      return { context: '', sources: [] };
+    }
+
+    const sources: WebSearchResult[] = searchData.data.map((item: any) => ({
+      url: item.url || '',
+      title: item.title || 'Sin título',
+      description: item.description || '',
+      markdown: item.markdown || '',
+    })).filter((s: WebSearchResult) => s.url);
+
+    if (sources.length === 0) {
+      return { context: '', sources: [] };
+    }
+
+    // Build context block to inject into system prompt
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('es-CL', { 
+      year: 'numeric', month: 'long', day: 'numeric' 
+    });
+
+    const contextBlocks = sources.map((s, i) => {
+      const content = s.markdown 
+        ? s.markdown.slice(0, 800).trim() 
+        : s.description.slice(0, 400).trim();
+      return `[FUENTE ${i + 1}] ${s.title}\nURL: ${s.url}\n${content}`;
+    }).join('\n\n---\n\n');
+
+    const context = `\n\n🌐 INFORMACIÓN WEB EN TIEMPO REAL (${dateStr}):\n\n${contextBlocks}\n\n⚠️ INSTRUCCIÓN IMPORTANTE: Usa EXCLUSIVAMENTE estos datos web actuales para responder sobre precios, mercados, tendencias o eventos actuales. NO uses tu conocimiento de entrenamiento (2023) para estos temas. Cita las fuentes al final de tu respuesta.\n`;
+
+    console.log(`✅ Found ${sources.length} web sources for context`);
+    return { context, sources };
+    
+  } catch (error) {
+    console.error('Web search error:', error);
+    return { context: '', sources: [] };
+  }
+}
+
+// =========================================================
+// COLLECTIVE MEMORY
+// =========================================================
+
 async function queryCollectiveMemory(query: string, supabase: any): Promise<string> {
   try {
     const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
@@ -118,7 +250,10 @@ async function queryCollectiveMemory(query: string, supabase: any): Promise<stri
   }
 }
 
-// Call a single brain and get response
+// =========================================================
+// BRAIN CALLING
+// =========================================================
+
 async function callBrain(
   config: BrainConfig, 
   apiKey: string, 
@@ -147,7 +282,6 @@ async function callBrain(
   }
 }
 
-// Multi-Brain Fusion: Query all available brains and synthesize
 async function multiBrainFusion(
   messages: any[],
   systemPrompt: string,
@@ -155,7 +289,6 @@ async function multiBrainFusion(
 ): Promise<string> {
   const availableBrains: { config: BrainConfig; key: string }[] = [];
   
-  // Check which brains are available
   for (const [brainId, config] of Object.entries(BRAIN_CONFIGS)) {
     const key = Deno.env.get(config.keyEnv);
     if (key) {
@@ -169,7 +302,6 @@ async function multiBrainFusion(
 
   console.log(`Multi-Brain Fusion: ${availableBrains.length} brains available`);
 
-  // If only one brain, use it directly
   if (availableBrains.length === 1) {
     const result = await callBrain(
       availableBrains[0].config,
@@ -180,7 +312,6 @@ async function multiBrainFusion(
     return result.response;
   }
 
-  // Query all brains in parallel
   const brainPromises = availableBrains.map(({ config, key }) =>
     callBrain(config, key, messages, systemPrompt)
   );
@@ -198,7 +329,6 @@ async function multiBrainFusion(
     return successfulResults[0].response;
   }
 
-  // Synthesize responses using Gemini
   const synthesisPrompt = `Eres el SINTETIZADOR MAESTRO de Brain Galaxy. Tu trabajo es analizar las respuestas de múltiples IAs expertas y crear LA MEJOR RESPUESTA POSIBLE combinando lo mejor de cada una.
 
 RESPUESTAS DE LOS CEREBROS:
@@ -232,6 +362,7 @@ ${r.response}
    - Responde directamente como si fueras un único experto
    - Usa el mejor formato/estructura de las respuestas originales
    - Incluye ejemplos concretos si los hay
+   - Si la respuesta contiene datos web en tiempo real, SIEMPRE incluye las fuentes al final con sus URLs
 
 Genera la RESPUESTA SINTETIZADA ÓPTIMA:`;
 
@@ -251,7 +382,6 @@ Genera la RESPUESTA SINTETIZADA ÓPTIMA:`;
   });
 
   if (!synthesisResponse.ok) {
-    // If synthesis fails, return the best individual response
     return successfulResults[0].response;
   }
 
@@ -259,7 +389,6 @@ Genera la RESPUESTA SINTETIZADA ÓPTIMA:`;
   return synthesisData.choices?.[0]?.message?.content || successfulResults[0].response;
 }
 
-// Stream a single brain response
 async function streamBrainResponse(
   config: BrainConfig,
   apiKey: string,
@@ -278,6 +407,10 @@ async function streamBrainResponse(
   return response;
 }
 
+// =========================================================
+// SYSTEM PROMPTS
+// =========================================================
+
 const SYSTEM_PROMPTS: Record<string, string> = {
   default: `Eres Brain Galaxy, el sistema de inteligencia híbrida del IWIE Holding.
 
@@ -286,13 +419,15 @@ Combinas el poder de múltiples IAs (Grok, ChatGPT, DeepSeek, Gemini) para dar l
 
 📚 FUENTES DE CONOCIMIENTO:
 - Memoria Colectiva: Documentos, decisiones y chats del holding
-- Conocimiento Externo: Información actualizada de múltiples modelos de IA
+- Búsqueda Web en Tiempo Real: Información actualizada de la web (2026)
+- Conocimiento Externo: Múltiples modelos de IA especializados
 
 Características:
 - Responde en español de manera clara y estructurada
 - Proporciona respuestas completas y bien fundamentadas
 - Ofrece múltiples perspectivas cuando sea relevante
 - Incluye ejemplos prácticos y aplicables
+- Cuando uses información web, SIEMPRE cita las fuentes con sus URLs
 
 Áreas de expertise:
 - Comercial, Finanzas, Ingenierías, Tributario-Contable
@@ -315,7 +450,8 @@ Proporciona:
 1. Respuestas técnicas precisas con fórmulas cuando aplique
 2. Múltiples enfoques de solución
 3. Herramientas y software recomendados
-4. Mejores prácticas y estándares`,
+4. Mejores prácticas y estándares
+5. Cuando uses información web en tiempo real, cita las fuentes`,
 
   curriculum: `Eres un experto en diseño instruccional del Brain Galaxy con capacidad multi-cerebro.
 
@@ -340,6 +476,10 @@ Formato JSON para cuestionarios:
 }`,
 };
 
+// =========================================================
+// MAIN SERVE
+// =========================================================
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -350,24 +490,38 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
 
     const { 
       messages, 
       brainModel = 'brain-4',
       action = 'chat',
       context = {},
-      mode = 'fusion', // 'fusion' (multi-brain) or 'single' or 'stream'
+      mode = 'fusion',
     } = await req.json();
 
     // Get last user message for context
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
     let hybridContext = "";
+    let webSearchPerformed = false;
+    let webSources: WebSearchResult[] = [];
     
     if (lastUserMessage && action === 'chat') {
+      // 1. Query collective memory
       const memoryContext = await queryCollectiveMemory(lastUserMessage.content, supabase);
-      
       if (memoryContext) {
-        hybridContext = `\n\n🧠 MEMORIA COLECTIVA DEL HOLDING:\n${memoryContext}\n\nUsa esta información interna como contexto prioritario.\n`;
+        hybridContext += `\n\n🧠 MEMORIA COLECTIVA DEL HOLDING:\n${memoryContext}\n\nUsa esta información interna como contexto prioritario.\n`;
+      }
+
+      // 2. Web Search Augmentation - inject real-time data if needed
+      if (firecrawlKey && needsWebSearch(lastUserMessage.content)) {
+        console.log('🌐 Query needs real-time web data, searching...');
+        const { context: webContext, sources } = await searchWebForContext(lastUserMessage.content, firecrawlKey);
+        if (webContext) {
+          hybridContext += webContext;
+          webSearchPerformed = true;
+          webSources = sources;
+        }
       }
     }
 
@@ -390,7 +544,9 @@ serve(async (req) => {
             content: fusionResponse
           }
         }],
-        mode: 'fusion'
+        mode: 'fusion',
+        webSearchPerformed,
+        webSources,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -418,7 +574,6 @@ serve(async (req) => {
       const response = await streamBrainResponse(config, apiKey, messages, systemPrompt);
       
       if (!response.ok) {
-        // Fallback to Lovable AI
         if (lovableKey) {
           const fallbackConfig = BRAIN_CONFIGS['brain-4'];
           const fallbackResponse = await streamBrainResponse(fallbackConfig, lovableKey, messages, systemPrompt);
@@ -452,14 +607,15 @@ serve(async (req) => {
     );
 
     if (!result.success) {
-      // Fallback
       if (lovableKey && config.keyEnv !== 'LOVABLE_API_KEY') {
         const fallbackResult = await callBrain(BRAIN_CONFIGS['brain-4'], lovableKey, messages, systemPrompt);
         if (fallbackResult.success) {
           return new Response(JSON.stringify({
             choices: [{ message: { role: 'assistant', content: fallbackResult.response } }],
             mode: 'single',
-            brain: 'Gemini (fallback)'
+            brain: 'Gemini (fallback)',
+            webSearchPerformed,
+            webSources,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -471,7 +627,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       choices: [{ message: { role: 'assistant', content: result.response } }],
       mode: 'single',
-      brain: config.name
+      brain: config.name,
+      webSearchPerformed,
+      webSources,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

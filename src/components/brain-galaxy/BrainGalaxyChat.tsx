@@ -17,6 +17,8 @@ import {
   FileImage,
   FileVideo,
   File,
+  Globe,
+  Search,
 } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import type { BrainModel, ChatMessage, BrainGalaxyArea } from '@/types/brain-galaxy';
@@ -70,6 +72,7 @@ export function BrainGalaxyChat({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const [selectedModel, setSelectedModel] = useState<BrainModel>(initialModel);
   const [selectedArea, setSelectedArea] = useState<string>(initialAreaId || 'none');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -223,6 +226,19 @@ Presenta estas opciones de forma clara y amigable.`,
       ? areas.find(a => a.id === selectedArea)?.name 
       : undefined;
 
+    // Detect if query might need web search (mirror server-side logic for UI indicator)
+    const lastMsg = userMessages.filter(m => m.role === 'user').pop();
+    if (lastMsg) {
+      const lm = lastMsg.content.toLowerCase();
+      const temporalTerms = ['hoy', 'ahora', 'actualmente', 'actual', '2025', '2026', 'reciente', 'últimas', 'últimos'];
+      const marketTerms = ['precio', 'mercado', 'tendencia', 'industria', 'sector', 'estadística', 'crecimiento', 'noticias'];
+      const hasTime = temporalTerms.some(t => lm.includes(t));
+      const hasMarket = marketTerms.some(t => lm.includes(t));
+      if (hasTime || hasMarket) {
+        setIsSearchingWeb(true);
+      }
+    }
+
     // Use FUSION mode by default - combines all available AI brains
     const response = await fetch(CHAT_URL, {
       method: 'POST',
@@ -235,9 +251,11 @@ Presenta estas opciones de forma clara y amigable.`,
         brainModel: selectedModel,
         action: 'chat',
         context: { area: areaContext },
-        mode: 'fusion', // Multi-Brain Fusion: queries all AIs and synthesizes best response
+        mode: 'fusion',
       }),
     });
+
+    setIsSearchingWeb(false);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -357,22 +375,23 @@ Presenta estas opciones de forma clara y amigable.`,
           saveSession(prev);
           return prev;
         });
-      } catch (error) {
-        console.error('Chat error:', error);
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `msg-error-${Date.now()}`,
-            role: 'assistant',
-            content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.',
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
-      return;
+    } catch (error) {
+      console.error('Chat error:', error);
+      setIsSearchingWeb(false);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `msg-error-${Date.now()}`,
+          role: 'assistant',
+          content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
     }
+    return;
+  }
 
     if (!input.trim()) return;
 
@@ -397,6 +416,7 @@ Presenta estas opciones de forma clara y amigable.`,
       });
     } catch (error) {
       console.error('Chat error:', error);
+      setIsSearchingWeb(false);
       setMessages(prev => [
         ...prev,
         {
@@ -561,11 +581,25 @@ Presenta estas opciones de forma clara y amigable.`,
 
           {(isLoading || processingFiles) && messages[messages.length - 1]?.role === 'user' && (
             <div className="flex justify-start">
-              <div className="bg-muted rounded-lg px-4 py-2 flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">
-                  {processingFiles ? 'Analizando archivos...' : 'Pensando...'}
-                </span>
+              <div className="bg-muted rounded-lg px-4 py-3 flex items-center gap-2">
+                {isSearchingWeb ? (
+                  <>
+                    <Globe className="h-4 w-4 animate-pulse text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      🔍 Buscando información actualizada en la web...
+                    </span>
+                  </>
+                ) : processingFiles ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Analizando archivos...</span>
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Pensando con Multi-Brain Fusion...</span>
+                  </>
+                )}
               </div>
             </div>
           )}
