@@ -3699,7 +3699,7 @@ export type Database = {
           eisenhower_priority: string | null
           end_date: string | null
           estimated_hours: number | null
-          execution_time: unknown
+          execution_time: string | null
           extension_reason: string | null
           final_results: string | null
           id: string
@@ -3731,7 +3731,7 @@ export type Database = {
           eisenhower_priority?: string | null
           end_date?: string | null
           estimated_hours?: number | null
-          execution_time?: unknown
+          execution_time?: string | null
           extension_reason?: string | null
           final_results?: string | null
           id?: string
@@ -3763,7 +3763,7 @@ export type Database = {
           eisenhower_priority?: string | null
           end_date?: string | null
           estimated_hours?: number | null
-          execution_time?: unknown
+          execution_time?: string | null
           extension_reason?: string | null
           final_results?: string | null
           id?: string
