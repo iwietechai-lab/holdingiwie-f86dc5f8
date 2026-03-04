@@ -48,7 +48,6 @@ import { es } from 'date-fns/locale';
 import { 
   SuperadminUser, 
   AppRole,
-  SUPERADMIN_USER_ID
 } from '@/types/superadmin';
 
 export default function SuperadminDashboard() {
@@ -422,7 +421,7 @@ export default function SuperadminDashboard() {
                     {filteredUsers.map((user) => (
                       <TableRow 
                         key={user.id} 
-                        className={`hover:bg-muted/50 ${user.id === SUPERADMIN_USER_ID ? 'bg-red-500/5' : ''}`}
+                        className={`hover:bg-muted/50 ${user.roles?.some(r => r.role === 'superadmin') ? 'bg-red-500/5' : ''}`}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -434,7 +433,7 @@ export default function SuperadminDashboard() {
                             <div>
                               <p className="font-medium text-foreground flex items-center gap-2">
                                 {user.full_name || 'Sin nombre'}
-                                {user.id === SUPERADMIN_USER_ID && (
+                                {user.roles?.some(r => r.role === 'superadmin') && (
                                   <Crown className="w-4 h-4 text-yellow-500" />
                                 )}
                               </p>

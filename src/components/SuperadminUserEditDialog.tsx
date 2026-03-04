@@ -42,7 +42,6 @@ import {
   APP_ROLE_LABELS,
   DashboardVisibility,
   DEFAULT_DASHBOARD_VISIBILITY,
-  SUPERADMIN_USER_ID
 } from '@/types/superadmin';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -225,8 +224,9 @@ export function SuperadminUserEditDialog({
       return;
     }
 
-    // Save role (only if user is not the superadmin or role changed)
-    if (user.id !== SUPERADMIN_USER_ID || selectedRole !== 'superadmin') {
+    // Save role (only if user doesn't already have superadmin role or role changed)
+    const userIsSuperadmin = user.roles?.some(r => r.role === 'superadmin');
+    if (!userIsSuperadmin || selectedRole !== 'superadmin') {
       const roleResult = await onSaveRole(user.id, selectedRole);
       if (!roleResult.success) {
         setIsSaving(false);
@@ -253,7 +253,7 @@ export function SuperadminUserEditDialog({
   };
 
   const selectedCompany = companies.find(c => c.id === companyId);
-  const isSuperadminUser = user?.id === SUPERADMIN_USER_ID;
+  const isSuperadminUser = user?.roles?.some(r => r.role === 'superadmin') ?? false;
   
   // Check if current user is editing themselves
   const isEditingSelf = isSelfEdit(currentUserProfile?.id, user?.id || null);

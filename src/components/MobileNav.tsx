@@ -31,7 +31,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/co
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { SUPERADMIN_USER_ID } from '@/types/superadmin';
+
 import { VerificationStatusBadge } from '@/components/FacialVerificationGuard';
 
 interface MobileNavProps {
@@ -61,7 +61,7 @@ export const MobileNav = ({ selectedCompany, onSelectCompany }: MobileNavProps) 
   const [devFeatureName, setDevFeatureName] = useState('Esta sección');
   const [expandedCompanies, setExpandedCompanies] = useState<string[]>([]);
 
-  const isSuperadmin = user?.id === SUPERADMIN_USER_ID;
+  const isSuperadmin = profile?.has_full_access === true;
 
   const handleLogout = async () => {
     await logout();
