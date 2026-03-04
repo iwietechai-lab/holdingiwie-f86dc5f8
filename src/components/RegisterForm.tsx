@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { isEmailAllowed, getEmailConfig } from '@/config/allowedEmails';
 import { supabase } from '@/lib/supabase';
 
 interface RegisterFormProps {
@@ -24,7 +23,6 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
     if (!email || !password || !confirmPassword) {
       toast({
         title: 'Error',
@@ -34,7 +32,6 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
       return;
     }
 
-    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       toast({
@@ -45,8 +42,14 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
       return;
     }
 
-    // Check if email is in whitelist
-    if (!isEmailAllowed(email)) {
+    // Check if email is allowed via secure RPC
+    const { data: checkResult, error: checkError } = await supabase.rpc('check_email_allowed', {
+      p_email: email,
+    });
+
+    const result = checkResult as unknown as { allowed: boolean; role?: string; company_id?: string };
+
+    if (checkError || !result?.allowed) {
       toast({
         title: 'Correo no autorizado',
         description: 'Correo no autorizado. Contacta al administrador.',
@@ -55,7 +58,6 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
       return;
     }
 
-    // Password match validation
     if (password !== confirmPassword) {
       toast({
         title: 'Error',
@@ -65,7 +67,6 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
       return;
     }
 
-    // Password strength validation
     if (password.length < 6) {
       toast({
         title: 'Error',
@@ -78,17 +79,14 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
     setIsLoading(true);
 
     try {
-      const config = getEmailConfig(email);
-      
-      // Try to sign up
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            role: config?.role,
-            company_id: config?.company_id,
+            role: result.role,
+            company_id: result.company_id,
           },
         },
       });
@@ -111,7 +109,6 @@ export const RegisterForm = ({ onBack, onSuccess }: RegisterFormProps) => {
         description: 'Ahora procederemos con tu primer inicio de sesión.',
       });
 
-      // Call onSuccess to trigger auto-login
       onSuccess(email, password);
     } catch (error: any) {
       toast({

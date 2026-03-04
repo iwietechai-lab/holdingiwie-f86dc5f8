@@ -67,7 +67,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { UserEditDialog } from '@/components/UserEditDialog';
-import { getFullAccessEmails } from '@/config/allowedEmails';
+
 import { companies, getCompanyById } from '@/data/companies';
 import { CreateUserRequestDialog } from '@/components/CreateUserRequestDialog';
 import { UserRequestsList } from '@/components/UserRequestsList';
@@ -940,7 +940,7 @@ export const UserManagement = () => {
         open={!!editingUser}
         onOpenChange={(open) => !open && setEditingUser(null)}
         onSave={handleSaveUser}
-        fullAccessEmails={getFullAccessEmails()}
+        fullAccessEmails={[]}
       />
 
       {/* Create User Request Dialog */}
