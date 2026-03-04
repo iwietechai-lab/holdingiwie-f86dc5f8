@@ -306,45 +306,9 @@ export const useSupabaseAuth = () => {
       });
 
       if (error) {
-        // If login fails with specific errors, try auto-signup (for development)
-        const errorMsg = error.message.toLowerCase();
-        if (errorMsg.includes('invalid login credentials') || errorMsg.includes('email not confirmed')) {
-          console.log('Login failed, attempting auto-signup for development...');
-          
-          // Try to sign up the user
-          const { error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/`,
-              data: {
-                full_name: email.split('@')[0],
-              },
-            },
-          });
-
-          if (signUpError && !signUpError.message.includes('already registered')) {
-            return { success: false, error: signUpError.message };
-          }
-
-          // After signup, try to sign in again
-          const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (retryError) {
-            // If still failing, might need email confirmation
-            if (retryError.message.toLowerCase().includes('email not confirmed')) {
-              return { success: false, error: 'Por favor confirma tu email antes de iniciar sesión. Revisa tu bandeja de entrada.' };
-            }
-            return { success: false, error: retryError.message };
-          }
-
-          // Don't log access here - it will be logged after facial recognition
-          return { success: true };
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          return { success: false, error: 'Por favor confirma tu email antes de iniciar sesión. Revisa tu bandeja de entrada.' };
         }
-
         return { success: false, error: error.message };
       }
 
