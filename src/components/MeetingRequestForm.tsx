@@ -22,9 +22,6 @@ import { useSuperadmin } from '@/hooks/useSuperadmin';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-// CEO's hardcoded ID for availability checking
-const SUPERADMIN_ID = 'e5251256-2f23-4613-8f07-22b149fbad72';
-
 interface MeetingRequestFormProps {
   currentUserId: string;
 }
@@ -62,11 +59,16 @@ export function MeetingRequestForm({ currentUserId }: MeetingRequestFormProps) {
     priority: 'media' as Priority,
   });
 
-  // Get CEO availability slots
-  const ceoSlots = useMemo(() => slots.filter(s => s.user_id === SUPERADMIN_ID), [slots]);
+  const superadminIds = useMemo(
+    () => users.filter(u => u.roles?.some(r => r.role === 'superadmin')).map(u => u.id),
+    [users]
+  );
 
-  // Check if CEO is selected
-  const isCeoSelected = selectedParticipants.includes(SUPERADMIN_ID);
+  // Get CEO/superadmin availability slots
+  const ceoSlots = useMemo(() => slots.filter(s => superadminIds.includes(s.user_id)), [slots, superadminIds]);
+
+  // Check if CEO/superadmin is selected
+  const isCeoSelected = selectedParticipants.some(id => superadminIds.includes(id));
 
   // Get dates with CEO availability
   const datesWithCeoAvailability = useMemo(() => {
@@ -280,7 +282,7 @@ export function MeetingRequestForm({ currentUserId }: MeetingRequestFormProps) {
                     onCheckedChange={() => toggleParticipant(user.id)}
                   />
                   <span className="text-sm truncate flex-1">{user.full_name || 'Sin nombre'}</span>
-                  {user.id === SUPERADMIN_ID && (
+                  {superadminIds.includes(user.id) && (
                     <Badge variant="outline" className="text-xs">CEO</Badge>
                   )}
                 </label>

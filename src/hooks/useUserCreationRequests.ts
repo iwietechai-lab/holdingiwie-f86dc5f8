@@ -130,15 +130,29 @@ export function useUserCreationRequests(companyId?: string) {
 
       if (insertError) throw insertError;
 
-      // Create notification for CEO
-      await supabase.rpc('create_notification', {
-        p_user_id: 'e5251256-2f23-4613-8f07-22b149fbad72', // CEO user id
-        p_company_id: request.company_id,
-        p_title: 'Nueva solicitud de usuario',
-        p_message: `${request.full_name} ha sido solicitado para unirse como ${request.proposed_role}`,
-        p_type: 'user_request',
-        p_priority: 'alta',
-      });
+      // Create notification for a superadmin in the same company (no hardcoded user IDs)
+      try {
+        const { data: superadminProfile } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('company_id', request.company_id)
+          .eq('role', 'superadmin')
+          .limit(1)
+          .maybeSingle();
+
+        if (superadminProfile?.id) {
+          await supabase.rpc('create_notification', {
+            p_user_id: superadminProfile.id,
+            p_company_id: request.company_id,
+            p_title: 'Nueva solicitud de usuario',
+            p_message: `${request.full_name} ha sido solicitado para unirse como ${request.proposed_role}`,
+            p_type: 'user_request',
+            p_priority: 'alta',
+          });
+        }
+      } catch (notificationError) {
+        console.warn('No se pudo notificar al superadmin:', notificationError);
+      }
 
       await fetchRequests();
       return { success: true };
