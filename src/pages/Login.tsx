@@ -11,7 +11,7 @@ import { ProfileSetupForm } from '@/components/ProfileSetupForm';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { SUPERADMIN_USER_ID } from '@/types/superadmin';
+
 import earthImage from '@/assets/tierra_desde_espacio.jpg';
 import { isMobileDevice, isRunningAsApp } from '@/utils/deviceDetection';
 type LoginStep = 'credentials' | 'register' | 'profile-setup' | 'face-recognition' | 'forgot-password' | 'reset-password';
@@ -135,31 +135,18 @@ export const Login = () => {
 
           if (error) {
             console.error('Error checking profile:', error);
-            // If there's an error, check if it's the superadmin by UUID
-            if (user.id === SUPERADMIN_USER_ID) {
-              console.log('Superadmin detected, skipping to face recognition');
-              setStep('face-recognition');
-              setPendingProfileCheck(false);
-              return;
-            }
+            // If profile check fails, go to profile setup
             setStep('profile-setup');
             setPendingProfileCheck(false);
             return;
           }
 
-          // Check if profile is complete enough to skip setup
-          const profileIsComplete = existingProfile && 
-            existingProfile.full_name && 
-            existingProfile.full_name.trim() !== '';
+          // Check profile completeness
 
-          // Superadmin always skips profile setup if they have any profile data
-          if (user.id === SUPERADMIN_USER_ID && existingProfile) {
-            console.log('Superadmin with existing profile, skipping to face recognition');
-            setStep('face-recognition');
-          } else if (!existingProfile) {
+          if (!existingProfile) {
             // New user - needs profile setup
             setStep('profile-setup');
-          } else if (profileIsComplete) {
+          } else if (existingProfile.full_name && existingProfile.full_name.trim() !== '') {
             // Existing user with complete profile - proceed to face recognition
             setStep('face-recognition');
           } else {
@@ -168,10 +155,6 @@ export const Login = () => {
           }
         } catch (err) {
           console.error('Profile check error:', err);
-          // On error, if it's superadmin, skip to face recognition
-          if (user.id === SUPERADMIN_USER_ID) {
-            setStep('face-recognition');
-          }
         }
         
         setPendingProfileCheck(false);

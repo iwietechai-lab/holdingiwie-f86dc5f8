@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { SUPERADMIN_USER_ID } from '@/types/superadmin';
+
 import { VerificationStatusBadge } from '@/components/FacialVerificationGuard';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
 
@@ -73,8 +73,8 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
   // Active company mode - when a company is selected, others are hidden
   const [activeCompanyMode, setActiveCompanyMode] = useState<string | null>(null);
   
-  // Check if current user is superadmin by UUID
-  const isSuperadmin = user?.id === SUPERADMIN_USER_ID;
+  // Check if current user is superadmin via profile
+  const isSuperadmin = profile?.has_full_access === true;
 
   // Sync active company mode with URL
   useEffect(() => {
