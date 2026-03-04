@@ -5,7 +5,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const ALLOWED_ORIGINS = [
   'https://holdingiwie.lovable.app',
-  'https://id-preview--884c43a8-f6d4-4c81-bcd5-d38f99303288.lovable.app',
+  'https://iwie.cl',
 ];
 
 function getCorsHeaders(req: Request) {
