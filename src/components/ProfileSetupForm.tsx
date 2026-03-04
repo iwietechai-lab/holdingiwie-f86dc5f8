@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Sparkles, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { getEmailConfig } from '@/config/allowedEmails';
 import { supabase } from '@/lib/supabase';
 
 interface ProfileSetupFormProps {
   userId: string;
   email: string;
   onComplete: () => void;
+}
+
+interface EmailConfig {
+  allowed: boolean;
+  role?: string;
+  company_id?: string;
+  department?: string;
 }
 
 export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupFormProps) => {
@@ -25,13 +31,19 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailConfig, setEmailConfig] = useState<EmailConfig | null>(null);
 
-  const emailConfig = getEmailConfig(email);
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data } = await supabase.rpc('check_email_allowed', { p_email: email });
+      if (data) setEmailConfig(data as unknown as EmailConfig);
+    };
+    fetchConfig();
+  }, [email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!firstName || !firstLastName || !secondLastName) {
       toast({
         title: 'Error',
@@ -71,15 +83,13 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
     setIsLoading(true);
 
     try {
-      // Build full name
       const fullNameParts = [firstName, secondName, firstLastName, secondLastName].filter(Boolean);
       const fullName = fullNameParts.join(' ');
 
-      // Insert profile with email
       const { error: profileError } = await supabase.from('user_profiles').insert({
         id: userId,
         full_name: fullName,
-        email: email, // Save the email!
+        email: email,
         role: emailConfig?.role || 'Usuario',
         company_id: emailConfig?.company_id || 'iwie-holding',
         department: emailConfig?.department || 'General',
@@ -89,7 +99,6 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
         throw profileError;
       }
 
-      // Update password
       const { error: passwordError } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -128,7 +137,7 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
         <CardDescription className="text-muted-foreground text-xs sm:text-sm">
           Completa tu información y establece tu contraseña permanente
         </CardDescription>
-        {emailConfig && (
+        {emailConfig?.allowed && (
           <div className="text-xs text-secondary bg-secondary/10 rounded-lg p-2">
             Rol asignado: <span className="font-semibold">{emailConfig.role}</span> en{' '}
             <span className="font-semibold">{emailConfig.company_id}</span>
@@ -138,7 +147,6 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
 
       <CardContent className="px-4 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-          {/* Names Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="firstName" className="text-foreground text-sm">
@@ -166,7 +174,6 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
             </div>
           </div>
 
-          {/* Last Names Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="firstLastName" className="text-foreground text-sm">
@@ -194,7 +201,6 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
             </div>
           </div>
 
-          {/* Password Section */}
           <div className="pt-3 border-t border-border/50 space-y-3">
             <p className="text-sm text-muted-foreground">
               Establece tu contraseña permanente:

@@ -28,7 +28,7 @@ import { InDevelopmentModal } from '@/components/InDevelopmentModal';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { companies, getCompanyById } from '@/data/companies';
-import { hasFullAccess } from '@/config/allowedEmails';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {

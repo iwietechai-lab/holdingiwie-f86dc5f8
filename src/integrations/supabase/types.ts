@@ -50,6 +50,47 @@ export type Database = {
         }
         Relationships: []
       }
+      allowed_registrations: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          department: string | null
+          email: string
+          id: string
+          is_active: boolean
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allowed_registrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           created_at: string | null
@@ -4224,6 +4265,7 @@ export type Database = {
         Returns: string
       }
       can_manage_users: { Args: { _user_id: string }; Returns: boolean }
+      check_email_allowed: { Args: { p_email: string }; Returns: Json }
       create_notification: {
         Args: {
           p_action_url?: string
