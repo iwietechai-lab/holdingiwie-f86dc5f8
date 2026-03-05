@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DashboardVisibility } from '@/types/superadmin';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface UserProfile {
@@ -39,6 +40,7 @@ export interface UserWithDetails extends UserProfile {
 }
 
 export function useUserManagement() {
+  const { user } = useSupabaseAuth();
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,6 @@ export function useUserManagement() {
 
   const checkUserManagementPermission = useCallback(async (): Promise<{ canManage: boolean; companyId: string | null }> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { canManage: false, companyId: null };
 
       const { data: profile, error: profileError } = await supabase

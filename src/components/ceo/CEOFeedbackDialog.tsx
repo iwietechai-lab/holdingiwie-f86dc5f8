@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { logger } from '@/utils/logger';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Send, Paperclip, X, MessageSquare, Lightbulb, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export function CEOFeedbackDialog({
   onOpenChange,
   onSuccess 
 }: CEOFeedbackDialogProps) {
+  const { user } = useSupabaseAuth();
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('comment');
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -59,7 +61,6 @@ export function CEOFeedbackDialog({
     setIsSending(true);
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No autenticado');
 
       // Upload attachments if any

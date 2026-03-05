@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { useTasks, EisenhowerPriority, AlertStatus } from '@/hooks/useTasks';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export default function TasksPage() {
+  const { user } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
@@ -37,7 +39,6 @@ export default function TasksPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       // Check if superadmin

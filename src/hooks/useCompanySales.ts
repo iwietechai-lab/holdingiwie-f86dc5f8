@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface Sale {
@@ -23,6 +24,7 @@ export interface CreateSaleInput {
 }
 
 export const useCompanySales = (companyId: string | null) => {
+  const { user } = useSupabaseAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -63,7 +65,7 @@ export const useCompanySales = (companyId: string | null) => {
 
   const createSale = async (input: CreateSaleInput) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      
       
       const { error } = await supabase
         .from('company_sales')

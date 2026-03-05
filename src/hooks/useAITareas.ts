@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface TareaArea {
@@ -133,6 +134,7 @@ const POINTS = {
 };
 
 export function useAITareas() {
+  const { user } = useSupabaseAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Tarea[]>([]);
@@ -150,7 +152,6 @@ export function useAITareas() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: tasksData } = await supabase
@@ -240,7 +241,6 @@ export function useAITareas() {
   };
 
   const createArea = async (name: string, color?: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     const randomColor = color || `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
@@ -278,7 +278,6 @@ export function useAITareas() {
   };
 
   const createTask = async (task: Partial<Tarea>) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     if (todayTaskCount >= 15 && task.date_for === today) {
@@ -411,7 +410,6 @@ export function useAITareas() {
   };
 
   const createDecision = async (decision: Partial<TareaDecision>) => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     const insertData = {
@@ -559,7 +557,6 @@ export function useAITareas() {
     if (!userStats) return;
     
     const earnedBadgeCodes = userBadges.map(ub => ub.badge?.code);
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     for (const badge of badges) {
@@ -612,13 +609,13 @@ export function useAITareas() {
     await supabase
       .from('mision_iwie_tasks')
       .update({ is_focus_mission: false })
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('user_id', user?.id)
       .eq('date_for', today);
 
     await supabase
       .from('mision_iwie_decisions')
       .update({ is_focus_mission: false })
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('user_id', user?.id)
       .eq('date_for', today);
 
     if (type === 'task') {
