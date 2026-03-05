@@ -2656,6 +2656,170 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_bank_transactions: {
+        Row: {
+          account_credit: string | null
+          account_debit: string | null
+          amount: number
+          company_id: string
+          confidence_score: number | null
+          cost_center_id: string | null
+          created_at: string
+          description_bank: string | null
+          description_normalized: string | null
+          document_number: string | null
+          id: string
+          processed_at: string | null
+          status: Database["public"]["Enums"]["finance_transaction_status"]
+          transaction_date: string
+          transaction_type: Database["public"]["Enums"]["finance_transaction_type"]
+        }
+        Insert: {
+          account_credit?: string | null
+          account_debit?: string | null
+          amount: number
+          company_id: string
+          confidence_score?: number | null
+          cost_center_id?: string | null
+          created_at?: string
+          description_bank?: string | null
+          description_normalized?: string | null
+          document_number?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: Database["public"]["Enums"]["finance_transaction_status"]
+          transaction_date: string
+          transaction_type?: Database["public"]["Enums"]["finance_transaction_type"]
+        }
+        Update: {
+          account_credit?: string | null
+          account_debit?: string | null
+          amount?: number
+          company_id?: string
+          confidence_score?: number | null
+          cost_center_id?: string | null
+          created_at?: string
+          description_bank?: string | null
+          description_normalized?: string | null
+          document_number?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: Database["public"]["Enums"]["finance_transaction_status"]
+          transaction_date?: string
+          transaction_type?: Database["public"]["Enums"]["finance_transaction_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_bank_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_bank_transactions_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "finance_cost_centers"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      finance_cost_centers: {
+        Row: {
+          code: string
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_cost_centers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_journal_entries: {
+        Row: {
+          amount: number
+          cost_center_id: string | null
+          created_at: string
+          created_by_agent: boolean
+          credit_account: string
+          debit_account: string
+          description: string | null
+          entry_number: string
+          id: string
+          journal_date: string
+          transaction_id: string
+        }
+        Insert: {
+          amount: number
+          cost_center_id?: string | null
+          created_at?: string
+          created_by_agent?: boolean
+          credit_account: string
+          debit_account: string
+          description?: string | null
+          entry_number: string
+          id?: string
+          journal_date: string
+          transaction_id: string
+        }
+        Update: {
+          amount?: number
+          cost_center_id?: string | null
+          created_at?: string
+          created_by_agent?: boolean
+          credit_account?: string
+          debit_account?: string
+          description?: string | null
+          entry_number?: string
+          id?: string
+          journal_date?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_journal_entries_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "finance_cost_centers"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "finance_journal_entries_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "finance_bank_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gerencias: {
         Row: {
           company_id: string | null
@@ -4333,6 +4497,15 @@ export type Database = {
         | "group_company"
         | "group_multi_company"
         | "global"
+      finance_transaction_status: "procesado" | "requiere_revision" | "aprobado"
+      finance_transaction_type:
+        | "gasto"
+        | "venta"
+        | "inversion"
+        | "transferencia"
+        | "nomina"
+        | "impuesto"
+        | "otro"
       knowledge_access_level:
         | "global_holding"
         | "empresa"
@@ -4483,6 +4656,20 @@ export const Constants = {
         "group_company",
         "group_multi_company",
         "global",
+      ],
+      finance_transaction_status: [
+        "procesado",
+        "requiere_revision",
+        "aprobado",
+      ],
+      finance_transaction_type: [
+        "gasto",
+        "venta",
+        "inversion",
+        "transferencia",
+        "nomina",
+        "impuesto",
+        "otro",
       ],
       knowledge_access_level: [
         "global_holding",
