@@ -702,7 +702,7 @@ export const UserManagement = () => {
                                             ) : (
                                               <XCircle className="w-3 h-3 text-red-500" />
                                             )}
-                                            <span>{log.timestampt ? format(new Date(log.timestampt), "dd/MM HH:mm", { locale: es }) : 'N/A'}</span>
+                                            <span>{log.timestamp ? format(new Date(log.timestamp), "dd/MM HH:mm", { locale: es }) : 'N/A'}</span>
                                             {log.city && (
                                               <span className="text-muted-foreground flex items-center gap-1">
                                                 <MapPin className="w-3 h-3" />
@@ -881,7 +881,7 @@ export const UserManagement = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {log.timestampt ? format(new Date(log.timestampt), "dd MMM yyyy, HH:mm:ss", { locale: es }) : 'N/A'}
+                      {log.timestamp ? format(new Date(log.timestamp), "dd MMM yyyy, HH:mm:ss", { locale: es }) : 'N/A'}
                     </TableCell>
                     <TableCell>
                       {log.city || log.country ? (
