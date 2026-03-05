@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.query-collective-memory]
 verify_jwt = false
+
+[functions.classify-movements]
+verify_jwt = false
+
+[functions.create-journal-entries]
+verify_jwt = false
