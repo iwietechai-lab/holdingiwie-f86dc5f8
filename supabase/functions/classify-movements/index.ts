@@ -102,33 +102,34 @@ serve(async (req) => {
       );
     }
 
-    // 3. Call AI for classification via Lovable AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    // 3. Call Claude claude-sonnet-4-20250514 via Anthropic API
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
     const userPrompt = `Clasifica los siguientes movimientos bancarios:\n${JSON.stringify(movements, null, 2)}`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        stream: false,
       }),
     });
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
+      console.error("Anthropic API error:", aiResponse.status, errText);
 
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded, try again later" }), {
@@ -136,17 +137,11 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI classification failed: ${aiResponse.status}`);
+      throw new Error(`Anthropic classification failed: ${aiResponse.status}`);
     }
 
     const aiResult = await aiResponse.json();
-    const rawContent = aiResult.choices?.[0]?.message?.content ?? "[]";
+    const rawContent = aiResult.content?.[0]?.text ?? "[]";
 
     // Extract JSON array from response (handle markdown code blocks)
     let jsonStr = rawContent.trim();
@@ -158,12 +153,12 @@ serve(async (req) => {
     try {
       classified = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", rawContent);
-      throw new Error("AI returned invalid JSON");
+      console.error("Failed to parse Anthropic response:", rawContent);
+      throw new Error("Claude returned invalid JSON");
     }
 
     if (classified.length !== movements.length) {
-      console.warn(`AI returned ${classified.length} items for ${movements.length} movements`);
+      console.warn(`Claude returned ${classified.length} items for ${movements.length} movements`);
     }
 
     // 4. Insert into finance_bank_transactions
