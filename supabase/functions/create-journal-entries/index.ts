@@ -7,13 +7,56 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Accounting rules for double-entry bookkeeping
+function resolveAccounts(tx: any): { debit_account: string; credit_account: string } {
+  const type = tx.transaction_type as string;
+  const amount = Number(tx.amount);
+  const isAbono = amount > 0; // positive = income/abono
+
+  switch (type) {
+    case "venta":
+      // Sale/Income: Debit Bank → Credit Revenue
+      return { debit_account: "1-1-01", credit_account: tx.account_credit || "4-1-01" };
+
+    case "gasto":
+      // Operational expense: Debit Expense → Credit Bank
+      return { debit_account: tx.account_debit || "5-1-01", credit_account: "1-1-01" };
+
+    case "inversion":
+      // Investment/Asset purchase: Debit Asset → Credit Bank
+      return { debit_account: tx.account_debit || "1-2-01", credit_account: "1-1-01" };
+
+    case "nomina":
+      // Payroll: Debit Salaries → Credit Bank
+      return { debit_account: "5-2-01", credit_account: "1-1-01" };
+
+    case "impuesto":
+      // Tax (IVA/PPM): Debit Tax liability → Credit Bank
+      return { debit_account: tx.account_debit || "2-1-01", credit_account: "1-1-01" };
+
+    case "transferencia":
+      // Transfer between banks: Debit Destination Bank → Credit Origin Bank
+      return {
+        debit_account: tx.account_debit || "1-1-02",
+        credit_account: tx.account_credit || "1-1-01",
+      };
+
+    default:
+      // Fallback: use AI-suggested accounts or generic
+      if (isAbono) {
+        return { debit_account: tx.account_debit || "1-1-01", credit_account: tx.account_credit || "4-1-99" };
+      }
+      return { debit_account: tx.account_debit || "5-1-99", credit_account: tx.account_credit || "1-1-01" };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Auth: accept service role key (internal call) or user JWT
+    // Verify JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -23,7 +66,24 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Validate token — accept service role key (internal) or user JWT
+    const token = authHeader.replace("Bearer ", "");
+    if (token !== serviceRoleKey) {
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { error: claimsError } = await authClient.auth.getClaims(token);
+      if (claimsError) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { transactions } = await req.json();
@@ -34,7 +94,7 @@ serve(async (req) => {
       );
     }
 
-    // Get current year and next entry number
+    // Get current year and next correlative number
     const year = new Date().getFullYear();
     const prefix = `ASIENTO-${year}-`;
 
@@ -57,31 +117,36 @@ serve(async (req) => {
 
     for (const tx of transactions) {
       const entryNumber = `${prefix}${String(nextNumber).padStart(4, "0")}`;
+      const { debit_account, credit_account } = resolveAccounts(tx);
 
       const record = {
         transaction_id: tx.id,
         journal_date: tx.transaction_date,
         entry_number: entryNumber,
-        debit_account: tx.account_debit,
-        credit_account: tx.account_credit,
-        amount: Math.abs(tx.amount),
+        debit_account,
+        credit_account,
+        amount: Math.abs(Number(tx.amount)),
         cost_center_id: tx.cost_center_id,
-        description: tx.description_normalized || tx.description_bank,
+        description: tx.description_normalized || tx.description_bank || "Asiento automático",
         created_by_agent: true,
       };
 
-      const { error } = await supabase.from("finance_journal_entries").insert(record);
+      const { data, error } = await supabase
+        .from("finance_journal_entries")
+        .insert(record)
+        .select("id, entry_number, debit_account, credit_account, amount")
+        .single();
 
       if (error) {
         errors.push(`Entry for tx ${tx.id}: ${error.message}`);
       } else {
-        entries.push(entryNumber);
+        entries.push(data);
         nextNumber++;
       }
     }
 
     return new Response(
-      JSON.stringify({ created: entries.length, entry_numbers: entries, errors }),
+      JSON.stringify({ created: entries.length, entries, errors }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
