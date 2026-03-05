@@ -86,7 +86,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       // Fetch user profiles - superadmin can see all due to RLS policy
       const { data: profiles, error: profilesError } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('id, full_name, role, company_id, department_id, dashboard_visibility, created_at, updated_at, avatar_url')
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
