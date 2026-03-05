@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   MessageSquare,
@@ -212,7 +213,7 @@ export default function CompanyChatbotPage() {
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err) {
-      console.error('Error sending message:', err);
+      logger.error('Error sending message:', err);
       toast.error('Error al enviar mensaje');
     } finally {
       setIsSending(false);
@@ -342,7 +343,7 @@ export default function CompanyChatbotPage() {
         toast.error('Error al agregar conocimiento');
       }
     } catch (error) {
-      console.error('Error adding knowledge:', error);
+      logger.error('Error adding knowledge:', error);
       toast.error('Error al agregar conocimiento');
     }
     

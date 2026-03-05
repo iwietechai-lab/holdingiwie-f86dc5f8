@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { 
   Brain, 
   Plus, 
@@ -85,7 +86,7 @@ export function ChatbotKnowledgeManager() {
         setSelectedChatbot(parsed[0] as Chatbot);
       }
     } catch (error) {
-      console.error('Error loading chatbots:', error);
+      logger.error('Error loading chatbots:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron cargar los chatbots',
@@ -167,7 +168,7 @@ export function ChatbotKnowledgeManager() {
         prev.map(cb => cb.id === selectedChatbot.id ? selectedChatbot : cb)
       );
     } catch (error) {
-      console.error('Error saving:', error);
+      logger.error('Error saving:', error);
       toast({
         title: 'Error',
         description: 'No se pudo guardar la base de conocimiento',

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { FileText, Download, Clock, Users, Calendar, Eye, Trash2 } from 'lucide-react';
@@ -59,7 +60,7 @@ export function MeetingSummariesList({ currentUserId }: MeetingSummariesListProp
       
       setSummaries(mappedData);
     } catch (error: any) {
-      console.error('Error fetching summaries:', error);
+      logger.error('Error fetching summaries:', error);
       toast.error('Error al cargar resúmenes');
     } finally {
       setIsLoading(false);

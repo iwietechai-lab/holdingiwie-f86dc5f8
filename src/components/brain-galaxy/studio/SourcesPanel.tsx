@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -110,7 +111,7 @@ export function SourcesPanel({
       setUrlInput('');
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error scraping URL:', error);
+      logger.error('Error scraping URL:', error);
     } finally {
       setIsProcessing(false);
     }

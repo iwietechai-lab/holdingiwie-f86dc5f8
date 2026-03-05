@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Camera, RefreshCw, CheckCircle, XCircle, AlertTriangle, Loader2, MapPin, User, MoveHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as faceapi from 'face-api.js';
@@ -121,7 +122,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         return location;
       }
     } catch (err) {
-      console.error('Error getting location:', err);
+      logger.error('Error getting location:', err);
       setGettingLocation(false);
       return {};
     }
@@ -144,19 +145,19 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       });
 
       if (error) {
-        console.error('Error logging access:', error);
+        logger.error('Error logging access:', error);
       } else {
-        console.log('✅ Access logged:', { userId, timestamp, success });
+        logger.log('✅ Access logged:', { userId, timestamp, success });
       }
     } catch (error) {
-      console.error('Error logging access:', error);
+      logger.error('Error logging access:', error);
     }
   }, [userId]);
 
   // Load face-api.js models
   const loadModels = useCallback(async () => {
     try {
-      console.log('🔄 Loading face-api.js models...');
+      logger.log('🔄 Loading face-api.js models...');
       setInstruction('Cargando modelos de reconocimiento facial...');
       
       await Promise.all([
@@ -165,12 +166,12 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODELS_URL),
       ]);
       
-      console.log('✅ Models loaded successfully');
+      logger.log('✅ Models loaded successfully');
       setModelsLoaded(true);
       setInstruction('Modelos cargados. Iniciando cámara...');
       return true;
     } catch (err) {
-      console.error('❌ Error loading face-api models:', err);
+      logger.error('❌ Error loading face-api models:', err);
       setError('Error al cargar modelos de IA. Recarga la página.');
       setStatus('failed');
       return false;
@@ -180,14 +181,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   // Check stored embedding using RPC
   const checkStoredEmbedding = useCallback(async () => {
     try {
-      console.log('🔍 Checking stored embedding for user:', userId);
+      logger.log('🔍 Checking stored embedding for user:', userId);
       
       const { data, error } = await supabase.rpc('get_user_facial_embedding', {
         target_user_id: userId
       });
 
       if (error) {
-        console.error('Error checking embedding via RPC:', error);
+        logger.error('Error checking embedding via RPC:', error);
         setHasStoredEmbedding(false);
         return false;
       }
@@ -196,11 +197,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       const embedding = data?.[0]?.facial_embedding;
       const hasEmbedding = embedding && Array.isArray(embedding) && embedding.length > 0;
       
-      console.log('📊 Has stored embedding:', hasEmbedding);
+      logger.log('📊 Has stored embedding:', hasEmbedding);
       setHasStoredEmbedding(hasEmbedding);
       return hasEmbedding;
     } catch (err) {
-      console.error('Error checking stored embedding:', err);
+      logger.error('Error checking stored embedding:', err);
       setHasStoredEmbedding(false);
       return false;
     }
@@ -209,7 +210,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   // Start camera - uses getUserMedia WebRTC API
   const startCamera = useCallback(async () => {
     try {
-      console.log('📹 Stream iniciado - requesting camera access...');
+      logger.log('📹 Stream iniciado - requesting camera access...');
       setStatus('initializing');
       setError(null);
       setInstruction('Solicitando acceso a la cámara...');
@@ -230,13 +231,13 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        console.log('📹 Stream iniciado - Camera ready, tracks:', stream.getTracks().length);
+        logger.log('📹 Stream iniciado - Camera ready, tracks:', stream.getTracks().length);
         setIsCameraActive(true);
         setStatus('ready');
         setInstruction('Posiciona tu rostro dentro del círculo');
       }
     } catch (err) {
-      console.error('❌ Camera error:', err);
+      logger.error('❌ Camera error:', err);
       setError('No se pudo acceder a la cámara. Permite el acceso e intenta de nuevo.');
       setStatus('failed');
       setIsCameraActive(false);
@@ -248,11 +249,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const stopCameraStream = useCallback(() => {
     // Prevent concurrent calls
     if (isStoppingRef.current) {
-      console.log('📹 RealFaceRecognition: stopCameraStream already in progress');
+      logger.log('📹 RealFaceRecognition: stopCameraStream already in progress');
       return;
     }
     
-    console.log('📹 RealFaceRecognition: ===== STOP CAMERA STREAM =====');
+    logger.log('📹 RealFaceRecognition: ===== STOP CAMERA STREAM =====');
     isStoppingRef.current = true;
     cleanedUpRef.current = true;
     
@@ -277,7 +278,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           track.stop();
         });
       } catch (e) {
-        console.warn('📹 Error stopping tracks:', e);
+        logger.warn('📹 Error stopping tracks:', e);
       }
       streamRef.current = null;
     }
@@ -297,7 +298,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     // Reset flag after delay
     setTimeout(() => { isStoppingRef.current = false; }, 300);
     
-    console.log('📹 RealFaceRecognition: ===== STOP COMPLETE =====');
+    logger.log('📹 RealFaceRecognition: ===== STOP COMPLETE =====');
   }, []);
 
   // Calculate cosine similarity
@@ -354,7 +355,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         x: nosePositionsRef.current.slice(0, 3).reduce((sum, p) => sum + p.x, 0) / 3,
         y: nosePositionsRef.current.slice(0, 3).reduce((sum, p) => sum + p.y, 0) / 3
       };
-      console.log('📍 Initial nose position set:', initialNosePositionRef.current, 'Adaptive threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+      logger.log('📍 Initial nose position set:', initialNosePositionRef.current, 'Adaptive threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
     }
 
     if (!initialNosePositionRef.current) return false;
@@ -387,7 +388,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         progress = Math.min(100, Math.max(0, (effectiveDeltaLeft / ADAPTIVE_THRESHOLD) * 100));
         setLivenessProgress(progress);
         if (effectiveDeltaLeft > ADAPTIVE_THRESHOLD) {
-          console.log('✅ LIVENESS: Turn left detected! DeltaX:', effectiveDeltaLeft.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          logger.log('✅ LIVENESS: Turn left detected! DeltaX:', effectiveDeltaLeft.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
           detected = true;
         }
         break;
@@ -398,7 +399,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         progress = Math.min(100, Math.max(0, (Math.abs(effectiveDeltaRight) / ADAPTIVE_THRESHOLD) * 100));
         setLivenessProgress(progress);
         if (effectiveDeltaRight < -ADAPTIVE_THRESHOLD) {
-          console.log('✅ LIVENESS: Turn right detected! DeltaX:', effectiveDeltaRight.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          logger.log('✅ LIVENESS: Turn right detected! DeltaX:', effectiveDeltaRight.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
           detected = true;
         }
         break;
@@ -409,7 +410,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         progress = Math.min(100, Math.max(0, (Math.abs(effectiveDeltaUp) / ADAPTIVE_THRESHOLD) * 100));
         setLivenessProgress(progress);
         if (effectiveDeltaUp < -ADAPTIVE_THRESHOLD) {
-          console.log('✅ LIVENESS: Nod up detected! DeltaY:', effectiveDeltaUp.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          logger.log('✅ LIVENESS: Nod up detected! DeltaY:', effectiveDeltaUp.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
           detected = true;
         }
         break;
@@ -420,7 +421,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         progress = Math.min(100, Math.max(0, (effectiveDeltaDown / ADAPTIVE_THRESHOLD) * 100));
         setLivenessProgress(progress);
         if (effectiveDeltaDown > ADAPTIVE_THRESHOLD) {
-          console.log('✅ LIVENESS: Nod down detected! DeltaY:', effectiveDeltaDown.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
+          logger.log('✅ LIVENESS: Nod down detected! DeltaY:', effectiveDeltaDown.toFixed(2), 'Threshold:', ADAPTIVE_THRESHOLD.toFixed(1));
           detected = true;
         }
         break;
@@ -428,7 +429,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
     // Log progress every 10 frames for debugging
     if (nosePositionsRef.current.length % 10 === 0) {
-      console.log(`🔍 Liveness: ${challenge} | Current: dX=${deltaX.toFixed(1)}, dY=${deltaY.toFixed(1)} | Max: dX=[${minDeltaX.toFixed(1)},${maxDeltaX.toFixed(1)}], dY=[${minDeltaY.toFixed(1)},${maxDeltaY.toFixed(1)}] | Threshold: ${ADAPTIVE_THRESHOLD.toFixed(1)} | Progress: ${progress.toFixed(0)}%`);
+      logger.log(`🔍 Liveness: ${challenge} | Current: dX=${deltaX.toFixed(1)}, dY=${deltaY.toFixed(1)} | Max: dX=[${minDeltaX.toFixed(1)},${maxDeltaX.toFixed(1)}], dY=[${minDeltaY.toFixed(1)},${maxDeltaY.toFixed(1)}] | Threshold: ${ADAPTIVE_THRESHOLD.toFixed(1)} | Progress: ${progress.toFixed(0)}%`);
     }
 
     return detected;
@@ -441,7 +442,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     isProcessingRef.current = true;
     
     const embedding = Array.from(descriptor);
-    console.log('🔐 Embedding generado', embedding.slice(0, 5), '... (length:', embedding.length, ')');
+    logger.log('🔐 Embedding generado', embedding.slice(0, 5), '... (length:', embedding.length, ')');
 
     if (hasStoredEmbedding) {
       setStatus('comparing');
@@ -456,7 +457,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         // RPC returns an array, get first element
         const embeddingData = data?.[0];
         if (error || !embeddingData?.facial_embedding) {
-          console.error('❌ Error getting facial embedding:', error);
+          logger.error('❌ Error getting facial embedding:', error);
           setError('Error al obtener datos faciales. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
@@ -467,13 +468,13 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         }
 
         const storedEmbedding = embeddingData.facial_embedding as number[];
-        console.log('📊 Embedding guardado', storedEmbedding.slice(0, 5), '... (length:', storedEmbedding.length, ')');
+        logger.log('📊 Embedding guardado', storedEmbedding.slice(0, 5), '... (length:', storedEmbedding.length, ')');
         
         const similarity = cosineSimilarity(embedding, storedEmbedding);
-        console.log('📏 Similitud calculada:', similarity.toFixed(4), '(umbral:', SIMILARITY_THRESHOLD, ')');
+        logger.log('📏 Similitud calculada:', similarity.toFixed(4), '(umbral:', SIMILARITY_THRESHOLD, ')');
 
         if (similarity >= SIMILARITY_THRESHOLD) {
-          console.log('✅ Face match successful!');
+          logger.log('✅ Face match successful!');
           
           // CRITICAL: Stop camera BEFORE anything else
           stopCameraStream();
@@ -484,7 +485,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           markSessionVerified();
           
           // Async operations (don't wait)
-          logAccessWithLocation(true, locationData || {}).catch(console.error);
+          logAccessWithLocation(true, locationData || {}).catch(logger.error);
           void supabase.rpc('save_facial_embedding', {
             target_user_id: userId,
             new_embedding: null,
@@ -492,11 +493,11 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           });
           
           // Call onSuccess after camera is stopped
-          console.log('📹 Calling onSuccess');
+          logger.log('📹 Calling onSuccess');
           onSuccess();
           return;
         } else {
-          console.log('❌ Face match failed - similarity:', similarity.toFixed(4));
+          logger.log('❌ Face match failed - similarity:', similarity.toFixed(4));
           setError(`Rostro no coincide (similitud: ${(similarity * 100).toFixed(1)}%). Intenta de nuevo.`);
           setAttempts(prev => prev + 1);
           setStatus('failed');
@@ -504,7 +505,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           stopCameraStream();
         }
       } catch (err) {
-        console.error('❌ Comparison error:', err);
+        logger.error('❌ Comparison error:', err);
         setError('Error al comparar rostros. Intenta de nuevo.');
         setAttempts(prev => prev + 1);
         setStatus('failed');
@@ -512,8 +513,8 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         stopCameraStream();
       }
     } else {
-      console.log('📝 Registrando nuevo embedding facial...');
-      console.log('📊 Guardando embedding', embedding.slice(0, 5), '...');
+      logger.log('📝 Registrando nuevo embedding facial...');
+      logger.log('📊 Guardando embedding', embedding.slice(0, 5), '...');
       setStatus('registering');
       statusRef.current = 'registering';
       setInstruction('Registrando tu rostro por primera vez...');
@@ -527,7 +528,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         });
 
         if (rpcError) {
-          console.error('❌ Error saving embedding via RPC:', rpcError);
+          logger.error('❌ Error saving embedding via RPC:', rpcError);
           setError('Error al registrar rostro. Intenta de nuevo.');
           setAttempts(prev => prev + 1);
           setStatus('failed');
@@ -537,7 +538,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           stopCameraStream();
           return;
         }
-        console.log('✅ Embedding registrado!');
+        logger.log('✅ Embedding registrado!');
         
         // CRITICAL: Stop camera BEFORE anything else
         stopCameraStream();
@@ -548,14 +549,14 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
         markSessionVerified();
         
         // Async operations (don't wait)
-        logAccessWithLocation(true, locationData || {}).catch(console.error);
+        logAccessWithLocation(true, locationData || {}).catch(logger.error);
         
         // Call onSuccess after camera is stopped
-        console.log('📹 Calling onSuccess (registration)');
+        logger.log('📹 Calling onSuccess (registration)');
         onSuccess();
         return;
       } catch (err) {
-        console.error('❌ Registration error:', err);
+        logger.error('❌ Registration error:', err);
         setError('Error al registrar rostro. Intenta de nuevo.');
         setAttempts(prev => prev + 1);
         setStatus('failed');
@@ -607,7 +608,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   const startDetection = useCallback(async () => {
     if (!videoRef.current || !modelsLoaded) return;
 
-    console.log('🚀 Starting face detection with liveness check...');
+    logger.log('🚀 Starting face detection with liveness check...');
     setStatus('detecting');
     statusRef.current = 'detecting';
     setInstruction('Posiciona tu rostro dentro del círculo');
@@ -622,7 +623,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     const challenge = selectRandomChallenge();
     setCurrentChallenge(challenge);
     currentChallengeRef.current = challenge;
-    console.log('🎯 Selected liveness challenge:', challenge);
+    logger.log('🎯 Selected liveness challenge:', challenge);
 
     let consecutiveDetections = 0;
     let frameCount = 0;
@@ -634,7 +635,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       const processing = isProcessingRef.current;
       
       if (!videoRef.current || currentStatus === 'success' || currentStatus === 'failed' || processing) {
-        console.log('🛑 Detection loop stopped:', { currentStatus, processing });
+        logger.log('🛑 Detection loop stopped:', { currentStatus, processing });
         return;
       }
 
@@ -658,7 +659,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
           // Phase 1: Detect face stably (5 consecutive detections)
           if (consecutiveDetections >= 5 && !hasStartedLiveness) {
-            console.log('✅ Stable face detected, starting liveness check');
+            logger.log('✅ Stable face detected, starting liveness check');
             hasStartedLiveness = true;
             setStatus('liveness-check');
             statusRef.current = 'liveness-check';
@@ -669,7 +670,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
           // Phase 2: Liveness check
           if (hasStartedLiveness && !livenessConfirmedRef.current) {
             if (checkLiveness(detection.landmarks)) {
-              console.log('🎉 Liveness confirmed!');
+              logger.log('🎉 Liveness confirmed!');
               livenessConfirmedRef.current = true;
               challengeCompletedRef.current = true;
               setLivenessProgress(100);
@@ -682,7 +683,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             // Check timeout
             const elapsed = (Date.now() - livenessStartTimeRef.current) / 1000;
             if (elapsed >= LIVENESS_TIMEOUT_SECONDS) {
-              console.log('❌ Liveness timeout after', LIVENESS_TIMEOUT_SECONDS, 'seconds');
+              logger.log('❌ Liveness timeout after', LIVENESS_TIMEOUT_SECONDS, 'seconds');
               setError('No se detectó movimiento. Intenta de nuevo siguiendo las instrucciones.');
               setAttempts(prev => prev + 1);
               setStatus('failed');
@@ -704,7 +705,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
         animationRef.current = requestAnimationFrame(detect);
       } catch (err) {
-        console.error('Detection error:', err);
+        logger.error('Detection error:', err);
         animationRef.current = requestAnimationFrame(detect);
       }
     };
@@ -714,7 +715,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
   // Handle retry
   const handleRetry = useCallback(async () => {
-    console.log('🔄 Retrying...');
+    logger.log('🔄 Retrying...');
     setError(null);
     setFaceDetected(false);
     setLandmarksCount(0);
@@ -731,7 +732,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       const newChallenge = selectRandomChallenge();
       setCurrentChallenge(newChallenge);
       currentChallengeRef.current = newChallenge;
-      console.log('🎯 New challenge:', newChallenge);
+      logger.log('🎯 New challenge:', newChallenge);
       setStatus('ready');
       statusRef.current = 'ready';
       setInstruction('Posiciona tu rostro dentro del círculo');
@@ -745,7 +746,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
 
   // Handle cancel - stops camera and calls onCancel
   const handleCancel = useCallback(() => {
-    console.log('📹 CANCEL: Using camera service for cleanup');
+    logger.log('📹 CANCEL: Using camera service for cleanup');
     cameraService.scheduleCleanup();
     onCancel();
   }, [onCancel]);
@@ -753,7 +754,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
   // Initialize on mount
   useEffect(() => {
     let mounted = true;
-    console.log('📹 Component mounted - initializing...');
+    logger.log('📹 Component mounted - initializing...');
     
     const init = async () => {
       getLocation();
@@ -768,18 +769,18 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
     // CLEANUP ON UNMOUNT - Use centralized camera service
     return () => {
       mounted = false;
-      console.log('📹 RealFaceRecognition: ===== COMPONENT UNMOUNTING =====');
+      logger.log('📹 RealFaceRecognition: ===== COMPONENT UNMOUNTING =====');
       
       // Step 1: Cancel animation IMMEDIATELY
       if (animationRef.current) {
-        console.log('📹 Cancelling animation frame on unmount');
+        logger.log('📹 Cancelling animation frame on unmount');
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
       
       // Step 2: Stop local stream tracks directly
       if (streamRef.current) {
-        console.log('📹 Stopping local stream on unmount');
+        logger.log('📹 Stopping local stream on unmount');
         cameraService.unregisterStream(streamRef.current);
         try {
           streamRef.current.getTracks().forEach(track => {
@@ -787,7 +788,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
             track.stop();
           });
         } catch (e) {
-          console.warn('📹 Error stopping tracks on unmount:', e);
+          logger.warn('📹 Error stopping tracks on unmount:', e);
         }
         streamRef.current = null;
       }
@@ -799,17 +800,17 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       }
       
       // Step 4: Use centralized camera service for complete global cleanup
-      console.log('📹 Scheduling global camera cleanup on unmount');
+      logger.log('📹 Scheduling global camera cleanup on unmount');
       cameraService.scheduleCleanup();
       
-      console.log('📹 RealFaceRecognition: ===== UNMOUNT CLEANUP SCHEDULED =====');
+      logger.log('📹 RealFaceRecognition: ===== UNMOUNT CLEANUP SCHEDULED =====');
     };
   }, [getLocation, loadModels, checkStoredEmbedding, startCamera]);
 
   // Stop camera when status changes to failed (success already handled in processEmbedding)
   useEffect(() => {
     if (status === 'failed') {
-      console.log('📹 Status changed to failed - ensuring camera is stopped');
+      logger.log('📹 Status changed to failed - ensuring camera is stopped');
       stopCameraStream();
     }
   }, [status, stopCameraStream]);

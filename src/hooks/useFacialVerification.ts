@@ -41,9 +41,9 @@ const markSessionVerified = () => {
   try {
     sessionStorage.setItem(SESSION_VERIFIED_KEY, 'true');
     sessionStorage.setItem(SESSION_TIMESTAMP_KEY, new Date().toISOString());
-    console.log('✅ useFacialVerification: Session marked as verified');
+    logger.log('✅ useFacialVerification: Session marked as verified');
   } catch {
-    console.warn('Could not save to sessionStorage');
+    logger.warn('Could not save to sessionStorage');
   }
 };
 
@@ -61,7 +61,7 @@ export function useFacialVerification(userId: string | undefined) {
   const [state, setState] = useState<FacialVerificationState>(() => {
     // CRITICAL: Initialize with session storage state to prevent flickering
     const isVerifiedInSession = isSessionVerified();
-    console.log('🔍 useFacialVerification: Initial state - session verified:', isVerifiedInSession);
+    logger.log('🔍 useFacialVerification: Initial state - session verified:', isVerifiedInSession);
     
     return {
       isVerified: isVerifiedInSession,
@@ -97,13 +97,13 @@ export function useFacialVerification(userId: string | undefined) {
 
     // CRITICAL: If already verified and locked, don't re-check to prevent flickering
     if (verifiedLockedRef.current) {
-      console.log('🔒 useFacialVerification: Verification locked, skipping check');
+      logger.log('🔒 useFacialVerification: Verification locked, skipping check');
       return;
     }
 
     // Fast path: If session says verified, trust it immediately
     if (isSessionVerified()) {
-      console.log('✅ useFacialVerification: Session verified, locking state');
+      logger.log('✅ useFacialVerification: Session verified, locking state');
       verifiedLockedRef.current = true;
       setState({
         isVerified: true,
@@ -120,7 +120,7 @@ export function useFacialVerification(userId: string | undefined) {
       });
 
       if (error) {
-        console.error('Facial verification RPC error:', error);
+        logger.error('Facial verification RPC error:', error);
         setState(prev => ({ ...prev, isLoading: false, isVerified: false }));
         return;
       }
@@ -175,7 +175,7 @@ export function useFacialVerification(userId: string | undefined) {
         });
       }
     } catch (err) {
-      console.error('Facial verification check error:', err);
+      logger.error('Facial verification check error:', err);
       setState(prev => ({ ...prev, isLoading: false, isVerified: false }));
     }
   }, [userId]);
@@ -184,7 +184,7 @@ export function useFacialVerification(userId: string | undefined) {
   const recordVerification = useCallback(async () => {
     if (!userId) return false;
 
-    console.log('📝 useFacialVerification: Recording verification...');
+    logger.log('📝 useFacialVerification: Recording verification...');
     
     // CRITICAL: Mark session verified FIRST before async DB call
     markSessionVerified();
@@ -206,15 +206,15 @@ export function useFacialVerification(userId: string | undefined) {
       });
 
       if (error) {
-        console.error('Error recording facial verification via RPC:', error);
+        logger.error('Error recording facial verification via RPC:', error);
         // Don't revert state - session storage is source of truth
         return false;
       }
 
-      console.log('✅ useFacialVerification: DB updated successfully');
+      logger.log('✅ useFacialVerification: DB updated successfully');
       return true;
     } catch (err) {
-      console.error('Error recording verification:', err);
+      logger.error('Error recording verification:', err);
       // Don't revert state - session storage is source of truth
       return false;
     }
@@ -222,7 +222,7 @@ export function useFacialVerification(userId: string | undefined) {
 
   // Invalidate verification (force re-verification)
   const invalidateVerification = useCallback(() => {
-    console.log('🔓 useFacialVerification: Invalidating verification');
+    logger.log('🔓 useFacialVerification: Invalidating verification');
     clearSessionVerification();
     verifiedLockedRef.current = false;
     setState({
@@ -263,7 +263,7 @@ export function useFacialVerification(userId: string | undefined) {
     
     // Skip if already verified in session (fast path)
     if (isSessionVerified()) {
-      console.log('⚡ useFacialVerification: Fast path - session already verified');
+      logger.log('⚡ useFacialVerification: Fast path - session already verified');
       verifiedLockedRef.current = true;
       setState({
         isVerified: true,
@@ -288,7 +288,7 @@ export function useFacialVerification(userId: string | undefined) {
     const interval = setInterval(() => {
       // Check if session is still valid
       if (!isSessionVerified()) {
-        console.log('⏰ useFacialVerification: Session expired, invalidating');
+        logger.log('⏰ useFacialVerification: Session expired, invalidating');
         invalidateVerification();
       }
     }, 60000); // Check every minute

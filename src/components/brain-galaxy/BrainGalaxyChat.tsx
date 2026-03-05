@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -188,7 +189,7 @@ Presenta estas opciones de forma clara y amigable.`,
       await streamChat(messagesForAI);
       
     } catch (error) {
-      console.error('Error processing files:', error);
+      logger.error('Error processing files:', error);
       toast.error('Error al procesar los archivos');
     } finally {
       setProcessingFiles(false);
@@ -376,7 +377,7 @@ Presenta estas opciones de forma clara y amigable.`,
           return prev;
         });
     } catch (error) {
-      console.error('Chat error:', error);
+      logger.error('Chat error:', error);
       setIsSearchingWeb(false);
       setMessages(prev => [
         ...prev,
@@ -415,7 +416,7 @@ Presenta estas opciones de forma clara y amigable.`,
         return prev;
       });
     } catch (error) {
-      console.error('Chat error:', error);
+      logger.error('Chat error:', error);
       setIsSearchingWeb(false);
       setMessages(prev => [
         ...prev,

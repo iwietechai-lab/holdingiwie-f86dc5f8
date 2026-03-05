@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -78,7 +79,7 @@ export function CreateMissionDialog({
           setUsers(data);
         }
       } catch (err) {
-        console.error('Error fetching users:', err);
+        logger.error('Error fetching users:', err);
       } finally {
         setLoadingUsers(false);
       }

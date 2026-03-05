@@ -47,7 +47,7 @@ export function useDocumentPermissions() {
       if (error) throw error;
       setUsers((data || []) as UserInfo[]);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      logger.error('Error fetching users:', err);
     } finally {
       setIsLoadingUsers(false);
     }
@@ -64,7 +64,7 @@ export function useDocumentPermissions() {
       if (error) throw error;
       return (data || []) as DocumentPermission[];
     } catch (err) {
-      console.error('Error getting document permissions:', err);
+      logger.error('Error getting document permissions:', err);
       return [];
     }
   }, []);
@@ -84,7 +84,7 @@ export function useDocumentPermissions() {
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('Error granting permission:', err);
+      logger.error('Error granting permission:', err);
       return false;
     }
   }, [user]);
@@ -138,7 +138,7 @@ export function useDocumentPermissions() {
         });
         
         // Notify user
-        console.log('Document sent to CEOChat for CEO review');
+        logger.log('Document sent to CEOChat for CEO review');
       }
 
       // Create notifications for users who received access
@@ -159,7 +159,7 @@ export function useDocumentPermissions() {
 
       return true;
     } catch (err) {
-      console.error('Error granting permissions:', err);
+      logger.error('Error granting permissions:', err);
       return false;
     }
   }, [user]);
@@ -176,7 +176,7 @@ export function useDocumentPermissions() {
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('Error revoking permission:', err);
+      logger.error('Error revoking permission:', err);
       return false;
     }
   }, []);
@@ -200,7 +200,7 @@ export function useDocumentPermissions() {
       if (error && error.code !== 'PGRST116') throw error;
       return !!data;
     } catch (err) {
-      console.error('Error checking access:', err);
+      logger.error('Error checking access:', err);
       return false;
     }
   }, [user]);
@@ -253,7 +253,7 @@ export function useDocumentPermissions() {
 
       return true;
     } catch (err) {
-      console.error('Error requesting access:', err);
+      logger.error('Error requesting access:', err);
       return false;
     }
   }, [user]);
@@ -287,7 +287,7 @@ export function useDocumentPermissions() {
         document_name: (documents || []).find((d: any) => d.id === req.document_id)?.nombre,
       }));
     } catch (err) {
-      console.error('Error getting pending requests:', err);
+      logger.error('Error getting pending requests:', err);
       return [];
     }
   }, [user]);
@@ -321,7 +321,7 @@ export function useDocumentPermissions() {
 
       return true;
     } catch (err) {
-      console.error('Error approving request:', err);
+      logger.error('Error approving request:', err);
       return false;
     }
   }, [user]);
@@ -346,7 +346,7 @@ export function useDocumentPermissions() {
 
       return true;
     } catch (err) {
-      console.error('Error rejecting request:', err);
+      logger.error('Error rejecting request:', err);
       return false;
     }
   }, []);

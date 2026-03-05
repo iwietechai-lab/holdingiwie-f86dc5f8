@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { User, Lock, Eye, EyeOff, Sparkles, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,7 +115,7 @@ export const ProfileSetupForm = ({ userId, email, onComplete }: ProfileSetupForm
 
       onComplete();
     } catch (error: any) {
-      console.error('Profile setup error:', error);
+      logger.error('Profile setup error:', error);
       toast({
         title: 'Error',
         description: error.message || 'No se pudo guardar el perfil',

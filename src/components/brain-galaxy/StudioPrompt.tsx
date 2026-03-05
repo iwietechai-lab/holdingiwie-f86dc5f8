@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -153,7 +154,7 @@ IMPORTANTE:
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Studio Prompt error:', error);
+      logger.error('Studio Prompt error:', error);
       toast.error('Error al procesar tu solicitud');
     } finally {
       setIsLoading(false);

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, CheckCircle, XCircle, User, AlertCircle } from 'lucide-react';
@@ -97,9 +98,9 @@ export default function AdminFaceSetup() {
       ]);
       setModelsLoaded(true);
       setOverallStatus('idle');
-      console.log('Face-api models loaded successfully');
+      logger.log('Face-api models loaded successfully');
     } catch (err) {
-      console.error('Error loading models:', err);
+      logger.error('Error loading models:', err);
       setOverallStatus('idle');
     }
   }, []);
@@ -125,19 +126,19 @@ export default function AdminFaceSetup() {
 
           if (detection) {
             const embedding = Array.from(detection.descriptor);
-            console.log('Embedding extracted, length:', embedding.length);
+            logger.log('Embedding extracted, length:', embedding.length);
             resolve(embedding);
           } else {
-            console.error('No face detected in image');
+            logger.error('No face detected in image');
             resolve(null);
           }
         } catch (err) {
-          console.error('Error extracting embedding:', err);
+          logger.error('Error extracting embedding:', err);
           resolve(null);
         }
       };
       img.onerror = () => {
-        console.error('Error loading image');
+        logger.error('Error loading image');
         resolve(null);
       };
       img.src = imageSrc;
@@ -154,7 +155,7 @@ export default function AdminFaceSetup() {
         .limit(100);
 
       if (error) {
-        console.error('Error fetching profiles:', error);
+        logger.error('Error fetching profiles:', error);
         return null;
       }
 
@@ -165,7 +166,7 @@ export default function AdminFaceSetup() {
       // For now, return null and we'll handle user creation differently
       return null;
     } catch (err) {
-      console.error('Error getting user ID:', err);
+      logger.error('Error getting user ID:', err);
       return null;
     }
   };
@@ -187,7 +188,7 @@ export default function AdminFaceSetup() {
         .limit(100);
 
       if (fetchError) {
-        console.error('Error fetching profiles:', fetchError);
+        logger.error('Error fetching profiles:', fetchError);
         return { success: false };
       }
 
@@ -209,20 +210,20 @@ export default function AdminFaceSetup() {
           .eq('id', matchingProfile.id);
 
         if (updateError) {
-          console.error('Error updating profile:', updateError);
+          logger.error('Error updating profile:', updateError);
           return { success: false };
         }
         
-        console.log(`Updated facial embedding for ${fullName} (${matchingProfile.id})`);
+        logger.log(`Updated facial embedding for ${fullName} (${matchingProfile.id})`);
         return { success: true };
       }
 
       // SECURITY: No longer storing in localStorage for security reasons
       // User must sign up first, then admin can re-process to store embedding
-      console.warn(`No existing profile found for ${email}. User needs to sign up first.`);
+      logger.warn(`No existing profile found for ${email}. User needs to sign up first.`);
       return { success: false, userNotFound: true };
     } catch (err) {
-      console.error('Error saving embedding:', err);
+      logger.error('Error saving embedding:', err);
       return { success: false };
     }
   };
@@ -294,7 +295,7 @@ export default function AdminFaceSetup() {
         // Small delay between processing
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
-        console.error(`Error processing ${member.fullName}:`, err);
+        logger.error(`Error processing ${member.fullName}:`, err);
         updatedMembers[i] = { 
           ...member, 
           status: 'error', 
@@ -364,7 +365,7 @@ export default function AdminFaceSetup() {
       
       setMembers([...updatedMembers]);
     } catch (err) {
-      console.error(`Error processing ${member.fullName}:`, err);
+      logger.error(`Error processing ${member.fullName}:`, err);
       updatedMembers[index] = { 
         ...member, 
         status: 'error', 

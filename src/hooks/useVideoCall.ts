@@ -86,7 +86,7 @@ export function useVideoCall(): UseVideoCallReturn {
           track.stop();
           track.enabled = false;
         } catch (e) {
-          console.error('Error stopping track:', e);
+          logger.error('Error stopping track:', e);
         }
       });
     }
@@ -101,7 +101,7 @@ export function useVideoCall(): UseVideoCallReturn {
   }, []);
 
   const removeParticipant = useCallback((oderId: string, peerId?: string) => {
-    console.log('Removing participant:', oderId, peerId);
+    logger.log('Removing participant:', oderId, peerId);
     
     // Clean up connection
     if (peerId) {
@@ -110,7 +110,7 @@ export function useVideoCall(): UseVideoCallReturn {
         try {
           connection.close();
         } catch (e) {
-          console.error('Error closing connection:', e);
+          logger.error('Error closing connection:', e);
         }
         connectionsRef.current.delete(peerId);
       }
@@ -133,11 +133,11 @@ export function useVideoCall(): UseVideoCallReturn {
     const name = peerName || call.metadata?.userName || 'Participante';
     const callPeerId = call.peer;
     
-    console.log('Handling incoming call from:', callPeerId, 'oderId:', odId, 'name:', name);
+    logger.log('Handling incoming call from:', callPeerId, 'oderId:', odId, 'name:', name);
     
     // Prevent duplicate participants - check by oderId
     if (knownParticipantsRef.current.has(odId) && odId !== callPeerId) {
-      console.log('Participant already exists, ignoring duplicate:', odId);
+      logger.log('Participant already exists, ignoring duplicate:', odId);
       return;
     }
 
@@ -146,13 +146,13 @@ export function useVideoCall(): UseVideoCallReturn {
     
     // Set timeout for stream reception
     const timeout = setTimeout(() => {
-      console.log('Stream timeout for:', callPeerId);
+      logger.log('Stream timeout for:', callPeerId);
       // Keep participant but mark as no stream
       setParticipants(prev => {
         const newMap = new Map(prev);
         const existing = newMap.get(odId);
         if (existing && !existing.stream) {
-          console.log('Removing unconnected participant:', odId);
+          logger.log('Removing unconnected participant:', odId);
           newMap.delete(odId);
           knownParticipantsRef.current.delete(odId);
         }
@@ -163,7 +163,7 @@ export function useVideoCall(): UseVideoCallReturn {
     connectionTimeoutsRef.current.set(callPeerId, timeout);
 
     call.on('stream', (remoteStream) => {
-      console.log('Received stream from:', callPeerId, 'for user:', odId);
+      logger.log('Received stream from:', callPeerId, 'for user:', odId);
       clearConnectionTimeout(callPeerId);
       
       // Mark as known
@@ -184,12 +184,12 @@ export function useVideoCall(): UseVideoCallReturn {
     });
 
     call.on('close', () => {
-      console.log('Call closed:', callPeerId);
+      logger.log('Call closed:', callPeerId);
       removeParticipant(odId, callPeerId);
     });
 
     call.on('error', (err) => {
-      console.error('Call error:', err);
+      logger.error('Call error:', err);
       clearConnectionTimeout(callPeerId);
     });
 
@@ -198,23 +198,23 @@ export function useVideoCall(): UseVideoCallReturn {
 
   const callPeer = useCallback((peerId: string, peerName: string, oderId: string) => {
     if (!peerRef.current || !localStreamRef.current) {
-      console.log('Cannot call peer - missing peer or stream');
+      logger.log('Cannot call peer - missing peer or stream');
       return;
     }
 
     // Prevent duplicate calls to the same user
     if (knownParticipantsRef.current.has(oderId)) {
-      console.log('Already connected to this user, skipping call:', oderId);
+      logger.log('Already connected to this user, skipping call:', oderId);
       return;
     }
 
     // Check if we already have a connection to this peer
     if (connectionsRef.current.has(peerId)) {
-      console.log('Already have connection to peer:', peerId);
+      logger.log('Already have connection to peer:', peerId);
       return;
     }
 
-    console.log('Calling peer:', peerId, 'with name:', peerName, 'oderId:', oderId);
+    logger.log('Calling peer:', peerId, 'with name:', peerName, 'oderId:', oderId);
     
     try {
       const call = peerRef.current.call(peerId, localStreamRef.current, {
@@ -228,7 +228,7 @@ export function useVideoCall(): UseVideoCallReturn {
         handleIncomingCall(call, peerName, oderId);
       }
     } catch (err) {
-      console.error('Error calling peer:', err);
+      logger.error('Error calling peer:', err);
     }
   }, [handleIncomingCall]);
 
@@ -269,13 +269,13 @@ export function useVideoCall(): UseVideoCallReturn {
     }
 
     reconnectAttemptRef.current++;
-    console.log(`Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttempts}`);
+    logger.log(`Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttempts}`);
 
     if (peerRef.current && peerRef.current.disconnected && !peerRef.current.destroyed) {
       try {
         peerRef.current.reconnect();
       } catch (e) {
-        console.error('Reconnect failed:', e);
+        logger.error('Reconnect failed:', e);
         // Try again after delay
         setTimeout(() => attemptReconnect(), 2000 * reconnectAttemptRef.current);
       }
@@ -304,7 +304,7 @@ export function useVideoCall(): UseVideoCallReturn {
       const peerId = generatePeerId(userId, roomId);
       peerIdRef.current = peerId;
 
-      console.log('Joining room with peer ID:', peerId, 'user:', userId);
+      logger.log('Joining room with peer ID:', peerId, 'user:', userId);
 
       // Get local media stream
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -340,7 +340,7 @@ export function useVideoCall(): UseVideoCallReturn {
       });
 
       peer.on('open', (id) => {
-        console.log('PeerJS connected with ID:', id);
+        logger.log('PeerJS connected with ID:', id);
         setIsConnected(true);
         setError(null);
         reconnectAttemptRef.current = 0;
@@ -353,14 +353,14 @@ export function useVideoCall(): UseVideoCallReturn {
       });
 
       peer.on('call', (call) => {
-        console.log('Receiving call from:', call.peer, 'metadata:', call.metadata);
+        logger.log('Receiving call from:', call.peer, 'metadata:', call.metadata);
         // Answer the call with our stream
         call.answer(localStreamRef.current!);
         handleIncomingCall(call, call.metadata?.userName, call.metadata?.oderId);
       });
 
       peer.on('error', (err) => {
-        console.error('PeerJS error:', err.type, err.message);
+        logger.error('PeerJS error:', err.type, err.message);
         
         // Only show error if not leaving
         if (!isLeavingRef.current) {
@@ -369,13 +369,13 @@ export function useVideoCall(): UseVideoCallReturn {
             // Generate new ID and try again
             const newPeerId = generatePeerId(userIdRef.current, roomIdRef.current);
             peerIdRef.current = newPeerId;
-            console.log('ID unavailable, generated new one:', newPeerId);
+            logger.log('ID unavailable, generated new one:', newPeerId);
           } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
             setError(`Error de conexión: ${err.message}`);
             attemptReconnect();
           } else if (err.type === 'peer-unavailable') {
             // Peer not available, this is normal when someone leaves
-            console.log('Peer unavailable - may have left the call');
+            logger.log('Peer unavailable - may have left the call');
           } else {
             setError(`Error: ${err.message}`);
           }

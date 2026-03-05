@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -61,7 +62,7 @@ export function DeleteTicketDialog({
       onOpenChange(false);
       setReason('');
     } catch (err) {
-      console.error('Error deleting ticket:', err);
+      logger.error('Error deleting ticket:', err);
       toast.error('Error al eliminar ticket');
     } finally {
       setIsDeleting(false);

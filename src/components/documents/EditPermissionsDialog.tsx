@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { Users, Shield, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,7 +56,7 @@ export function EditPermissionsDialog({
       setSelectedUsers(userIds);
       setInitialSelectedUsers(userIds);
     } catch (error) {
-      console.error('Error loading permissions:', error);
+      logger.error('Error loading permissions:', error);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +95,7 @@ export function EditPermissionsDialog({
       onOpenChange(false);
       onPermissionsUpdated?.();
     } catch (error) {
-      console.error('Error saving permissions:', error);
+      logger.error('Error saving permissions:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron actualizar los permisos',

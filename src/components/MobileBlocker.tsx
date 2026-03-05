@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone, Download, Rocket, MessageCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export function MobileBlocker({ children }: MobileBlockerProps) {
         navigate('/iwiechat');
       }
     } catch (error) {
-      console.error('Install error:', error);
+      logger.error('Install error:', error);
     }
     
     setInstalling(false);

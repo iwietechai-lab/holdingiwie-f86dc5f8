@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, AlertTriangle, Fingerprint, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,7 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     if (successHandledRef.current) return;
     successHandledRef.current = true;
     
-    console.log('✅ FacialVerificationGuard: Face recognition success');
+    logger.log('✅ FacialVerificationGuard: Face recognition success');
     
     // Update global state
     setGlobalVerificationComplete(true);
@@ -92,7 +93,7 @@ export const FacialVerificationGuard = ({ children }: FacialVerificationGuardPro
     setShowFaceRecognition(false);
     
     // Record in database (async, don't wait)
-    try { await recordVerification(); } catch (e) { console.error(e); }
+    try { await recordVerification(); } catch (e) { logger.error(e); }
   }, [recordVerification]);
 
   const handleCancel = useCallback(async () => {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -224,7 +225,7 @@ export function ManualCourseBuilder({
         toast.success('Curso guardado correctamente');
       }
     } catch (error) {
-      console.error('Error saving course:', error);
+      logger.error('Error saving course:', error);
       toast.error('Error al guardar el curso');
     } finally {
       setIsSaving(false);
