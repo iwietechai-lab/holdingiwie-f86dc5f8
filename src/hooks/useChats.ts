@@ -145,16 +145,19 @@ export function useChats() {
   }, [fetchChats]);
 
   // Subscribe to realtime updates
+  // Note: 'chats' table can't be filtered by user_id here because membership
+  // is tracked via 'chat_participants' join table. RLS on fetchChats() ensures
+  // only the user's own chats are returned. The subscription triggers a refetch.
   useEffect(() => {
     if (!user) return;
 
     fetchChats();
 
     const channel = supabase
-      .channel('chats-changes')
+      .channel(`chats-changes-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats' },
+        { event: '*', schema: 'public', table: 'chat_participants', filter: `user_id=eq.${user.id}` },
         () => {
           fetchChats();
         }

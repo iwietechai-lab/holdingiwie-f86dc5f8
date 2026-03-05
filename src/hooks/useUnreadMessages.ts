@@ -93,13 +93,16 @@ export function useUnreadMessages() {
   }, [user, lastReadTimestamps]);
 
   // Subscribe to realtime message updates
+  // Note: 'messages' table has no recipient column to filter on.
+  // We filter client-side by checking chat_participants membership.
+  // RLS ensures only accessible messages trigger the callback.
   useEffect(() => {
     if (!user) return;
 
     fetchUnreadCounts();
 
     const channel = supabase
-      .channel('unread-messages-global')
+      .channel(`unread-messages-${user.id}`)
       .on(
         'postgres_changes',
         { 

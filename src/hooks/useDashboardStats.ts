@@ -270,12 +270,20 @@ export const useDashboardStats = (selectedCompanyId: string | null) => {
 
     fetchStats();
 
+    const channelName = selectedCompanyId 
+      ? `dashboard-stats-${selectedCompanyId}` 
+      : 'dashboard-stats-all';
+    
+    const filterOpt = selectedCompanyId 
+      ? { filter: `company_id=eq.${selectedCompanyId}` } 
+      : {};
+
     const channel = supabase
-      .channel('dashboard-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, fetchStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_sales' }, fetchStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_items' }, fetchStats)
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', ...filterOpt }, fetchStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets', ...filterOpt }, fetchStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_sales', ...filterOpt }, fetchStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_items', ...filterOpt }, fetchStats)
       .subscribe();
 
     return () => {
