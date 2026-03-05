@@ -69,15 +69,20 @@ export default defineConfig(({ mode }) => ({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/svrrliskjlpmsofjjqrx\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
+            // Block caching for sensitive Supabase API routes (auth, data, storage)
+            urlPattern: /^https:\/\/svrrliskjlpmsofjjqrx\.supabase\.co\/(rest|storage|auth|functions)\/v1\/.*/i,
+            handler: "NetworkOnly",
+          },
+          {
+            // Only cache static Supabase assets (e.g. public bucket images served via /object/public/)
+            urlPattern: /^https:\/\/svrrliskjlpmsofjjqrx\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+            handler: "CacheFirst",
             options: {
-              cacheName: "supabase-api-cache",
+              cacheName: "supabase-public-assets",
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 // 1 hour
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours for public assets only
               },
-              networkTimeoutSeconds: 10
             }
           }
         ]
