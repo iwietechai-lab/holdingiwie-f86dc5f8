@@ -28,6 +28,7 @@ import MisionIwiePage from "./pages/MisionIwiePage";
 import AITareasPage from "./pages/AITareasPage";
 import ConfiguracionPage from "./pages/ConfiguracionPage";
 import BrainGalaxyPage from "./pages/BrainGalaxyPage";
+import FinanzasPage from "./pages/FinanzasPage";
 import NotFound from "./pages/NotFound";
 import { FacialVerificationGuard } from "./components/FacialVerificationGuard";
 import { IncomingCallAlert } from "./components/meetings/IncomingCallAlert";
@@ -86,6 +87,7 @@ function AppContent() {
         <Route path="/admin/face-setup" element={<ProtectedRoute blockMobile><AdminFaceSetup /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute blockMobile><UserManagement /></ProtectedRoute>} />
         <Route path="/superadmin" element={<ProtectedRoute blockMobile><SuperadminDashboard /></ProtectedRoute>} />
+        <Route path="/finanzas" element={<ProtectedRoute blockMobile><FinanzasPage /></ProtectedRoute>} />
         
         {/* Mobile-friendly pages - no mobile blocking */}
         <Route path="/mision-iwie" element={<ProtectedRoute><MisionIwiePage /></ProtectedRoute>} />
