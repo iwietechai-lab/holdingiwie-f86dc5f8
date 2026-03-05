@@ -162,12 +162,11 @@ export const useSupabaseAuth = () => {
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session - only to handle errors
+    // Profile fetching is handled exclusively by onAuthStateChange above
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      // Handle session errors (like invalid refresh token)
       if (error) {
         logger.error('Error getting session:', error);
-        // Clear any invalid session state and redirect to login
         setAuthState({
           user: null,
           session: null,
@@ -175,27 +174,9 @@ export const useSupabaseAuth = () => {
           isAuthenticated: false,
           isLoading: false,
         });
-        return;
       }
-      
-      setAuthState(prev => ({
-        ...prev,
-        user: session?.user ?? null,
-        session,
-        isAuthenticated: !!session,
-        isLoading: false,
-      }));
-
-      if (session?.user) {
-        fetchUserProfile(session.user.id).then(profile => {
-          setAuthState(prev => ({
-            ...prev,
-            profile,
-          }));
-        });
-      }
+      // No need to set state or fetch profile here — onAuthStateChange handles it
     }).catch(err => {
-      // Catch any unhandled errors
       logger.error('Unhandled session error:', err);
       setAuthState({
         user: null,
