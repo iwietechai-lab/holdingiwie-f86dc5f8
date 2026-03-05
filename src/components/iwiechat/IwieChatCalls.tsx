@@ -42,6 +42,8 @@ export function IwieChatCalls({ userId }: IwieChatCallsProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Real-time subscription for meeting requests
+  // Note: meeting_requests can't be filtered by a single user column since
+  // both requested_by and requested_to need updates. RLS protects data on fetch.
   useEffect(() => {
     const channel = supabase
       .channel('iwiechat-calls')

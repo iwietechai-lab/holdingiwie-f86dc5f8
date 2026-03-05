@@ -41,6 +41,7 @@ export function IwieChatCallsList({ userId, userName }: IwieChatCallsListProps) 
   const [showCallDialog, setShowCallDialog] = useState(false);
 
   // Real-time subscription for meeting requests
+  // Note: Can't filter by single user since both requested_by/requested_to need updates
   useEffect(() => {
     const channel = supabase
       .channel('iwiechat-calls-list')

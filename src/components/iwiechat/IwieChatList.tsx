@@ -24,11 +24,13 @@ export function IwieChatList({ onSelectChat }: IwieChatListProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('todos');
 
-  // Real-time subscription for chats and messages
+  // Real-time subscription for chat participation changes and new messages
+  // Note: We listen to chat_participants filtered by current user instead of
+  // the entire 'chats' table to avoid receiving events for all chats.
   useEffect(() => {
     const chatsChannel = supabase
-      .channel('iwiechat-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => {
+      .channel('iwiechat-list-participants')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participants' }, () => {
         fetchChats();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {

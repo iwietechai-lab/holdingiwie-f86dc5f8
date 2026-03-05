@@ -226,13 +226,13 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
 
     // Realtime subscriptions
     const itemsChannel = supabase
-      .channel('budget-items-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_items' }, fetchItems)
+      .channel(`budget-items-changes-${companyId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_items', filter: `company_id=eq.${companyId}` }, fetchItems)
       .subscribe();
 
     const quotesChannel = supabase
-      .channel('budget-quotes-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_quotes' }, fetchQuotes)
+      .channel(`budget-quotes-changes-${companyId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_quotes', filter: `company_id=eq.${companyId}` }, fetchQuotes)
       .subscribe();
 
     return () => {
