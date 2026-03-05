@@ -89,7 +89,7 @@ export function useUserCreationRequests(companyId?: string) {
         setRequests([]);
       }
     } catch (err) {
-      console.error('Error fetching user creation requests:', err);
+      logger.error('Error fetching user creation requests:', err);
       setError('Error al cargar solicitudes');
     } finally {
       setIsLoading(false);
@@ -153,13 +153,13 @@ export function useUserCreationRequests(companyId?: string) {
           });
         }
       } catch (notificationError) {
-        console.warn('No se pudo notificar al superadmin:', notificationError);
+        logger.warn('No se pudo notificar al superadmin:', notificationError);
       }
 
       await fetchRequests();
       return { success: true };
     } catch (err) {
-      console.error('Error creating user creation request:', err);
+      logger.error('Error creating user creation request:', err);
       return { success: false, error: 'Error al crear solicitud' };
     }
   };
@@ -204,7 +204,7 @@ export function useUserCreationRequests(companyId?: string) {
       await fetchRequests();
       return { success: true };
     } catch (err) {
-      console.error('Error reviewing request:', err);
+      logger.error('Error reviewing request:', err);
       return { success: false, error: 'Error al procesar solicitud' };
     }
   };

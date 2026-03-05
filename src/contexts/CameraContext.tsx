@@ -8,6 +8,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useLocation } from 'react-router-dom';
 import cameraService from '@/utils/cameraService';
 import { isGlobalVerificationComplete } from '@/utils/verificationState';
@@ -71,7 +72,7 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
     
     if (isCameraFreeRoute && !hasCleanedOnRouteRef.current) {
-      console.log('📹 CameraContext: Navigating to', currentPath, '- scheduling cleanup');
+      logger.log('📹 CameraContext: Navigating to', currentPath, '- scheduling cleanup');
       hasCleanedOnRouteRef.current = true;
       
       // Single cleanup - don't keep hammering
@@ -85,10 +86,10 @@ export const CameraProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       verificationTimeoutRef.current = setTimeout(() => {
         if (cameraService.isCameraActive()) {
-          console.log('📹 CameraContext: Post-navigation camera still active, forcing stop');
+          logger.log('📹 CameraContext: Post-navigation camera still active, forcing stop');
           cameraService.forceStopAllCameras();
         } else {
-          console.log('📹 CameraContext: ✅ Camera verified stopped');
+          logger.log('📹 CameraContext: ✅ Camera verified stopped');
         }
         hasCleanedOnRouteRef.current = false;
       }, 2000);
