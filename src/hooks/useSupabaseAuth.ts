@@ -301,6 +301,19 @@ export const useSupabaseAuth = () => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Clean up user-specific localStorage keys before losing the user reference
+    const userId = authState.user?.id;
+    if (userId) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.includes(userId)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+
     // Reset global verification state
     resetGlobalVerification();
     clearVerificationStorage();
@@ -313,7 +326,7 @@ export const useSupabaseAuth = () => {
       isAuthenticated: false,
       isLoading: false,
     });
-  }, []);
+  }, [authState.user?.id]);
 
   const isSuperadmin = authState.profile?.has_full_access === true;
 
