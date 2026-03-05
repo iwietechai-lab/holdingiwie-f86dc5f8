@@ -135,7 +135,7 @@ export const RealFaceRecognition = ({ userId, onSuccess, onCancel }: RealFaceRec
       
       const { error } = await supabase.from('access_logs').insert({
         user_id: userId,
-        timestampt: timestamp,
+        timestamp: timestamp,
         latitude: location.latitude || null,
         longitude: location.longitude || null,
         city: location.city || null,

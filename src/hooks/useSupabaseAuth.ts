@@ -236,7 +236,7 @@ export const useSupabaseAuth = () => {
       
       const { error } = await supabase.from('access_logs').insert({
         user_id: userId,
-        timestampt: new Date().toISOString(), // Note: column name has typo in DB
+        timestamp: new Date().toISOString(),
         latitude: location.latitude || null,
         longitude: location.longitude || null,
         city: location.city || null,

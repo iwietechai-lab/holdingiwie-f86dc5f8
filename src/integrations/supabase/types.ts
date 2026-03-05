@@ -23,7 +23,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           success: boolean | null
-          timestampt: string | null
+          timestamp: string | null
           user_id: string | null
         }
         Insert: {
@@ -34,7 +34,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           success?: boolean | null
-          timestampt?: string | null
+          timestamp?: string | null
           user_id?: string | null
         }
         Update: {
@@ -45,7 +45,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           success?: boolean | null
-          timestampt?: string | null
+          timestamp?: string | null
           user_id?: string | null
         }
         Relationships: []

@@ -24,7 +24,7 @@ export interface UserRole {
 export interface AccessLog {
   id: string;
   user_id: string;
-  timestampt: string | null;
+  timestamp: string | null;
   city: string | null;
   country: string | null;
   latitude: number | null;
@@ -130,7 +130,7 @@ export function useUserManagement() {
       let logsQuery = supabase
         .from('access_logs')
         .select('*')
-        .order('timestampt', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(500);
 
       if (!superadminStatus && canManage && companyId && profiles) {
@@ -153,7 +153,7 @@ export function useUserManagement() {
           }));
         
         const userLogs = accessLogs.filter((l) => l.user_id === profile.id);
-        const lastAccess = userLogs.length > 0 ? userLogs[0].timestampt : null;
+        const lastAccess = userLogs.length > 0 ? userLogs[0].timestamp : null;
         const hasSuperadminRole = roles.some((r: UserRole) => r.role === 'superadmin');
 
         return {
@@ -342,7 +342,7 @@ export function useUserManagement() {
         .from('access_logs')
         .select('*')
         .eq('user_id', userId)
-        .order('timestampt', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(50);
 
       if (error) throw error;
