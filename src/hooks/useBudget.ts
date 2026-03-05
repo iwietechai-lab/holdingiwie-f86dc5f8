@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface BudgetCategory {
@@ -62,6 +63,7 @@ export interface BudgetQuoteItem {
 }
 
 export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => {
+  const { user } = useSupabaseAuth();
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [items, setItems] = useState<BudgetItem[]>([]);
   const [quotes, setQuotes] = useState<BudgetQuote[]>([]);
@@ -145,7 +147,7 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
 
   const createQuote = async (quote: Omit<BudgetQuote, 'id' | 'created_at'>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
       const { data, error } = await supabase.from('budget_quotes').insert({
         ...quote,
         created_by: user?.id,

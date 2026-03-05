@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ResponsiveLayout } from '@/components/ResponsiveLayout';
 import { useBudget, BudgetItem, BudgetCategory } from '@/hooks/useBudget';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,7 @@ const formatRMB = (value: number) => {
 };
 
 export default function BudgetPage() {
+  const { user } = useSupabaseAuth();
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
@@ -64,7 +66,6 @@ export default function BudgetPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: isSA } = await supabase.rpc('is_superadmin');

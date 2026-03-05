@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 import type { 
   Mission, 
@@ -27,6 +28,7 @@ interface UseMissionWorkspaceProps {
 }
 
 export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
+  const { user } = useSupabaseAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<MissionChatMessage[]>([]);
@@ -47,7 +49,6 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUserId(user.id);
 

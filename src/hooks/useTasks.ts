@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export type EisenhowerPriority = 'urgente_importante' | 'no_urgente_importante' | 'urgente_no_importante' | 'no_urgente_no_importante';
@@ -64,6 +65,7 @@ export interface CreateTaskInput {
 }
 
 export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHolding?: boolean) => {
+  const { user } = useSupabaseAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -124,7 +126,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
   const createTask = async (input: CreateTaskInput) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
       const { data, error } = await supabase
@@ -179,7 +180,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
       const currentTask = tasks.find(t => t.id === taskId);
@@ -249,7 +249,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
   const addComment = async (taskId: string, content: string, type: TaskComment['comment_type'] = 'comment') => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
       const { error } = await supabase

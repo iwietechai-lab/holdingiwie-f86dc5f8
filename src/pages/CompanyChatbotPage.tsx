@@ -252,7 +252,6 @@ export default function CompanyChatbotPage() {
   };
 
   const uploadFile = async (file: File): Promise<string | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
     const fileExt = file.name.split('.').pop();

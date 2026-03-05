@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface CompanyKnowledge {
@@ -26,6 +27,7 @@ export interface CompanyKnowledge {
 }
 
 export function useCompanyKnowledge(companyId?: string) {
+  const { user } = useSupabaseAuth();
   const [knowledge, setKnowledge] = useState<CompanyKnowledge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,6 @@ export function useCompanyKnowledge(companyId?: string) {
     if (!companyId) return { success: false, error: 'No company selected' };
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       const { error: insertError } = await supabase
@@ -132,7 +133,6 @@ export function useCompanyKnowledge(companyId?: string) {
 
   const approveForCEO = async (knowledgeId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       const { error } = await supabase

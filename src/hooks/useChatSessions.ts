@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface ChatSession {
@@ -15,13 +16,13 @@ export interface ChatSession {
 }
 
 export function useChatSessions() {
+  const { user } = useSupabaseAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSessions = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -41,7 +42,6 @@ export function useChatSessions() {
 
   const createSession = useCallback(async (title?: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
       const { data, error } = await supabase

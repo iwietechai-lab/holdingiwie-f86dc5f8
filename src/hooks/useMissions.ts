@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import type { Mission, MissionParticipant, MissionType } from '@/types/mision-iwie';
 import { logger } from '@/utils/logger';
 
@@ -36,6 +37,7 @@ const castMission = (m: any): Mission => ({
 });
 
 export function useMissions() {
+  const { user } = useSupabaseAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -44,7 +46,6 @@ export function useMissions() {
   const fetchMissions = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
       setCurrentUserId(user.id);
@@ -128,7 +129,6 @@ export function useMissions() {
 
   // Create a new mission
   const createMission = async (missionData: Partial<Mission>, participantIds?: string[]): Promise<Mission | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     try {

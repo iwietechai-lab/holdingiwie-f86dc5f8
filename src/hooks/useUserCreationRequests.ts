@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardVisibility, DEFAULT_DASHBOARD_VISIBILITY } from '@/types/superadmin';
+import { useSupabaseAuth } from './useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export interface UserCreationRequest {
@@ -28,6 +29,7 @@ export interface UserCreationRequest {
 }
 
 export function useUserCreationRequests(companyId?: string) {
+  const { user } = useSupabaseAuth();
   const [requests, setRequests] = useState<UserCreationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,6 @@ export function useUserCreationRequests(companyId?: string) {
     access_permissions?: Partial<DashboardVisibility>;
   }) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const { error: insertError } = await supabase
@@ -169,7 +170,6 @@ export function useUserCreationRequests(companyId?: string) {
     reviewNotes?: string
   ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const { error: updateError } = await supabase
