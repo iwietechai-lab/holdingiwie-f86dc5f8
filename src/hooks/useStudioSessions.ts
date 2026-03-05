@@ -64,7 +64,7 @@ export function useStudioSessions({ userId, autoSaveDebounce = 2000 }: UseStudio
 
       setSessions(parsedSessions);
     } catch (error) {
-      console.error('Error fetching studio sessions:', error);
+      logger.error('Error fetching studio sessions:', error);
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +108,7 @@ export function useStudioSessions({ userId, autoSaveDebounce = 2000 }: UseStudio
       setCurrentSessionId(newSession.id);
       return newSession;
     } catch (error) {
-      console.error('Error creating studio session:', error);
+      logger.error('Error creating studio session:', error);
       toast.error('Error al crear la sesión');
       return null;
     }
@@ -158,7 +158,7 @@ export function useStudioSessions({ userId, autoSaveDebounce = 2000 }: UseStudio
 
       return true;
     } catch (error) {
-      console.error('Error saving studio session:', error);
+      logger.error('Error saving studio session:', error);
       return false;
     } finally {
       setIsSaving(false);
@@ -191,7 +191,7 @@ export function useStudioSessions({ userId, autoSaveDebounce = 2000 }: UseStudio
       setCurrentSessionId(sessionId);
       return session;
     } catch (error) {
-      console.error('Error loading studio session:', error);
+      logger.error('Error loading studio session:', error);
       toast.error('Error al cargar la sesión');
       return null;
     }
@@ -219,7 +219,7 @@ export function useStudioSessions({ userId, autoSaveDebounce = 2000 }: UseStudio
       toast.success('Sesión eliminada');
       return true;
     } catch (error) {
-      console.error('Error deleting studio session:', error);
+      logger.error('Error deleting studio session:', error);
       toast.error('Error al eliminar la sesión');
       return false;
     }

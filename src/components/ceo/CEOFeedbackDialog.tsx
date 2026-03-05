@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { Send, Paperclip, X, MessageSquare, Lightbulb, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -116,7 +117,7 @@ export function CEOFeedbackDialog({
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error('Error sending feedback:', error);
+      logger.error('Error sending feedback:', error);
       toast.error('Error al enviar retroalimentación');
     } finally {
       setIsSending(false);

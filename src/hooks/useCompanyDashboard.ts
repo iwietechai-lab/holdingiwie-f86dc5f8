@@ -257,7 +257,7 @@ export const useCompanyDashboard = (companyId: string | null) => {
         ]);
 
       } catch (error) {
-        console.error('Error fetching company dashboard stats:', error);
+        logger.error('Error fetching company dashboard stats:', error);
       } finally {
         setIsLoading(false);
       }

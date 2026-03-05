@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -199,7 +200,7 @@ export function StudioBuilder({
       
       return content;
     } catch (error) {
-      console.error('Error scraping URL:', error);
+      logger.error('Error scraping URL:', error);
       toast.error('Error al extraer contenido de la URL');
       throw error;
     } finally {
@@ -402,7 +403,7 @@ RESPONDE EN FORMATO JSON:
       }
       
     } catch (error) {
-      console.error('Course creation error:', error);
+      logger.error('Course creation error:', error);
       toast.error('Error al crear la propuesta del curso');
     } finally {
       setIsCreatingCourse(false);
@@ -489,7 +490,7 @@ Responde de manera clara y en español.`,
 
       setChatMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
+      logger.error('Chat error:', error);
       toast.error('Error al procesar el mensaje');
     } finally {
       setIsLoading(false);
@@ -620,7 +621,7 @@ REGLA IMPORTANTE: Siempre genera contenido completo y desarrollado. Nunca des so
       if (error instanceof Error && error.name === 'AbortError') {
         toast.info('Generación cancelada');
       } else {
-        console.error('Error generating output:', error);
+        logger.error('Error generating output:', error);
         toast.error('Error al generar el contenido');
       }
     } finally {

@@ -10,6 +10,8 @@
  * - Mutex prevents concurrent cleanup operations
  */
 
+import { logger } from '@/utils/logger';
+
 // Private state - completely isolated
 const registeredStreams = new Set<MediaStream>();
 let cleanupScheduled = false;
@@ -25,14 +27,14 @@ const CLEANUP_DELAYS = [0, 50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000];
 const stopTrack = (track: MediaStreamTrack, source: string): boolean => {
   try {
     if (track.readyState === 'live') {
-      console.log(`📹 CameraService: Stopping ${source} track: ${track.kind}`);
+      logger.log(`📹 CameraService: Stopping ${source} track: ${track.kind}`);
       track.enabled = false;
       track.stop();
       return true;
     }
     return false;
   } catch (e) {
-    console.warn(`📹 CameraService: Error stopping ${source} track:`, e);
+    logger.warn(`📹 CameraService: Error stopping ${source} track:`, e);
     return false;
   }
 };
@@ -59,7 +61,7 @@ const releaseVideoElement = (video: HTMLVideoElement): boolean => {
     
     return stoppedTracks > 0;
   } catch (e) {
-    console.warn('📹 CameraService: Error releasing video:', e);
+    logger.warn('📹 CameraService: Error releasing video:', e);
     return false;
   }
 };
@@ -93,10 +95,10 @@ const cleanupFaceApiCanvases = (): number => {
     });
     
     if (removed > 0) {
-      console.log(`📹 CameraService: Removed ${removed} face-api canvases`);
+      logger.log(`📹 CameraService: Removed ${removed} face-api canvases`);
     }
   } catch (e) {
-    console.warn('📹 CameraService: Error cleaning canvases:', e);
+    logger.warn('📹 CameraService: Error cleaning canvases:', e);
   }
   return removed;
 };
@@ -106,7 +108,7 @@ const cleanupFaceApiCanvases = (): number => {
  */
 export const registerStream = (stream: MediaStream): void => {
   if (!stream) return;
-  console.log('📹 CameraService: Registering stream with', stream.getTracks().length, 'tracks');
+  logger.log('📹 CameraService: Registering stream with', stream.getTracks().length, 'tracks');
   registeredStreams.add(stream);
   cleanupScheduled = false;
 };
@@ -116,7 +118,7 @@ export const registerStream = (stream: MediaStream): void => {
  */
 export const unregisterStream = (stream: MediaStream): void => {
   if (!stream) return;
-  console.log('📹 CameraService: Unregistering stream');
+  logger.log('📹 CameraService: Unregistering stream');
   registeredStreams.delete(stream);
 };
 
@@ -134,7 +136,7 @@ export const getActiveStreamCount = (): number => {
 export const forceStopAllCameras = (): void => {
   // Use mutex to prevent concurrent operations
   if (isCleaningMutex) {
-    console.log('📹 CameraService: Cleanup in progress, skipping');
+    logger.log('📹 CameraService: Cleanup in progress, skipping');
     return;
   }
   
@@ -152,7 +154,7 @@ export const forceStopAllCameras = (): void => {
         });
       }
     } catch (e) {
-      console.warn('📹 CameraService: Error stopping registered stream:', e);
+      logger.warn('📹 CameraService: Error stopping registered stream:', e);
     }
   });
   registeredStreams.clear();
@@ -166,7 +168,7 @@ export const forceStopAllCameras = (): void => {
   cleanupFaceApiCanvases();
   
   if (stoppedTracks > 0 || stoppedVideos > 0) {
-    console.log(`📹 CameraService: Stopped ${stoppedTracks} tracks, ${stoppedVideos} video elements`);
+    logger.log(`📹 CameraService: Stopped ${stoppedTracks} tracks, ${stoppedVideos} video elements`);
   }
   
   // Release mutex after a short delay
@@ -254,12 +256,12 @@ export const verifyCamerasStopped = (): boolean => {
   const isActive = isCameraActive();
   
   if (isActive) {
-    console.warn('📹 CameraService: ⚠️ Camera still active - forcing additional cleanup');
+    logger.warn('📹 CameraService: ⚠️ Camera still active - forcing additional cleanup');
     forceStopAllCameras();
     return false;
   }
   
-  console.log('📹 CameraService: ✅ All cameras stopped');
+  logger.log('📹 CameraService: ✅ All cameras stopped');
   return true;
 };
 
@@ -267,10 +269,10 @@ export const verifyCamerasStopped = (): boolean => {
  * Debug: Log current camera state
  */
 export const logCameraState = (): void => {
-  console.log('📹 CameraService: === STATE ===');
-  console.log('📹 Registered streams:', registeredStreams.size);
-  console.log('📹 Cleanup scheduled:', cleanupScheduled);
-  console.log('📹 Camera active:', isCameraActive());
+  logger.log('📹 CameraService: === STATE ===');
+  logger.log('📹 Registered streams:', registeredStreams.size);
+  logger.log('📹 Cleanup scheduled:', cleanupScheduled);
+  logger.log('📹 Camera active:', isCameraActive());
 };
 
 // Default export as object

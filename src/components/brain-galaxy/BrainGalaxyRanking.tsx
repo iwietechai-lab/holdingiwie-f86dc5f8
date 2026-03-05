@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +48,7 @@ export function BrainGalaxyRanking({ levels, currentUserId }: BrainGalaxyRanking
 
       setRankings(enrichedData);
     } catch (error) {
-      console.error('Error fetching rankings:', error);
+      logger.error('Error fetching rankings:', error);
     } finally {
       setIsLoading(false);
     }

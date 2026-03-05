@@ -55,7 +55,7 @@ export const useCompanySales = (companyId: string | null) => {
         created_at: s.created_at || '',
       })));
     } catch (error) {
-      console.error('Error fetching sales:', error);
+      logger.error('Error fetching sales:', error);
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +81,7 @@ export const useCompanySales = (companyId: string | null) => {
 
       fetchSales();
     } catch (error: any) {
-      console.error('Error creating sale:', error);
+      logger.error('Error creating sale:', error);
       toast({
         title: 'Error',
         description: error.message || 'No se pudo registrar la venta',
@@ -105,7 +105,7 @@ export const useCompanySales = (companyId: string | null) => {
 
       fetchSales();
     } catch (error: any) {
-      console.error('Error deleting sale:', error);
+      logger.error('Error deleting sale:', error);
       toast({
         title: 'Error',
         description: error.message,

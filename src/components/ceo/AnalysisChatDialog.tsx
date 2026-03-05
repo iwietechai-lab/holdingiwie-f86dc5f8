@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import {
   Sparkles,
   Send,
@@ -127,7 +128,7 @@ export function AnalysisChatDialog({
         content: data.response || 'No pude generar una respuesta.' 
       }]);
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       toast.error('Error al enviar mensaje');
       setChatMessages(prev => [...prev, { 
         role: 'assistant', 

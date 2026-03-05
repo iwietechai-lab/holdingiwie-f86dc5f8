@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { MessageSquare, Lightbulb, AlertTriangle, CheckCircle2, FileText, ExternalLink, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -93,7 +94,7 @@ export function ViewFeedbackDialog({
 
       setFeedback(feedbackData);
     } catch (error) {
-      console.error('Error loading feedback:', error);
+      logger.error('Error loading feedback:', error);
     } finally {
       setLoading(false);
     }

@@ -47,7 +47,7 @@ export function useAvailabilitySlots(): UseavailabilitySlotsReturn {
       if (queryError) throw queryError;
       setSlots(data || []);
     } catch (err: any) {
-      console.error('Error fetching availability slots:', err);
+      logger.error('Error fetching availability slots:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -66,7 +66,7 @@ export function useAvailabilitySlots(): UseavailabilitySlotsReturn {
       toast.success('Horario agregado');
       return { success: true };
     } catch (err: any) {
-      console.error('Error adding availability slot:', err);
+      logger.error('Error adding availability slot:', err);
       toast.error(err.message || 'Error al agregar horario');
       return { success: false, error: err.message };
     }
@@ -85,7 +85,7 @@ export function useAvailabilitySlots(): UseavailabilitySlotsReturn {
       toast.success('Horario actualizado');
       return { success: true };
     } catch (err: any) {
-      console.error('Error updating availability slot:', err);
+      logger.error('Error updating availability slot:', err);
       toast.error(err.message || 'Error al actualizar horario');
       return { success: false, error: err.message };
     }
@@ -104,7 +104,7 @@ export function useAvailabilitySlots(): UseavailabilitySlotsReturn {
       toast.success('Horario eliminado');
       return { success: true };
     } catch (err: any) {
-      console.error('Error deleting availability slot:', err);
+      logger.error('Error deleting availability slot:', err);
       toast.error(err.message || 'Error al eliminar horario');
       return { success: false, error: err.message };
     }

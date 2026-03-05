@@ -67,7 +67,7 @@ export function useUnreadMessages() {
 
       setUnreadCounts(counts);
     } catch (err) {
-      console.error('Error fetching unread counts:', err);
+      logger.error('Error fetching unread counts:', err);
     }
   }, [user, lastReadTimestamps]);
 

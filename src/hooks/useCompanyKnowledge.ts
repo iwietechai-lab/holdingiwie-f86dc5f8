@@ -69,7 +69,7 @@ export function useCompanyKnowledge(companyId?: string) {
         setKnowledge([]);
       }
     } catch (err) {
-      console.error('Error fetching company knowledge:', err);
+      logger.error('Error fetching company knowledge:', err);
       setError('Error al cargar conocimiento');
     } finally {
       setIsLoading(false);
@@ -108,7 +108,7 @@ export function useCompanyKnowledge(companyId?: string) {
       await fetchKnowledge();
       return { success: true };
     } catch (err) {
-      console.error('Error adding knowledge:', err);
+      logger.error('Error adding knowledge:', err);
       return { success: false, error: 'Error al agregar conocimiento' };
     }
   };
@@ -125,7 +125,7 @@ export function useCompanyKnowledge(companyId?: string) {
       await fetchKnowledge();
       return { success: true, data };
     } catch (err) {
-      console.error('Error analyzing knowledge:', err);
+      logger.error('Error analyzing knowledge:', err);
       return { success: false, error: 'Error al analizar conocimiento' };
     }
   };
@@ -149,7 +149,7 @@ export function useCompanyKnowledge(companyId?: string) {
       await fetchKnowledge();
       return { success: true };
     } catch (err) {
-      console.error('Error approving knowledge:', err);
+      logger.error('Error approving knowledge:', err);
       return { success: false, error: 'Error al aprobar conocimiento' };
     }
   };

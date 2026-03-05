@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, Mail, Lock, Eye, EyeOff, Sparkles, Shield, MapPin, Clock, Fingerprint, Satellite, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -72,7 +73,7 @@ export const Login = () => {
       
       // Handle error cases (expired link, etc.)
       if (error) {
-        console.log('Auth error:', error, errorDescription);
+        logger.log('Auth error:', error, errorDescription);
         toast({
           title: 'Error',
           description: errorDescription || 'El enlace ha expirado o es inválido. Solicita uno nuevo.',
@@ -85,7 +86,7 @@ export const Login = () => {
       }
       
       if ((type === 'recovery' && accessToken) || queryType === 'recovery') {
-        console.log('Password recovery detected from URL');
+        logger.log('Password recovery detected from URL');
         setIsPasswordRecovery(true);
         setStep('reset-password');
         return;
@@ -93,9 +94,9 @@ export const Login = () => {
 
       // Listen for PASSWORD_RECOVERY event from Supabase
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth state change:', event);
+        logger.log('Auth state change:', event);
         if (event === 'PASSWORD_RECOVERY') {
-          console.log('PASSWORD_RECOVERY event detected');
+          logger.log('PASSWORD_RECOVERY event detected');
           setIsPasswordRecovery(true);
           setStep('reset-password');
         }
@@ -134,7 +135,7 @@ export const Login = () => {
             .maybeSingle();
 
           if (error) {
-            console.error('Error checking profile:', error);
+            logger.error('Error checking profile:', error);
             // If profile check fails, go to profile setup
             setStep('profile-setup');
             setPendingProfileCheck(false);
@@ -154,7 +155,7 @@ export const Login = () => {
             setStep('profile-setup');
           }
         } catch (err) {
-          console.error('Profile check error:', err);
+          logger.error('Profile check error:', err);
         }
         
         setPendingProfileCheck(false);

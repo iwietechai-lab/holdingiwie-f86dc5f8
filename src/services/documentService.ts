@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/utils/logger';
 import { Document, DocumentUpload, getDocumentTypeFromMime } from '@/types/documents';
 
 const BUCKET_NAME = 'documentos';
@@ -133,7 +134,7 @@ export const documentService = {
           .catch(error => resolve({ path: '', error }));
       });
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       return { path: '', error: error as Error };
     }
   },
@@ -175,7 +176,7 @@ export const documentService = {
 
       return { path: data.path, error: null };
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       return { path: '', error: error as Error };
     }
   },
@@ -209,7 +210,7 @@ export const documentService = {
 
       return { data: data as unknown as Document, error: null };
     } catch (error) {
-      console.error('Create document error:', error);
+      logger.error('Create document error:', error);
       return { data: null, error: error as Error };
     }
   },
@@ -241,7 +242,7 @@ export const documentService = {
 
       return { data: (data || []) as unknown as Document[], error: null };
     } catch (error) {
-      console.error('Get documents error:', error);
+      logger.error('Get documents error:', error);
       return { data: [], error: error as Error };
     }
   },
@@ -257,7 +258,7 @@ export const documentService = {
 
       return data.signedUrl;
     } catch (error) {
-      console.error('Get download URL error:', error);
+      logger.error('Get download URL error:', error);
       return null;
     }
   },
@@ -281,7 +282,7 @@ export const documentService = {
 
       return { error: null };
     } catch (error) {
-      console.error('Delete document error:', error);
+      logger.error('Delete document error:', error);
       return { error: error as Error };
     }
   },
@@ -321,7 +322,7 @@ export const documentService = {
 
       return { data: data as unknown as Document, error: null };
     } catch (error) {
-      console.error('Update version error:', error);
+      logger.error('Update version error:', error);
       return { data: null, error: error as Error };
     }
   },

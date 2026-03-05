@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Phone, MonitorUp, MessageSquare, X, Send, Circle, Loader2, Users, ChevronLeft, Maximize2, CircleDot, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -158,7 +159,7 @@ export default function VideoCallPage() {
             });
 
           if (saveError) {
-            console.error('Error saving summary:', saveError);
+            logger.error('Error saving summary:', saveError);
             toast.error('Error al guardar el resumen');
           } else {
             toast.success('Resumen de reunión guardado');
@@ -179,7 +180,7 @@ export default function VideoCallPage() {
             }
           }
         } catch (err) {
-          console.error('Error saving meeting summary:', err);
+          logger.error('Error saving meeting summary:', err);
         }
       }
     }
@@ -191,10 +192,10 @@ export default function VideoCallPage() {
           .from('meeting_requests')
           .update({ status: 'pausada' })
           .eq('id', meetingRequestId);
-        console.log('Meeting marked as paused');
+        logger.log('Meeting marked as paused');
         toast.info('Reunión pausada - puedes reactivarla desde el dashboard');
       } catch (err) {
-        console.error('Error marking meeting as completed:', err);
+        logger.error('Error marking meeting as completed:', err);
       }
     }
     

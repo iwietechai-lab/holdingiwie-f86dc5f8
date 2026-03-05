@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText, RotateCw, Hand, Maximize2, Minimize2 } from 'lucide-react';
@@ -51,7 +52,7 @@ export const DocumentViewer = ({ url, fileName, mimeType }: DocumentViewerProps)
   };
 
   const onDocumentLoadError = (error: Error) => {
-    console.error('PDF load error:', error);
+    logger.error('PDF load error:', error);
     setError('No se pudo cargar el documento PDF');
     setLoading(false);
   };

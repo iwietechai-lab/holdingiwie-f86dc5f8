@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
@@ -73,7 +74,7 @@ export const Dashboard = () => {
                         profile.role === 'CEO Global' ||
                         profile.role === 'superadmin';
       
-      console.log('Dashboard access check:', { 
+      logger.log('Dashboard access check:', { 
         profileRole: profile.role, 
         hasAccess, 
         ver_dashboard: profile.dashboard_visibility?.ver_dashboard,

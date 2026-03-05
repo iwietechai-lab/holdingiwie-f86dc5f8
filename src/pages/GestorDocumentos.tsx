@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import {
   FolderOpen,
@@ -168,7 +169,7 @@ export const GestorDocumentos = () => {
 
       setDocuments(docsWithAccess);
     } catch (error) {
-      console.error('Load documents error:', error);
+      logger.error('Load documents error:', error);
     } finally {
       setIsLoadingDocs(false);
     }

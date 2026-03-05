@@ -111,7 +111,7 @@ export function useMissions() {
       const transformedMissions = uniqueMissions.map(castMission);
       setMissions(transformedMissions);
     } catch (error) {
-      console.error('Error fetching missions:', error);
+      logger.error('Error fetching missions:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron cargar las misiones',
@@ -203,7 +203,7 @@ export function useMissions() {
 
       return newMission;
     } catch (error) {
-      console.error('Error creating mission:', error);
+      logger.error('Error creating mission:', error);
       toast({
         title: 'Error',
         description: 'No se pudo crear la misión',
@@ -245,7 +245,7 @@ export function useMissions() {
       setMissions(prev => prev.map(m => m.id === id ? newMission : m));
       return newMission;
     } catch (error) {
-      console.error('Error updating mission:', error);
+      logger.error('Error updating mission:', error);
       toast({
         title: 'Error',
         description: 'No se pudo actualizar la misión',
@@ -274,7 +274,7 @@ export function useMissions() {
 
       return true;
     } catch (error) {
-      console.error('Error deleting mission:', error);
+      logger.error('Error deleting mission:', error);
       toast({
         title: 'Error',
         description: 'No se pudo eliminar la misión',
@@ -318,7 +318,7 @@ export function useMissions() {
 
       return data;
     } catch (error) {
-      console.error('Error adding participant:', error);
+      logger.error('Error adding participant:', error);
       toast({
         title: 'Error',
         description: 'No se pudo agregar al participante',

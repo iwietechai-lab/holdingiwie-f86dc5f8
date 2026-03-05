@@ -129,7 +129,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
         });
       }
     } catch (error) {
-      console.error('Error fetching workspace data:', error);
+      logger.error('Error fetching workspace data:', error);
     } finally {
       setLoading(false);
     }
@@ -244,7 +244,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
       // for immediate feedback (realtime will sync)
       
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       toast({
         title: 'Error',
         description: 'No se pudo enviar el mensaje',
@@ -286,7 +286,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
 
       setWorkspaceState(prev => prev ? { ...prev, active_panels: panels } : null);
     } catch (error) {
-      console.error('Error updating panels:', error);
+      logger.error('Error updating panels:', error);
     }
   };
 
@@ -316,7 +316,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
       setCostEstimates(prev => [data as MissionCostEstimate, ...prev]);
       return data;
     } catch (error) {
-      console.error('Error adding cost estimate:', error);
+      logger.error('Error adding cost estimate:', error);
       return null;
     }
   };
@@ -344,7 +344,7 @@ export function useMissionWorkspace({ mission }: UseMissionWorkspaceProps) {
       setTimeEstimates(prev => [data as MissionTimeEstimate, ...prev]);
       return data;
     } catch (error) {
-      console.error('Error adding time estimate:', error);
+      logger.error('Error adding time estimate:', error);
       return null;
     }
   };
@@ -425,7 +425,7 @@ ${mission.target_end_date || 'Por definir'}
 
       return true;
     } catch (error) {
-      console.error('Error exporting to CEOChat:', error);
+      logger.error('Error exporting to CEOChat:', error);
       toast({
         title: 'Error',
         description: 'No se pudo enviar el plan a CEOChat',

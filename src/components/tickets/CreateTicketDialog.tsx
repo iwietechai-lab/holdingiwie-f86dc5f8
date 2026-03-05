@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -94,7 +95,7 @@ export function CreateTicketDialog({ open, onOpenChange, onTicketCreated }: Crea
         if (usersRes.data) setUsers(usersRes.data);
         if (companiesRes.data) setCompanies(companiesRes.data);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        logger.error('Error fetching data:', err);
       } finally {
         setIsLoading(false);
       }
@@ -189,7 +190,7 @@ export function CreateTicketDialog({ open, onOpenChange, onTicketCreated }: Crea
       onTicketCreated();
       onOpenChange(false);
     } catch (err) {
-      console.error('Error creating ticket:', err);
+      logger.error('Error creating ticket:', err);
       toast.error('Error al crear ticket');
     } finally {
       setIsSubmitting(false);

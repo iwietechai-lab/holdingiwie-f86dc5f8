@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { 
   Brain, 
@@ -186,7 +187,7 @@ export default function CEOKnowledgeManager() {
         setSelectedCompany(data[0].id);
       }
     } catch (error) {
-      console.error('Error loading companies:', error);
+      logger.error('Error loading companies:', error);
       toast.error('Error al cargar empresas');
     } finally {
       setIsLoading(false);
@@ -203,7 +204,7 @@ export default function CEOKnowledgeManager() {
       if (error) throw error;
       setAllUsers(data || []);
     } catch (error) {
-      console.error('Error loading users:', error);
+      logger.error('Error loading users:', error);
     }
   };
 
@@ -237,7 +238,7 @@ export default function CEOKnowledgeManager() {
       
       setKnowledgeEntries(entries);
     } catch (error) {
-      console.error('Error loading knowledge:', error);
+      logger.error('Error loading knowledge:', error);
       toast.error('Error al cargar conocimiento');
     }
   };
@@ -264,7 +265,7 @@ export default function CEOKnowledgeManager() {
       
       setUserAccess(enrichedAccess);
     } catch (error) {
-      console.error('Error loading user access:', error);
+      logger.error('Error loading user access:', error);
     }
   };
 
@@ -307,7 +308,7 @@ export default function CEOKnowledgeManager() {
         type: selectedFile.type,
       };
     } catch (error) {
-      console.error('Error uploading document:', error);
+      logger.error('Error uploading document:', error);
       toast.error('Error al subir documento');
       return null;
     } finally {
@@ -355,7 +356,7 @@ export default function CEOKnowledgeManager() {
       setShowAddDialog(false);
       loadKnowledge();
     } catch (error) {
-      console.error('Error adding entry:', error);
+      logger.error('Error adding entry:', error);
       toast.error('Error al agregar conocimiento');
     } finally {
       setIsSaving(false);
@@ -374,7 +375,7 @@ export default function CEOKnowledgeManager() {
       toast.success('Conocimiento eliminado');
       loadKnowledge();
     } catch (error) {
-      console.error('Error deleting entry:', error);
+      logger.error('Error deleting entry:', error);
       toast.error('Error al eliminar');
     }
   };
@@ -411,7 +412,7 @@ export default function CEOKnowledgeManager() {
       setSelectedUserForAccess(null);
       loadUserAccess();
     } catch (error) {
-      console.error('Error granting access:', error);
+      logger.error('Error granting access:', error);
       toast.error('Error al conceder acceso');
     }
   };
@@ -437,7 +438,7 @@ export default function CEOKnowledgeManager() {
       toast.success('Acceso revocado');
       loadUserAccess();
     } catch (error) {
-      console.error('Error revoking access:', error);
+      logger.error('Error revoking access:', error);
       toast.error('Error al revocar acceso');
     }
   };
@@ -478,7 +479,7 @@ export default function CEOKnowledgeManager() {
         loadKnowledge();
       }
     } catch (error) {
-      console.error('Error analyzing knowledge:', error);
+      logger.error('Error analyzing knowledge:', error);
       toast.error('Error al analizar conocimiento');
     } finally {
       setIsAnalyzing(false);
@@ -513,7 +514,7 @@ export default function CEOKnowledgeManager() {
         setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
       }
     } catch (error) {
-      console.error('Error sending chat message:', error);
+      logger.error('Error sending chat message:', error);
       toast.error('Error al enviar mensaje');
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, hubo un error al procesar tu mensaje.' }]);
     } finally {
@@ -543,7 +544,7 @@ export default function CEOKnowledgeManager() {
         ]);
       }
     } catch (error) {
-      console.error('Error getting suggestion:', error);
+      logger.error('Error getting suggestion:', error);
       toast.error('Error al obtener sugerencia');
     } finally {
       setIsSendingChat(false);

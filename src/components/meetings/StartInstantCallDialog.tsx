@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { Video, Users, Search, User, Phone } from 'lucide-react';
 import {
@@ -103,7 +104,7 @@ export function StartInstantCallDialog({ currentUserId, currentUserName }: Start
       setOpen(false);
       navigate(`/videollamada/${roomId}`);
     } catch (error: any) {
-      console.error('Error starting call:', error);
+      logger.error('Error starting call:', error);
       toast.error(error.message || 'Error al iniciar la llamada');
     } finally {
       setIsStarting(false);

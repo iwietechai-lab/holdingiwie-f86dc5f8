@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import { Tarea, TareaDecision, UserStats } from '@/hooks/useAITareas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,7 +140,7 @@ export function TareasAIAssistant({
         content: response.data.response 
       }]);
     } catch (error) {
-      console.error('AI Error:', error);
+      logger.error('AI Error:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.' 

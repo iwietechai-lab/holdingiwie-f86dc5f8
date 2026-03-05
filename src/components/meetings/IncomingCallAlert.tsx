@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { Phone, PhoneOff, Video, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -70,7 +71,7 @@ export function IncomingCallAlert({ userId }: IncomingCallAlertProps) {
               // Store audio to stop later
               (window as any).__incomingCallAudio = audio;
             } catch (e) {
-              console.log('Could not play ringtone');
+              logger.log('Could not play ringtone');
             }
 
             // Auto-dismiss after 30 seconds

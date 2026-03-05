@@ -66,7 +66,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       if (chatsRes.data) setChatSessions(chatsRes.data as unknown as BrainGalaxyChatSession[]);
 
     } catch (error) {
-      console.error('Error fetching Brain Galaxy data:', error);
+      logger.error('Error fetching Brain Galaxy data:', error);
       toast({
         title: 'Error',
         description: 'No se pudo cargar los datos de Brain Galaxy',
@@ -131,7 +131,7 @@ export function useBrainGalaxy(userId: string | undefined) {
         description: reason,
       });
     } catch (error) {
-      console.error('Error adding points:', error);
+      logger.error('Error adding points:', error);
     }
   }, [userId, userStats, toast]);
 
@@ -158,7 +158,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       setChatSessions(prev => [newSession, ...prev]);
       return newSession;
     } catch (error) {
-      console.error('Error creating chat session:', error);
+      logger.error('Error creating chat session:', error);
       toast({
         title: 'Error',
         description: 'No se pudo crear la sesión de chat',
@@ -205,7 +205,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       
       return true;
     } catch (error) {
-      console.error('Error saving chat session:', error);
+      logger.error('Error saving chat session:', error);
       return false;
     }
   }, [userId]);
@@ -226,7 +226,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       
       return data as unknown as BrainGalaxyChatSession;
     } catch (error) {
-      console.error('Error loading chat session:', error);
+      logger.error('Error loading chat session:', error);
       toast({
         title: 'Error',
         description: 'No se pudo cargar la sesión de chat',
@@ -258,7 +258,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       
       return true;
     } catch (error) {
-      console.error('Error deleting chat session:', error);
+      logger.error('Error deleting chat session:', error);
       toast({
         title: 'Error',
         description: 'No se pudo eliminar la conversación',
@@ -337,7 +337,7 @@ export function useBrainGalaxy(userId: string | undefined) {
 
       return newContent;
     } catch (error) {
-      console.error('Error uploading content:', error);
+      logger.error('Error uploading content:', error);
       toast({
         title: 'Error',
         description: 'No se pudo subir el contenido',
@@ -377,7 +377,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       });
       return true;
     } catch (error) {
-      console.error('Error creating area:', error);
+      logger.error('Error creating area:', error);
       toast({
         title: 'Error',
         description: 'No se pudo crear el área',
@@ -437,7 +437,7 @@ export function useBrainGalaxy(userId: string | undefined) {
       });
       return true;
     } catch (error) {
-      console.error('Error creating course:', error);
+      logger.error('Error creating course:', error);
       toast({
         title: 'Error',
         description: 'No se pudo crear el curso',

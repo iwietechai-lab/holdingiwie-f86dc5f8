@@ -218,7 +218,7 @@ export function useAITareas() {
       setUserBadges(userBadgesData as UserBadge[] || []);
 
     } catch (error) {
-      console.error('Error fetching AI Tareas data:', error);
+      logger.error('Error fetching AI Tareas data:', error);
     } finally {
       setLoading(false);
     }

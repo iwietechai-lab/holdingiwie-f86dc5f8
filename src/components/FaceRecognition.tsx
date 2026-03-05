@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Camera, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,7 +33,7 @@ export const FaceRecognition = ({ onSuccess, onCancel }: FaceRecognitionProps) =
         setStatus('ready');
       }
     } catch (err) {
-      console.error('Camera error:', err);
+      logger.error('Camera error:', err);
       setError('No se pudo acceder a la cámara. Por favor, permite el acceso.');
       setStatus('failed');
     }
