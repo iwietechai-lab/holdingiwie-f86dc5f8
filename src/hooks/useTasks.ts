@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 export type EisenhowerPriority = 'urgente_importante' | 'no_urgente_importante' | 'urgente_no_importante' | 'no_urgente_no_importante';
 export type AlertStatus = 'al_dia' | 'por_vencer' | 'vencida';
@@ -72,8 +73,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
     try {
       let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
       
-      // Only holding and superadmins can see all tasks
-      // Other companies only see their own tasks
       if (!isSuperadmin && !isHolding && companyId) {
         query = query.eq('company_id', companyId);
       }
@@ -109,7 +108,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
         created_by: task.created_by,
         created_at: task.created_at,
         updated_at: task.updated_at,
-        // New enhanced fields
         eisenhower_priority: (task as any).eisenhower_priority as EisenhowerPriority | null,
         alert_status: (task as any).alert_status as AlertStatus | null,
         responsible_name: (task as any).responsible_name as string | null,
@@ -118,7 +116,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
       
       setTasks(mappedTasks);
     } catch (error) {
-      console.error('Error fetching tasks:', error);
+      logger.error('Error fetching tasks:', error);
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +148,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
       if (error) throw error;
 
-      // Create notifications for assigned users
       for (const userId of input.assigned_to) {
         await supabase.from('notifications').insert({
           user_id: userId,
@@ -170,7 +167,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
       fetchTasks();
       return data;
     } catch (error: any) {
-      console.error('Error creating task:', error);
+      logger.error('Error creating task:', error);
       toast({
         title: 'Error',
         description: error.message || 'No se pudo crear la tarea',
@@ -185,7 +182,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      // Get current task to track changes
       const currentTask = tasks.find(t => t.id === taskId);
       
       const { error } = await supabase
@@ -195,7 +191,6 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
       if (error) throw error;
 
-      // Track changes in history
       if (currentTask) {
         const changedFields = Object.keys(updates) as (keyof Task)[];
         for (const field of changedFields) {
@@ -218,7 +213,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
       fetchTasks();
     } catch (error: any) {
-      console.error('Error updating task:', error);
+      logger.error('Error updating task:', error);
       toast({
         title: 'Error',
         description: error.message || 'No se pudo actualizar la tarea',
@@ -243,7 +238,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
       fetchTasks();
     } catch (error: any) {
-      console.error('Error deleting task:', error);
+      logger.error('Error deleting task:', error);
       toast({
         title: 'Error',
         description: error.message || 'No se pudo eliminar la tarea',
@@ -274,7 +269,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
 
       return true;
     } catch (error: any) {
-      console.error('Error adding comment:', error);
+      logger.error('Error adding comment:', error);
       toast({
         title: 'Error',
         description: error.message,
@@ -302,7 +297,7 @@ export const useTasks = (companyId?: string | null, isSuperadmin?: boolean, isHo
         created_at: c.created_at,
       }));
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      logger.error('Error fetching comments:', error);
       return [];
     }
   };

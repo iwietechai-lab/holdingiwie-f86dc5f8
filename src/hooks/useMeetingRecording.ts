@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 
 interface UseMeetingRecordingReturn {
   isRecording: boolean;
@@ -30,7 +31,6 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
       setRecordingDuration(0);
       startTimeRef.current = Date.now();
       
-      // Create MediaRecorder with audio only for transcription
       const audioStream = new MediaStream(stream.getAudioTracks());
       
       const mediaRecorder = new MediaRecorder(audioStream, {
@@ -43,18 +43,17 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
         }
       };
 
-      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
 
-      // Update duration every second
       durationIntervalRef.current = setInterval(() => {
         setRecordingDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
 
-      console.log('Recording started');
+      logger.log('Recording started');
     } catch (error) {
-      console.error('Error starting recording:', error);
+      logger.error('Error starting recording:', error);
       toast.error('Error al iniciar la grabación');
     }
   }, []);
@@ -65,7 +64,6 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
     setIsProcessing(true);
     const durationSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
 
-    // Clear duration interval
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
@@ -88,7 +86,6 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
         try {
           const audioBlob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
           
-          // Convert to base64
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           
@@ -96,14 +93,13 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
             try {
               const base64Audio = (reader.result as string).split(',')[1];
               
-              // Transcribe audio
               toast.info('Transcribiendo audio...');
               const { data: transcriptionData, error: transcriptionError } = await supabase.functions.invoke('transcribe-audio', {
                 body: { audio: base64Audio, mimeType: 'audio/webm' },
               });
 
               if (transcriptionError) {
-                console.error('Transcription error:', transcriptionError);
+                logger.error('Transcription error:', transcriptionError);
                 throw new Error('Error al transcribir audio');
               }
 
@@ -116,7 +112,6 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
                 return;
               }
 
-              // Generate summary
               toast.info('Generando resumen...');
               const { data: summaryData, error: summaryError } = await supabase.functions.invoke('generate-meeting-summary', {
                 body: { 
@@ -126,8 +121,7 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
               });
 
               if (summaryError) {
-                console.error('Summary error:', summaryError);
-                // Continue without summary
+                logger.error('Summary error:', summaryError);
               }
 
               const summary = summaryData?.summary || '';
@@ -135,19 +129,19 @@ export function useMeetingRecording(): UseMeetingRecordingReturn {
               setIsProcessing(false);
               resolve({ transcription, summary, durationSeconds });
             } catch (error) {
-              console.error('Processing error:', error);
+              logger.error('Processing error:', error);
               setIsProcessing(false);
               resolve(null);
             }
           };
 
           reader.onerror = () => {
-            console.error('Error reading audio blob');
+            logger.error('Error reading audio blob');
             setIsProcessing(false);
             resolve(null);
           };
         } catch (error) {
-          console.error('Error processing recording:', error);
+          logger.error('Error processing recording:', error);
           setIsProcessing(false);
           resolve(null);
         }

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 import type { Source, StudioOutput, ChatMessage } from '@/components/brain-galaxy/studio/types';
 
 // Types for studio sessions

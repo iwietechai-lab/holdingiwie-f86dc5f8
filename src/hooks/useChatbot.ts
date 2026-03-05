@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Chatbot, ChatMessage, KnowledgeEntry } from '@/types/organization';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 interface UseChatbotReturn {
   chatbot: Chatbot | null;
@@ -30,7 +31,6 @@ export function useChatbot(): UseChatbotReturn {
     setError(null);
 
     try {
-      // Fetch chatbot for company
       const { data: chatbotData, error: chatbotError } = await supabase
         .from('chatbots')
         .select('*')
@@ -41,7 +41,6 @@ export function useChatbot(): UseChatbotReturn {
       setChatbot(chatbotData as unknown as Chatbot);
 
       if (chatbotData) {
-        // Fetch previous messages
         const { data: messagesData } = await supabase
           .from('chat_messages')
           .select('*')
@@ -53,7 +52,7 @@ export function useChatbot(): UseChatbotReturn {
         setMessages((messagesData || []) as unknown as ChatMessage[]);
       }
     } catch (err) {
-      console.error('Error fetching chatbot:', err);
+      logger.error('Error fetching chatbot:', err);
       setError(err instanceof Error ? err.message : 'Error loading chatbot');
     } finally {
       setIsLoading(false);
@@ -66,7 +65,6 @@ export function useChatbot(): UseChatbotReturn {
     setIsSending(true);
 
     try {
-      // Save user message
       const { data: userMessage, error: userMsgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -81,7 +79,6 @@ export function useChatbot(): UseChatbotReturn {
       if (userMsgError) throw userMsgError;
       setMessages(prev => [...prev, userMessage as unknown as ChatMessage]);
 
-      // Call AI Gateway for response
       const response = await supabase.functions.invoke('ceo-chatbot', {
         body: {
           message: content,
@@ -89,7 +86,7 @@ export function useChatbot(): UseChatbotReturn {
           company_id: chatbot.company_id,
           knowledge_base: chatbot.knowledge_base,
           system_prompt: chatbot.system_prompt,
-          history: messages.slice(-10), // Last 10 messages for context
+          history: messages.slice(-10),
         },
       });
 
@@ -97,7 +94,6 @@ export function useChatbot(): UseChatbotReturn {
 
       const assistantContent = response.data?.response || 'Lo siento, no pude procesar tu solicitud.';
 
-      // Save assistant message
       const { data: assistantMessage, error: assistantMsgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -113,7 +109,7 @@ export function useChatbot(): UseChatbotReturn {
       if (assistantMsgError) throw assistantMsgError;
       setMessages(prev => [...prev, assistantMessage as unknown as ChatMessage]);
     } catch (err) {
-      console.error('Error sending message:', err);
+      logger.error('Error sending message:', err);
       setError(err instanceof Error ? err.message : 'Error sending message');
     } finally {
       setIsSending(false);
@@ -138,7 +134,7 @@ const updateKnowledgeBase = useCallback(async (
       await fetchChatbot();
       return { success: true };
     } catch (err) {
-      console.error('Error updating knowledge base:', err);
+      logger.error('Error updating knowledge base:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error updating knowledge base' };
     }
   }, [chatbot, fetchChatbot]);

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Mission, MissionParticipant, MissionType } from '@/types/mision-iwie';
+import { logger } from '@/utils/logger';
 
 // Helper to safely cast string to typed values
 const castMission = (m: any): Mission => ({

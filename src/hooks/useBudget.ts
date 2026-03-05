@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 export interface BudgetCategory {
   id: string;
@@ -73,7 +74,7 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
       query = query.eq('company_id', companyId);
     }
     const { data, error } = await query;
-    if (error) console.error('Error fetching categories:', error);
+    if (error) logger.error('Error fetching categories:', error);
     setCategories((data || []) as BudgetCategory[]);
   };
 
@@ -83,7 +84,7 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
       query = query.eq('company_id', companyId);
     }
     const { data, error } = await query;
-    if (error) console.error('Error fetching items:', error);
+    if (error) logger.error('Error fetching items:', error);
     setItems((data || []).map(item => ({
       ...item,
       price_rmb: Number(item.price_rmb) || 0,
@@ -98,7 +99,7 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
       query = query.eq('company_id', companyId);
     }
     const { data, error } = await query;
-    if (error) console.error('Error fetching quotes:', error);
+    if (error) logger.error('Error fetching quotes:', error);
     setQuotes((data || []).map(q => ({
       ...q,
       subtotal: Number(q.subtotal) || 0,
@@ -187,7 +188,7 @@ export const useBudget = (companyId?: string | null, isSuperadmin?: boolean) => 
       .select('*')
       .eq('quote_id', quoteId);
     if (error) {
-      console.error('Error fetching quote items:', error);
+      logger.error('Error fetching quote items:', error);
       return [];
     }
     return (data || []).map(qi => ({

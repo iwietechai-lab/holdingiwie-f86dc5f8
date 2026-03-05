@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Meeting } from '@/types/organization';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 interface UseMeetingsReturn {
   meetings: Meeting[];
@@ -34,7 +35,7 @@ export function useMeetings(): UseMeetingsReturn {
       if (fetchError) throw fetchError;
       setMeetings((data || []) as unknown as Meeting[]);
     } catch (err) {
-      console.error('Error fetching meetings:', err);
+      logger.error('Error fetching meetings:', err);
       setError(err instanceof Error ? err.message : 'Error loading meetings');
     } finally {
       setIsLoading(false);
@@ -57,7 +58,7 @@ export function useMeetings(): UseMeetingsReturn {
       await fetchMeetings();
       return { success: true };
     } catch (err) {
-      console.error('Error creating meeting:', err);
+      logger.error('Error creating meeting:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error creating meeting' };
     }
   }, [user, profile, fetchMeetings]);
@@ -76,7 +77,7 @@ export function useMeetings(): UseMeetingsReturn {
       await fetchMeetings();
       return { success: true };
     } catch (err) {
-      console.error('Error updating meeting:', err);
+      logger.error('Error updating meeting:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error updating meeting' };
     }
   }, [fetchMeetings]);
@@ -92,7 +93,7 @@ export function useMeetings(): UseMeetingsReturn {
       await fetchMeetings();
       return { success: true };
     } catch (err) {
-      console.error('Error deleting meeting:', err);
+      logger.error('Error deleting meeting:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error deleting meeting' };
     }
   }, [fetchMeetings]);

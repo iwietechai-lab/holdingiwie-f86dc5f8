@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 import { 
   AppRole, 
   DbCompany, 
@@ -58,14 +59,14 @@ export function useSuperadmin(): UseSuperadminReturn {
         const { data, error: rpcError } = await supabase.rpc('is_superadmin');
         
         if (rpcError) {
-          console.error('Error checking superadmin status:', rpcError);
+          logger.error('Error checking superadmin status:', rpcError);
           setIsSuperadmin(false);
         } else {
-          console.log('Superadmin check result:', data);
+          logger.log('Superadmin check result:', data);
           setIsSuperadmin(data === true);
         }
       } catch (err) {
-        console.error('Error in superadmin check:', err);
+        logger.error('Error in superadmin check:', err);
         setIsSuperadmin(false);
       }
       
@@ -96,7 +97,7 @@ export function useSuperadmin(): UseSuperadminReturn {
         .select('*');
 
       if (rolesError) {
-        console.warn('Error fetching roles:', rolesError);
+        logger.warn('Error fetching roles:', rolesError);
       }
 
       // Fetch companies for association
@@ -105,7 +106,7 @@ export function useSuperadmin(): UseSuperadminReturn {
         .select('*');
       
       if (companiesError) {
-        console.warn('Error fetching companies for users:', companiesError);
+        logger.warn('Error fetching companies for users:', companiesError);
       }
 
       // Fetch departments for association
@@ -114,7 +115,7 @@ export function useSuperadmin(): UseSuperadminReturn {
         .select('*');
       
       if (departmentsError) {
-        console.warn('Error fetching departments for users:', departmentsError);
+        logger.warn('Error fetching departments for users:', departmentsError);
       }
 
       // Combine data
@@ -149,7 +150,7 @@ export function useSuperadmin(): UseSuperadminReturn {
 
       setUsers(usersWithDetails);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      logger.error('Error fetching users:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar usuarios');
     } finally {
       setIsLoading(false);
@@ -164,13 +165,13 @@ export function useSuperadmin(): UseSuperadminReturn {
         .order('name');
       
       if (error) {
-        console.error('Error fetching companies:', error);
+        logger.error('Error fetching companies:', error);
         return;
       }
       
       setCompanies(data || []);
     } catch (err) {
-      console.error('Error in fetchCompanies:', err);
+      logger.error('Error in fetchCompanies:', err);
     }
   }, []);
 
@@ -182,13 +183,13 @@ export function useSuperadmin(): UseSuperadminReturn {
         .order('name');
       
       if (error) {
-        console.error('Error fetching departments:', error);
+        logger.error('Error fetching departments:', error);
         return;
       }
       
       setDepartments(data || []);
     } catch (err) {
-      console.error('Error in fetchDepartments:', err);
+      logger.error('Error in fetchDepartments:', err);
     }
   }, []);
 
@@ -226,7 +227,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       if (updates.position_id !== undefined) updateData.position_id = updates.position_id;
       if (updates.can_upload_documents !== undefined) updateData.can_upload_documents = updates.can_upload_documents;
       
-      console.log('Updating user profile:', userId, updateData);
+      logger.log('Updating user profile:', userId, updateData);
       
       const { error } = await supabase
         .from('user_profiles')
@@ -237,7 +238,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error updating user profile:', err);
+      logger.error('Error updating user profile:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar' };
     }
   }, [isSuperadmin, fetchUsers]);
@@ -278,7 +279,7 @@ export function useSuperadmin(): UseSuperadminReturn {
         .neq('role', 'superadmin');
 
       if (deleteError) {
-        console.error('Error deleting existing roles:', deleteError);
+        logger.error('Error deleting existing roles:', deleteError);
         throw deleteError;
       }
 
@@ -289,7 +290,7 @@ export function useSuperadmin(): UseSuperadminReturn {
           .insert({ user_id: userId, role: dbRole });
 
         if (insertError) {
-          console.error('Error inserting new role:', insertError);
+          logger.error('Error inserting new role:', insertError);
           throw insertError;
         }
       }
@@ -301,14 +302,14 @@ export function useSuperadmin(): UseSuperadminReturn {
         .eq('id', userId);
 
       if (error) {
-        console.error('Error updating user_profiles role:', error);
+        logger.error('Error updating user_profiles role:', error);
         throw error;
       }
       
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error updating role:', err);
+      logger.error('Error updating role:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar rol' };
     }
   }, [isSuperadmin, fetchUsers]);
@@ -334,7 +335,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error updating dashboard visibility:', err);
+      logger.error('Error updating dashboard visibility:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar visibilidad' };
     }
   }, [isSuperadmin, fetchUsers]);
@@ -368,7 +369,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error removing role:', err);
+      logger.error('Error removing role:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al eliminar rol' };
     }
   }, [isSuperadmin, fetchUsers]);
@@ -416,7 +417,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       await fetchCompanies();
       return { success: true };
     } catch (err: any) {
-      console.error('Error creating company:', err);
+      logger.error('Error creating company:', err);
       return { success: false, error: err?.message || 'Error al crear empresa' };
     }
   }, [isSuperadmin, fetchCompanies]);
@@ -441,7 +442,7 @@ export function useSuperadmin(): UseSuperadminReturn {
       await fetchDepartments();
       return { success: true };
     } catch (err) {
-      console.error('Error creating department:', err);
+      logger.error('Error creating department:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al crear departamento' };
     }
   }, [isSuperadmin, fetchDepartments]);
