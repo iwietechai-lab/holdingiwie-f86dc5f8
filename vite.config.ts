@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6 MB limit
         runtimeCaching: [
           {
             // Block caching for sensitive Supabase API routes (auth, data, storage)
@@ -92,6 +92,17 @@ export default defineConfig(({ mode }) => ({
       }
     })
   ].filter(Boolean),
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'face-api': ['@vladmandic/face-api'],
+          'recharts': ['recharts'],
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
