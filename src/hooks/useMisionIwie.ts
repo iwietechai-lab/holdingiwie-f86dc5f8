@@ -229,7 +229,7 @@ export function useMisionIwie() {
       setUserBadges(userBadgesData as UserBadge[] || []);
 
     } catch (error) {
-      console.error('Error fetching Misión Iwie data:', error);
+      logger.error('Error fetching Misión Iwie data:', error);
     } finally {
       setLoading(false);
     }

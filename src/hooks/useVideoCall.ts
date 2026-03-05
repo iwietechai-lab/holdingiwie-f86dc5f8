@@ -383,7 +383,7 @@ export function useVideoCall(): UseVideoCallReturn {
       });
 
       peer.on('disconnected', () => {
-        console.log('PeerJS disconnected');
+        logger.log('PeerJS disconnected');
         setIsConnected(false);
         
         if (!isLeavingRef.current) {
@@ -393,7 +393,7 @@ export function useVideoCall(): UseVideoCallReturn {
       });
 
       peer.on('close', () => {
-        console.log('PeerJS closed');
+        logger.log('PeerJS closed');
         setIsConnected(false);
       });
 
@@ -409,7 +409,7 @@ export function useVideoCall(): UseVideoCallReturn {
           },
         })
         .on('broadcast', { event: 'presence' }, ({ payload }) => {
-          console.log('Received presence:', payload);
+          logger.log('Received presence:', payload);
           
           // Ignore our own messages
           if (payload.oderId === userIdRef.current) {
@@ -418,7 +418,7 @@ export function useVideoCall(): UseVideoCallReturn {
           
           // If someone else joined, call them
           if (payload.action === 'join' && payload.peerId) {
-            console.log('New participant joined, calling:', payload.peerId);
+            logger.log('New participant joined, calling:', payload.peerId);
             // Small delay to ensure peer is ready
             setTimeout(() => {
               callPeer(payload.peerId, payload.userName, payload.oderId);
@@ -435,18 +435,18 @@ export function useVideoCall(): UseVideoCallReturn {
           }]);
         })
         .on('broadcast', { event: 'leave' }, ({ payload }) => {
-          console.log('Participant leaving:', payload);
+          logger.log('Participant leaving:', payload);
           removeParticipant(payload.oderId, payload.peerId);
         })
         .on('broadcast', { event: 'heartbeat' }, ({ payload }) => {
           // Keep track of active participants
           if (payload.oderId !== userIdRef.current) {
             // Participant is still active
-            console.log('Heartbeat from:', payload.userName);
+            logger.log('Heartbeat from:', payload.userName);
           }
         })
         .subscribe((status) => {
-          console.log('Channel subscription status:', status);
+          logger.log('Channel subscription status:', status);
           if (status === 'SUBSCRIBED') {
             // Re-announce presence after subscription
             setTimeout(() => {
@@ -458,13 +458,13 @@ export function useVideoCall(): UseVideoCallReturn {
       channelRef.current = channel;
 
     } catch (err: any) {
-      console.error('Error joining room:', err);
+      logger.error('Error joining room:', err);
       setError(err.message);
     }
   }, [broadcastPresence, callPeer, handleIncomingCall, attemptReconnect, startHeartbeat, removeParticipant]);
 
   const leaveRoom = useCallback(() => {
-    console.log('Leaving room...');
+    logger.log('Leaving room...');
     isLeavingRef.current = true;
     
     // Stop heartbeat
@@ -492,7 +492,7 @@ export function useVideoCall(): UseVideoCallReturn {
       try {
         connection.close();
       } catch (e) {
-        console.error('Error closing connection:', e);
+        logger.error('Error closing connection:', e);
       }
     });
     connectionsRef.current.clear();
@@ -510,7 +510,7 @@ export function useVideoCall(): UseVideoCallReturn {
       try {
         peerRef.current.destroy();
       } catch (e) {
-        console.error('Error destroying peer:', e);
+        logger.error('Error destroying peer:', e);
       }
       peerRef.current = null;
     }
@@ -529,7 +529,7 @@ export function useVideoCall(): UseVideoCallReturn {
     setIsVideoEnabled(true);
     setIsScreenSharing(false);
     
-    console.log('Left room successfully');
+    logger.log('Left room successfully');
   }, [localStream, broadcastPresence, stopAllTracks]);
 
   const toggleAudio = useCallback(() => {
@@ -620,7 +620,7 @@ export function useVideoCall(): UseVideoCallReturn {
         setIsScreenSharing(true);
       }
     } catch (err: any) {
-      console.error('Error toggling screen share:', err);
+      logger.error('Error toggling screen share:', err);
       setError(err.message);
     }
   }, [isScreenSharing]);
@@ -701,7 +701,7 @@ export function useVideoCall(): UseVideoCallReturn {
           try {
             peerRef.current.destroy();
           } catch (e) {
-            console.error('Error destroying peer on unmount:', e);
+            logger.error('Error destroying peer on unmount:', e);
           }
         }
         
