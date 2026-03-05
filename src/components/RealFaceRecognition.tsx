@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 import { Camera, RefreshCw, CheckCircle, XCircle, AlertTriangle, Loader2, MapPin, User, MoveHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 import { supabase } from '@/lib/supabase';
 import cameraService from '@/utils/cameraService';
 import { markSessionVerified } from '@/hooks/useFacialVerification';

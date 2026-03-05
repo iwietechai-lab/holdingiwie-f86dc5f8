@@ -3,7 +3,7 @@ import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, CheckCircle, XCircle, User, AlertCircle } from 'lucide-react';
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
