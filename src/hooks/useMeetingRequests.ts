@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 
 export type MeetingRequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'completada' | 'pausada';
 export type Priority = 'baja' | 'media' | 'alta' | 'urgente';
@@ -72,7 +73,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       
       setRequests(mappedData);
     } catch (err: any) {
-      console.error('Error fetching meeting requests:', err);
+      logger.error('Error fetching meeting requests:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -112,7 +113,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Solicitud de reunión creada');
       return { success: true, data: data as MeetingRequest };
     } catch (err: any) {
-      console.error('Error creating meeting request:', err);
+      logger.error('Error creating meeting request:', err);
       toast.error(err.message || 'Error al crear solicitud');
       return { success: false, error: err.message };
     }
@@ -130,7 +131,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       await fetchRequests();
       return { success: true };
     } catch (err: any) {
-      console.error('Error updating meeting request:', err);
+      logger.error('Error updating meeting request:', err);
       toast.error(err.message || 'Error al actualizar solicitud');
       return { success: false, error: err.message };
     }
@@ -149,7 +150,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Solicitud eliminada');
       return { success: true };
     } catch (err: any) {
-      console.error('Error deleting meeting request:', err);
+      logger.error('Error deleting meeting request:', err);
       toast.error(err.message || 'Error al eliminar solicitud');
       return { success: false, error: err.message };
     }
@@ -200,7 +201,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Reunión aprobada');
       return { success: true };
     } catch (err: any) {
-      console.error('Error approving meeting request:', err);
+      logger.error('Error approving meeting request:', err);
       toast.error(err.message || 'Error al aprobar solicitud');
       return { success: false, error: err.message };
     }
@@ -233,7 +234,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Reunión rechazada');
       return { success: true };
     } catch (err: any) {
-      console.error('Error rejecting meeting request:', err);
+      logger.error('Error rejecting meeting request:', err);
       toast.error(err.message || 'Error al rechazar solicitud');
       return { success: false, error: err.message };
     }
@@ -255,7 +256,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Reunión pausada - puede reactivarse más tarde');
       return { success: true };
     } catch (err: any) {
-      console.error('Error pausing meeting request:', err);
+      logger.error('Error pausing meeting request:', err);
       toast.error(err.message || 'Error al pausar solicitud');
       return { success: false, error: err.message };
     }
@@ -290,7 +291,7 @@ export function useMeetingRequests(): UseMeetingRequestsReturn {
       toast.success('Reunión reactivada');
       return { success: true };
     } catch (err: any) {
-      console.error('Error reactivating meeting request:', err);
+      logger.error('Error reactivating meeting request:', err);
       toast.error(err.message || 'Error al reactivar solicitud');
       return { success: false, error: err.message };
     }
