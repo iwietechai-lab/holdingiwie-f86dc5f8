@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 interface ChatMessage {
   id: string;
@@ -44,7 +45,7 @@ export function useCEOChatbot(): UseCEOChatbotReturn {
           .single();
 
         if (chatbotError && chatbotError.code !== 'PGRST116') {
-          console.error('Error fetching chatbot:', chatbotError);
+          logger.error('Error fetching chatbot:', chatbotError);
         }
 
         if (chatbotData) {
@@ -70,7 +71,7 @@ export function useCEOChatbot(): UseCEOChatbotReturn {
           }
         }
       } catch (err) {
-        console.error('Error loading chatbot:', err);
+        logger.error('Error loading chatbot:', err);
         setError(err instanceof Error ? err.message : 'Error cargando chatbot');
       } finally {
         setIsLoading(false);
@@ -158,7 +159,7 @@ export function useCEOChatbot(): UseCEOChatbotReturn {
       }]);
 
     } catch (err) {
-      console.error('Error sending message:', err);
+      logger.error('Error sending message:', err);
       setError(err instanceof Error ? err.message : 'Error al enviar mensaje');
     } finally {
       setIsSending(false);
@@ -178,7 +179,7 @@ export function useCEOChatbot(): UseCEOChatbotReturn {
 
       setMessages([]);
     } catch (err) {
-      console.error('Error clearing conversation:', err);
+      logger.error('Error clearing conversation:', err);
       setError(err instanceof Error ? err.message : 'Error al limpiar conversación');
     }
   }, [chatbotId, user?.id]);

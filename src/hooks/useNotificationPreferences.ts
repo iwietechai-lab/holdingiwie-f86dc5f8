@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 import { 
   NotificationSound, 
   UserNotificationPreference, 
@@ -40,7 +41,7 @@ export function useNotificationPreferences(): UseNotificationPreferencesReturn {
       if (fetchError) throw fetchError;
       setSounds((data || []) as NotificationSound[]);
     } catch (err) {
-      console.error('Error fetching notification sounds:', err);
+      logger.error('Error fetching notification sounds:', err);
       setError(err instanceof Error ? err.message : 'Error loading sounds');
     }
   }, []);
@@ -58,7 +59,7 @@ export function useNotificationPreferences(): UseNotificationPreferencesReturn {
       if (fetchError) throw fetchError;
       setPreferences((data || []) as UserNotificationPreference[]);
     } catch (err) {
-      console.error('Error fetching notification preferences:', err);
+      logger.error('Error fetching notification preferences:', err);
       setError(err instanceof Error ? err.message : 'Error loading preferences');
     }
   }, [user]);
@@ -173,7 +174,7 @@ export function useNotificationPreferences(): UseNotificationPreferencesReturn {
           ];
         });
       } catch (err) {
-        console.error('Error updating notification preference:', err);
+        logger.error('Error updating notification preference:', err);
         throw err;
       }
     },

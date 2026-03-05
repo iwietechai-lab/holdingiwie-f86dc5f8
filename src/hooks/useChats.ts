@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 export type ChatType = 'one_to_one' | 'group_company' | 'group_multi_company' | 'global';
 
@@ -76,7 +77,7 @@ export function useChats() {
       if (queryError) throw queryError;
       setChats((data || []) as Chat[]);
     } catch (err: any) {
-      console.error('Error fetching chats:', err);
+      logger.error('Error fetching chats:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -118,7 +119,7 @@ export function useChats() {
       await fetchChats();
       return chat as Chat;
     } catch (err: any) {
-      console.error('Error creating chat:', err);
+      logger.error('Error creating chat:', err);
       toast.error('Error al crear el chat');
       return null;
     }
@@ -137,7 +138,7 @@ export function useChats() {
       await fetchChats();
       return true;
     } catch (err: any) {
-      console.error('Error deleting chat:', err);
+      logger.error('Error deleting chat:', err);
       toast.error('Error al eliminar el chat');
       return false;
     }
@@ -209,7 +210,7 @@ export function useChatMessages(chatId: string | null) {
 
       setMessages(messagesWithSenders as Message[]);
     } catch (err) {
-      console.error('Error fetching messages:', err);
+      logger.error('Error fetching messages:', err);
     } finally {
       setIsLoading(false);
     }
@@ -230,7 +231,7 @@ export function useChatMessages(chatId: string | null) {
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('Error sending message:', err);
+      logger.error('Error sending message:', err);
       toast.error('Error al enviar mensaje');
       return false;
     }
@@ -315,7 +316,7 @@ export function useChatParticipants(chatId: string | null) {
 
       setParticipants(participantsWithProfiles as ChatParticipant[]);
     } catch (err) {
-      console.error('Error fetching participants:', err);
+      logger.error('Error fetching participants:', err);
     } finally {
       setIsLoading(false);
     }
@@ -350,7 +351,7 @@ export function useChatSummaries(chatId: string | null) {
       if (error) throw error;
       setSummaries((data || []) as ChatSummary[]);
     } catch (err) {
-      console.error('Error fetching summaries:', err);
+      logger.error('Error fetching summaries:', err);
     }
   }, [chatId]);
 
@@ -388,7 +389,7 @@ export function useChatSummaries(chatId: string | null) {
       await fetchSummaries();
       return true;
     } catch (err) {
-      console.error('Error generating summary:', err);
+      logger.error('Error generating summary:', err);
       toast.error('Error al generar informe');
       return false;
     } finally {

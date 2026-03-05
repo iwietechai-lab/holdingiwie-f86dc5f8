@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Gerencia, SubGerencia, Area, Position } from '@/types/organization';
+import { logger } from '@/utils/logger';
 
 interface UseOrganizationReturn {
   gerencias: Gerencia[];
@@ -30,7 +31,6 @@ export function useOrganization(): UseOrganizationReturn {
     setError(null);
 
     try {
-      // Fetch gerencias
       const { data: gerenciasData, error: gerenciasError } = await supabase
         .from('gerencias')
         .select('*')
@@ -40,11 +40,9 @@ export function useOrganization(): UseOrganizationReturn {
       if (gerenciasError) throw gerenciasError;
       setGerencias((gerenciasData || []) as unknown as Gerencia[]);
 
-      // Get gerencia IDs
       const gerenciaIds = (gerenciasData || []).map(g => g.id);
 
       if (gerenciaIds.length > 0) {
-        // Fetch sub_gerencias
         const { data: subGerenciasData } = await supabase
           .from('sub_gerencias')
           .select('*')
@@ -52,7 +50,6 @@ export function useOrganization(): UseOrganizationReturn {
           .order('order_index');
         setSubGerencias((subGerenciasData || []) as unknown as SubGerencia[]);
 
-        // Fetch areas
         const { data: areasData } = await supabase
           .from('areas')
           .select('*')
@@ -60,7 +57,6 @@ export function useOrganization(): UseOrganizationReturn {
           .order('order_index');
         setAreas((areasData || []) as unknown as Area[]);
 
-        // Fetch positions
         const { data: positionsData } = await supabase
           .from('positions')
           .select('*')
@@ -69,7 +65,7 @@ export function useOrganization(): UseOrganizationReturn {
         setPositions((positionsData || []) as unknown as Position[]);
       }
     } catch (err) {
-      console.error('Error fetching organization:', err);
+      logger.error('Error fetching organization:', err);
       setError(err instanceof Error ? err.message : 'Error loading organization');
     } finally {
       setIsLoading(false);

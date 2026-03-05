@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { logger } from '@/utils/logger';
 
 export interface ChatSession {
   id: string;
@@ -30,11 +31,9 @@ export function useChatSessions() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // Group sessions by date
       setSessions(data || []);
     } catch (err) {
-      console.error('Error fetching chat sessions:', err);
+      logger.error('Error fetching chat sessions:', err);
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +59,7 @@ export function useChatSessions() {
       await fetchSessions();
       return data;
     } catch (err) {
-      console.error('Error creating session:', err);
+      logger.error('Error creating session:', err);
       return null;
     }
   }, [fetchSessions]);
@@ -80,7 +79,7 @@ export function useChatSessions() {
       await fetchSessions();
       return true;
     } catch (err) {
-      console.error('Error deleting session:', err);
+      logger.error('Error deleting session:', err);
       return false;
     }
   }, [activeSession, fetchSessions]);

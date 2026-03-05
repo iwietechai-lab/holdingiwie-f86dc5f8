@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Notification } from '@/types/organization';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 interface UseNotificationsReturn {
   notifications: Notification[];
@@ -69,7 +70,7 @@ export function useNotifications(): UseNotificationsReturn {
           });
         }
       } catch (err) {
-        console.error('Error fetching notification preferences:', err);
+        logger.error('Error fetching notification preferences:', err);
       }
     };
 
@@ -112,10 +113,10 @@ export function useNotifications(): UseNotificationsReturn {
       audio.volume = volume / 100;
       audio.currentTime = 0;
       audio.play().catch((err) => {
-        console.warn('Could not play notification sound:', err);
+        logger.warn('Could not play notification sound:', err);
       });
     } catch (err) {
-      console.error('Error playing notification sound:', err);
+      logger.error('Error playing notification sound:', err);
     }
   }, []);
 
@@ -136,7 +137,7 @@ export function useNotifications(): UseNotificationsReturn {
       if (fetchError) throw fetchError;
       setNotifications((data || []) as unknown as Notification[]);
     } catch (err) {
-      console.error('Error fetching notifications:', err);
+      logger.error('Error fetching notifications:', err);
       setError(err instanceof Error ? err.message : 'Error loading notifications');
     } finally {
       setIsLoading(false);
@@ -154,7 +155,7 @@ export function useNotifications(): UseNotificationsReturn {
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
     } catch (err) {
-      console.error('Error marking notification as read:', err);
+      logger.error('Error marking notification as read:', err);
     }
   }, []);
 
@@ -170,7 +171,7 @@ export function useNotifications(): UseNotificationsReturn {
 
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (err) {
-      console.error('Error marking all as read:', err);
+      logger.error('Error marking all as read:', err);
     }
   }, [user]);
 

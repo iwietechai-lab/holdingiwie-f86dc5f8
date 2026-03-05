@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DashboardVisibility, DEFAULT_DASHBOARD_VISIBILITY } from '@/types/superadmin';
+import { logger } from '@/utils/logger';
 import { resetGlobalVerification, clearVerificationStorage } from '@/utils/verificationState';
 
 interface UserProfile {
@@ -42,7 +43,7 @@ export const useSupabaseAuth = () => {
     try {
       const { data, error } = await supabase.rpc('is_superadmin');
       if (error) {
-        console.error('Error checking superadmin status:', error);
+        logger.error('Error checking superadmin status:', error);
         return false;
       }
       return !!data;
@@ -82,7 +83,7 @@ export const useSupabaseAuth = () => {
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        logger.error('Error fetching user profile:', error);
         if (isSuperadmin) {
           return {
             id: userId,
@@ -123,7 +124,7 @@ export const useSupabaseAuth = () => {
         dashboard_visibility: dashboardVisibility,
       };
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      logger.error('Error fetching user profile:', error);
       return null;
     }
   }, [checkIsSuperadmin]);
@@ -132,7 +133,7 @@ export const useSupabaseAuth = () => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, session ? 'has session' : 'no session');
+        logger.log('Auth state change:', event, session ? 'has session' : 'no session');
         
         setAuthState(prev => ({
           ...prev,
@@ -165,7 +166,7 @@ export const useSupabaseAuth = () => {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       // Handle session errors (like invalid refresh token)
       if (error) {
-        console.error('Error getting session:', error);
+        logger.error('Error getting session:', error);
         // Clear any invalid session state and redirect to login
         setAuthState({
           user: null,
@@ -195,7 +196,7 @@ export const useSupabaseAuth = () => {
       }
     }).catch(err => {
       // Catch any unhandled errors
-      console.error('Unhandled session error:', err);
+      logger.error('Unhandled session error:', err);
       setAuthState({
         user: null,
         session: null,
@@ -264,10 +265,10 @@ export const useSupabaseAuth = () => {
       });
 
       if (error) {
-        console.error('Error logging access:', error);
+        logger.error('Error logging access:', error);
       }
     } catch (error) {
-      console.error('Error logging access:', error);
+      logger.error('Error logging access:', error);
     }
   }, [getLocation]);
 

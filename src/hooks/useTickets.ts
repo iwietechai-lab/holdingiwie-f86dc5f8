@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Ticket } from '@/types/organization';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { logger } from '@/utils/logger';
 
 interface UseTicketsReturn {
   tickets: Ticket[];
@@ -32,7 +33,6 @@ export function useTickets(): UseTicketsReturn {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Only show non-deleted tickets unless includeDeleted is true (for CEO)
       if (!includeDeleted) {
         query = query.or('is_deleted.is.null,is_deleted.eq.false');
       }
@@ -42,7 +42,7 @@ export function useTickets(): UseTicketsReturn {
       if (fetchError) throw fetchError;
       setTickets((data || []) as unknown as Ticket[]);
     } catch (err) {
-      console.error('Error fetching tickets:', err);
+      logger.error('Error fetching tickets:', err);
       setError(err instanceof Error ? err.message : 'Error loading tickets');
     } finally {
       setIsLoading(false);
@@ -67,7 +67,7 @@ export function useTickets(): UseTicketsReturn {
       await fetchTickets();
       return { success: true, data: data as unknown as Ticket };
     } catch (err) {
-      console.error('Error creating ticket:', err);
+      logger.error('Error creating ticket:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error creating ticket' };
     }
   }, [user, profile, fetchTickets]);
@@ -92,7 +92,7 @@ export function useTickets(): UseTicketsReturn {
       await fetchTickets();
       return { success: true };
     } catch (err) {
-      console.error('Error updating ticket:', err);
+      logger.error('Error updating ticket:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error updating ticket' };
     }
   }, [fetchTickets]);
@@ -125,7 +125,7 @@ export function useTickets(): UseTicketsReturn {
       await fetchTickets();
       return { success: true };
     } catch (err) {
-      console.error('Error soft deleting ticket:', err);
+      logger.error('Error soft deleting ticket:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error deleting ticket' };
     }
   }, [user, fetchTickets]);
