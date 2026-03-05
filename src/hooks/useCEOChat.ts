@@ -141,7 +141,7 @@ export function useCEOChat() {
       if (error) throw error;
       setCompanies((data || []) as Company[]);
     } catch (error) {
-      console.error('Error loading companies:', error);
+      logger.error('Error loading companies:', error);
     }
   }, []);
 
@@ -163,7 +163,7 @@ export function useCEOChat() {
       
       setProjects(enriched);
     } catch (error) {
-      console.error('Error loading projects:', error);
+      logger.error('Error loading projects:', error);
     }
   }, [companies]);
 
@@ -189,7 +189,7 @@ export function useCEOChat() {
         attachments: Array.isArray(t.attachments) ? t.attachments as unknown as CEOAttachment[] : []
       })) as unknown as CEOThought[]);
     } catch (error) {
-      console.error('Error loading thoughts:', error);
+      logger.error('Error loading thoughts:', error);
     }
   }, []);
 
@@ -212,7 +212,7 @@ export function useCEOChat() {
         attachments: Array.isArray(m.attachments) ? m.attachments as unknown as CEOAttachment[] : []
       })) as unknown as CEOInternalMessage[]);
     } catch (error) {
-      console.error('Error loading internal messages:', error);
+      logger.error('Error loading internal messages:', error);
     }
   }, []);
 
@@ -249,7 +249,7 @@ export function useCEOChat() {
 
       setTeamSubmissions(enriched as CEOTeamSubmission[]);
     } catch (error) {
-      console.error('Error loading team submissions:', error);
+      logger.error('Error loading team submissions:', error);
     }
   }, [projects]);
 
@@ -265,7 +265,7 @@ export function useCEOChat() {
       if (error) throw error;
       setPendingReviews((data || []) as CEOPendingReview[]);
     } catch (error) {
-      console.error('Error loading pending reviews:', error);
+      logger.error('Error loading pending reviews:', error);
     }
   }, []);
 
@@ -291,7 +291,7 @@ export function useCEOChat() {
       
       setReports(enriched as CEOInternalReport[]);
     } catch (error) {
-      console.error('Error loading reports:', error);
+      logger.error('Error loading reports:', error);
     }
   }, [projects]);
 
@@ -314,7 +314,7 @@ export function useCEOChat() {
       toast.success('Proyecto creado');
       return newProject;
     } catch (error) {
-      console.error('Error creating project:', error);
+      logger.error('Error creating project:', error);
       toast.error('Error al crear proyecto');
       return null;
     }
@@ -347,7 +347,7 @@ export function useCEOChat() {
         size: file.size
       };
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       toast.error('Error al subir archivo');
       return null;
     }
@@ -381,7 +381,7 @@ export function useCEOChat() {
       toast.success('Pensamiento guardado');
       return true;
     } catch (error) {
-      console.error('Error creating thought:', error);
+      logger.error('Error creating thought:', error);
       toast.error('Error al guardar pensamiento');
       return false;
     }
@@ -459,7 +459,7 @@ export function useCEOChat() {
       await loadInternalMessages(projectId || selectedProjectId);
       return response;
     } catch (error) {
-      console.error('Error sending internal message:', error);
+      logger.error('Error sending internal message:', error);
       toast.error('Error al enviar mensaje');
       return null;
     } finally {
@@ -508,7 +508,7 @@ export function useCEOChat() {
       toast.success('Informe generado exitosamente');
       return data;
     } catch (error) {
-      console.error('Error generating report:', error);
+      logger.error('Error generating report:', error);
       toast.error('Error al generar informe');
       return null;
     }
@@ -541,7 +541,7 @@ export function useCEOChat() {
 
       setUserSubmissions(enriched as CEOTeamSubmission[]);
     } catch (error) {
-      console.error('Error loading user submissions:', error);
+      logger.error('Error loading user submissions:', error);
     }
   }, [user?.id, profile]);
 
@@ -551,7 +551,7 @@ export function useCEOChat() {
   const truncateContent = (content: string): string => {
     if (content.length <= MAX_CONTENT_LENGTH) return content;
     
-    console.log(`📝 Content too long (${content.length} chars), truncating to ${MAX_CONTENT_LENGTH}...`);
+    logger.log(`📝 Content too long (${content.length} chars), truncating to ${MAX_CONTENT_LENGTH}...`);
     const truncated = content.substring(0, MAX_CONTENT_LENGTH);
     return truncated + `\n\n[... CONTENIDO TRUNCADO - El documento tiene ${content.length.toLocaleString()} caracteres, se muestran los primeros ${MAX_CONTENT_LENGTH.toLocaleString()} para el análisis ...]`;
   };
@@ -559,26 +559,26 @@ export function useCEOChat() {
   // Parse file content in the browser
   const parseFileContent = async (file: File): Promise<string> => {
     const fileName = file.name.toLowerCase();
-    console.log('📄 Parsing file:', fileName, 'Type:', file.type, 'Size:', file.size);
+    logger.log('📄 Parsing file:', fileName, 'Type:', file.type, 'Size:', file.size);
     
     // Handle Excel files - Using ExcelJS (secure alternative to xlsx)
     // Security: ExcelJS has no known high-severity vulnerabilities
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       try {
-        console.log('📊 Reading Excel file with ExcelJS...');
+        logger.log('📊 Reading Excel file with ExcelJS...');
         const arrayBuffer = await file.arrayBuffer();
-        console.log('📊 ArrayBuffer size:', arrayBuffer.byteLength);
+        logger.log('📊 ArrayBuffer size:', arrayBuffer.byteLength);
         
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
         
-        console.log('📊 Workbook sheets:', workbook.worksheets.map(ws => ws.name));
+        logger.log('📊 Workbook sheets:', workbook.worksheets.map(ws => ws.name));
         let content = `=== ARCHIVO EXCEL: ${file.name} ===\n`;
         content += `Total de hojas: ${workbook.worksheets.length}\n`;
         
         for (const sheet of workbook.worksheets) {
           content += `\n\n========== HOJA: ${sheet.name} ==========\n\n`;
-          console.log(`📊 Sheet "${sheet.name}" has ${sheet.rowCount} rows`);
+          logger.log(`📊 Sheet "${sheet.name}" has ${sheet.rowCount} rows`);
           
           // Extract row data
           if (sheet.rowCount > 0) {
@@ -600,8 +600,8 @@ export function useCEOChat() {
           }
         }
         
-        console.log('📊 Total extracted content length:', content.length);
-        console.log('📊 First 1000 chars:', content.substring(0, 1000));
+        logger.log('📊 Total extracted content length:', content.length);
+        logger.log('📊 First 1000 chars:', content.substring(0, 1000));
         
         if (content.length < 100) {
           return `[Archivo Excel "${file.name}" parece estar vacío o corrupto. Tamaño: ${file.size} bytes]`;
@@ -609,7 +609,7 @@ export function useCEOChat() {
         
         return truncateContent(content);
       } catch (error) {
-        console.error('❌ Error parsing Excel:', error);
+        logger.error('❌ Error parsing Excel:', error);
         return `[Error al parsear Excel "${file.name}": ${error instanceof Error ? error.message : 'Unknown'}. Por favor, intenta exportar a CSV.]`;
       }
     }
@@ -636,32 +636,32 @@ export function useCEOChat() {
     
     // Handle PDF files - extract text using pdf.js approach
     if (fileName.endsWith('.pdf')) {
-      console.log('📄 Processing PDF file...');
+      logger.log('📄 Processing PDF file...');
       try {
         // For PDFs, we'll indicate to the backend that parsing is needed
         // The backend edge function will use the Lovable document parser
         return `[PDF_REQUIRES_PARSING:${file.name}:${file.size}]`;
       } catch (error) {
-        console.error('❌ Error with PDF:', error);
+        logger.error('❌ Error with PDF:', error);
         return `[Error al procesar PDF "${file.name}". Intente copiar el texto del documento.]`;
       }
     }
     
     // Handle Word documents (.docx, .doc)
     if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-      console.log('📄 Processing Word file...');
+      logger.log('📄 Processing Word file...');
       try {
         // For Word docs, indicate to backend that parsing is needed
         return `[WORD_REQUIRES_PARSING:${file.name}:${file.size}]`;
       } catch (error) {
-        console.error('❌ Error with Word:', error);
+        logger.error('❌ Error with Word:', error);
         return `[Error al procesar Word "${file.name}". Intente copiar el texto del documento.]`;
       }
     }
     
     // Handle PowerPoint files
     if (fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) {
-      console.log('📄 Processing PowerPoint file...');
+      logger.log('📄 Processing PowerPoint file...');
       return `[PPT_REQUIRES_PARSING:${file.name}:${file.size}]`;
     }
     
@@ -686,10 +686,10 @@ export function useCEOChat() {
 
       if (data.file) {
         // Parse file content in the browser BEFORE uploading
-        console.log('Parsing file content in browser...');
+        logger.log('Parsing file content in browser...');
         const extractedContent = await parseFileContent(data.file);
         parsedContent = extractedContent;
-        console.log('Extracted content length:', parsedContent.length);
+        logger.log('Extracted content length:', parsedContent.length);
 
         // Sanitize filename to avoid invalid characters
         const sanitizedFileName = data.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -699,7 +699,7 @@ export function useCEOChat() {
           .upload(filePath, data.file);
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
+          logger.error('Upload error:', uploadError);
           throw new Error(`Error al subir archivo: ${uploadError.message}`);
         }
 
@@ -729,7 +729,7 @@ export function useCEOChat() {
         .single();
 
       if (error) {
-        console.error('Insert error:', error);
+        logger.error('Insert error:', error);
         throw new Error(`Error al guardar documento: ${error.message}`);
       }
 
@@ -762,14 +762,14 @@ export function useCEOChat() {
             });
         }
       }).catch(err => {
-        console.error('AI analysis error:', err);
+        logger.error('AI analysis error:', err);
       });
 
       toast.success('Documento enviado para análisis del CEO');
       await loadUserSubmissions();
       return submission;
     } catch (error: any) {
-      console.error('Error submitting for review:', error);
+      logger.error('Error submitting for review:', error);
       toast.error(error.message || 'Error al enviar documento');
       return null;
     } finally {
@@ -787,7 +787,7 @@ export function useCEOChat() {
       
       await loadPendingReviews();
     } catch (error) {
-      console.error('Error marking review as read:', error);
+      logger.error('Error marking review as read:', error);
     }
   };
 
@@ -806,7 +806,7 @@ export function useCEOChat() {
       await loadTeamSubmissions();
       toast.success('Notas guardadas');
     } catch (error) {
-      console.error('Error updating notes:', error);
+      logger.error('Error updating notes:', error);
       toast.error('Error al guardar notas');
     }
   };
@@ -860,7 +860,7 @@ export function useCEOChat() {
       
       return null;
     } catch (error: any) {
-      console.error('Error analyzing submission:', error);
+      logger.error('Error analyzing submission:', error);
       toast.error('Error al analizar documento');
       return null;
     }
