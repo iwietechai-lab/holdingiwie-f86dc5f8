@@ -36,7 +36,17 @@ import { CameraProvider } from "./contexts/CameraContext";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
 // QueryClient for React Query data fetching
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        if (error?.status === 401 || error?.status === 403) return false;
+        return failureCount < 2;
+      },
+      staleTime: 1000 * 60 * 5,
+    },
+  },
+});
 
 // Protected route with facial verification and mobile blocking for dashboard pages
 const ProtectedRoute = ({ children, blockMobile = false }: { children: React.ReactNode; blockMobile?: boolean }) => (
