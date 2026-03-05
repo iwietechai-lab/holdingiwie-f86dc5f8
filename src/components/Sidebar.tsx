@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   X,
   Target,
+  LineChart,
   Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -140,6 +141,7 @@ export const Sidebar = ({ selectedCompany, onSelectCompany }: SidebarProps) => {
     { icon: ClipboardList, label: 'AI Tareas', action: 'navigate', path: '/ai-tareas' },
     { icon: Bell, label: 'Gestor Notificaciones', action: 'navigate', path: '/configuracion' },
     { icon: Brain, label: 'Brain Galaxy', action: 'navigate', path: '/brain-galaxy' },
+    { icon: LineChart, label: 'Finanzas', action: 'navigate', path: '/finanzas' },
     { icon: Network, label: 'Organización', action: 'navigate', path: '/organizacion' },
     { icon: BarChart3, label: 'Reportes', action: 'dev' },
     // Only show superadmin panel to the superadmin user
