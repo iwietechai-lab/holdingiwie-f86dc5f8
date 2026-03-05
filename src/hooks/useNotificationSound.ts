@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useNotificationPreferences } from './useNotificationPreferences';
 import { NotificationType } from '@/types/notification-sounds';
+import { logger } from '@/utils/logger';
 
 interface UseNotificationSoundReturn {
   playSound: (soundPath: string, volume?: number) => void;
@@ -34,10 +35,10 @@ export function useNotificationSound(): UseNotificationSoundReturn {
         audio.volume = volume / 100;
         audio.currentTime = 0;
         audio.play().catch((err) => {
-          console.warn('Could not play notification sound:', err);
+          logger.warn('Could not play notification sound:', err);
         });
       } catch (err) {
-        console.error('Error playing sound:', err);
+        logger.error('Error playing sound:', err);
       }
     },
     [getAudio]
@@ -80,10 +81,10 @@ export function useNotificationSound(): UseNotificationSoundReturn {
         audio.volume = 0.7;
         previewAudioRef.current = audio;
         audio.play().catch((err) => {
-          console.warn('Could not preview sound:', err);
+          logger.warn('Could not preview sound:', err);
         });
       } catch (err) {
-        console.error('Error previewing sound:', err);
+        logger.error('Error previewing sound:', err);
       }
     },
     []

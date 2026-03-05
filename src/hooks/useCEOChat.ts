@@ -4,6 +4,7 @@ import { useSupabaseAuth } from './useSupabaseAuth';
 import { useSuperadmin } from './useSuperadmin';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
+import { logger } from '@/utils/logger';
 
 export interface Company {
   id: string;

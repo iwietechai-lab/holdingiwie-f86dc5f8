@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import Peer, { MediaConnection } from 'peerjs';
+import { logger } from '@/utils/logger';
 
 interface Participant {
   oderId: string;

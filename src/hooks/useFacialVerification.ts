@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/utils/logger';
 
 const VERIFICATION_TIMEOUT_MINUTES = 30;
 const SESSION_KEY = 'facial_verification_session';

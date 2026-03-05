@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DashboardVisibility } from '@/types/superadmin';
+import { logger } from '@/utils/logger';
 
 export interface UserProfile {
   id: string;
@@ -45,24 +46,22 @@ export function useUserManagement() {
   const [canManageUsers, setCanManageUsers] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
-  // Check superadmin status first
   const checkSuperadminStatus = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error: rpcError } = await supabase.rpc('is_superadmin');
       
       if (rpcError) {
-        console.error('Error checking superadmin:', rpcError);
+        logger.error('Error checking superadmin:', rpcError);
         return false;
       }
       
       return data === true;
     } catch (err) {
-      console.error('Error in superadmin check:', err);
+      logger.error('Error in superadmin check:', err);
       return false;
     }
   }, []);
 
-  // Check if user has gestionar_usuarios permission
   const checkUserManagementPermission = useCallback(async (): Promise<{ canManage: boolean; companyId: string | null }> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -84,7 +83,7 @@ export function useUserManagement() {
         companyId: profile.company_id 
       };
     } catch (err) {
-      console.error('Error checking management permission:', err);
+      logger.error('Error checking management permission:', err);
       return { canManage: false, companyId: null };
     }
   }, []);
@@ -94,27 +93,22 @@ export function useUserManagement() {
     setError(null);
 
     try {
-      // Check superadmin status using SECURITY DEFINER function
       const superadminStatus = await checkSuperadminStatus();
       setIsSuperadmin(superadminStatus);
       
-      // Check user management permission for non-superadmins
       const { canManage, companyId } = await checkUserManagementPermission();
       setCanManageUsers(canManage);
       setUserCompanyId(companyId);
 
-      // User must be either superadmin or have gestionar_usuarios permission
       if (!superadminStatus && !canManage) {
         throw new Error('No tienes permisos para ver usuarios');
       }
 
-      // Build query - filter by company if not superadmin
       let query = supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Non-superadmins can only see users from their company
       if (!superadminStatus && canManage && companyId) {
         query = query.eq('company_id', companyId);
       }
@@ -122,25 +116,22 @@ export function useUserManagement() {
       const { data: profiles, error: profilesError } = await query;
       
       if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+        logger.error('Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      // Fetch user roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
       
       const userRoles = rolesError ? [] : (rolesData || []);
 
-      // Fetch access logs - RLS will handle permissions
       let logsQuery = supabase
         .from('access_logs')
         .select('*')
         .order('timestampt', { ascending: false })
         .limit(500);
 
-      // Filter logs by company users if not superadmin
       if (!superadminStatus && canManage && companyId && profiles) {
         const userIds = profiles.map(p => p.id);
         if (userIds.length > 0) {
@@ -151,7 +142,6 @@ export function useUserManagement() {
       const { data: logsData, error: logsError } = await logsQuery;
       const accessLogs = logsError ? [] : (logsData || []);
 
-      // Combine data
       const usersWithDetails: UserWithDetails[] = (profiles || []).map((profile) => {
         const roles = userRoles
           .filter((r: any) => r.user_id === profile.id)
@@ -182,7 +172,7 @@ export function useUserManagement() {
 
       setUsers(usersWithDetails);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      logger.error('Error fetching users:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar usuarios');
     } finally {
       setIsLoading(false);
@@ -194,13 +184,11 @@ export function useUserManagement() {
   }, [fetchUsers]);
 
   const addRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
-    // Only superadmin can add roles
     if (!isSuperadmin) {
       return { success: false, error: 'Solo superadmin puede modificar roles' };
     }
 
     try {
-      // Insert role into user_roles table
       const { error } = await supabase
         .from('user_roles')
         .insert({ user_id: userId, role })
@@ -208,7 +196,6 @@ export function useUserManagement() {
 
       if (error) throw error;
       
-      // Also update role in user_profiles for compatibility
       await supabase
         .from('user_profiles')
         .update({ role })
@@ -217,13 +204,12 @@ export function useUserManagement() {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error adding role:', err);
+      logger.error('Error adding role:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al agregar rol' };
     }
   };
 
   const removeRole = async (userId: string, role: 'superadmin' | 'manager' | 'employee') => {
-    // Only superadmin can remove roles
     if (!isSuperadmin) {
       return { success: false, error: 'Solo superadmin puede modificar roles' };
     }
@@ -237,7 +223,6 @@ export function useUserManagement() {
 
       if (error) throw error;
       
-      // Update user_profiles role to 'user'
       await supabase
         .from('user_profiles')
         .update({ role: 'user' })
@@ -246,18 +231,16 @@ export function useUserManagement() {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error removing role:', err);
+      logger.error('Error removing role:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al eliminar rol' };
     }
   };
 
   const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
-    // Either superadmin or manager with gestionar_usuarios can update profiles in their company
     if (!isSuperadmin && !canManageUsers) {
       return { success: false, error: 'No autorizado' };
     }
 
-    // Non-superadmins can only update users from their company
     if (!isSuperadmin && canManageUsers) {
       const targetUser = users.find(u => u.id === userId);
       if (targetUser?.company_id !== userCompanyId) {
@@ -266,7 +249,6 @@ export function useUserManagement() {
     }
 
     try {
-      // Remove has_full_access from updates if it exists - it's computed
       const { has_full_access, ...profileUpdates } = updates as any;
       
       const { error } = await supabase
@@ -278,7 +260,7 @@ export function useUserManagement() {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error updating user:', err);
+      logger.error('Error updating user:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar usuario' };
     }
   };
@@ -292,18 +274,15 @@ export function useUserManagement() {
       department?: string;
     }
   ) => {
-    // Either superadmin or manager with gestionar_usuarios can update
     if (!isSuperadmin && !canManageUsers) {
       return { success: false, error: 'No autorizado' };
     }
 
-    // Non-superadmins can only update users from their company
     if (!isSuperadmin && canManageUsers) {
       const targetUser = users.find(u => u.id === userId);
       if (targetUser?.company_id !== userCompanyId) {
         return { success: false, error: 'Solo puedes editar usuarios de tu empresa' };
       }
-      // Non-superadmins cannot change the company_id
       if (updates.company_id !== userCompanyId) {
         return { success: false, error: 'No puedes cambiar la empresa del usuario' };
       }
@@ -324,19 +303,17 @@ export function useUserManagement() {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error updating user:', err);
+      logger.error('Error updating user:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al actualizar usuario' };
     }
   };
 
   const deleteUser = async (userId: string) => {
-    // Only superadmin can delete users
     if (!isSuperadmin) {
       return { success: false, error: 'Solo superadmin puede eliminar usuarios' };
     }
 
     try {
-      // Delete profile
       const { error } = await supabase
         .from('user_profiles')
         .delete()
@@ -346,14 +323,13 @@ export function useUserManagement() {
       await fetchUsers();
       return { success: true };
     } catch (err) {
-      console.error('Error deleting user:', err);
+      logger.error('Error deleting user:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al eliminar usuario' };
     }
   };
 
   const getAccessLogsByUser = async (userId: string) => {
     try {
-      // Non-superadmins can only view logs for users in their company
       if (!isSuperadmin && canManageUsers) {
         const targetUser = users.find(u => u.id === userId);
         if (targetUser?.company_id !== userCompanyId) {
@@ -371,7 +347,7 @@ export function useUserManagement() {
       if (error) throw error;
       return { success: true, data: data || [] };
     } catch (err) {
-      console.error('Error fetching access logs:', err);
+      logger.error('Error fetching access logs:', err);
       return { success: false, error: err instanceof Error ? err.message : 'Error al cargar logs', data: [] };
     }
   };
